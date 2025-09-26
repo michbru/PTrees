@@ -21,10 +21,10 @@ def _open_session():
     Platform requires proper RDP credentials configured in your JSON config.
     """
     if SESSION_TYPE == "platform":
-        # relies on lseg-data.config.json with platform credentials, or env vars
-        return ld.open_platform_session(app_key=APP_KEY)
+        # Use the configured platform session
+        return ld.open_session('platform.rdp')
     else:
-        return ld.open_desktop_session(app_key=APP_KEY)
+        return ld.open_session()
 
 
 @contextmanager

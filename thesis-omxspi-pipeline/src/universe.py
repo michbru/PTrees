@@ -14,10 +14,11 @@ def _fetch_constituents_asof(date: pd.Timestamp) -> pd.DataFrame:
     """
     chain = f"0#{INDEX_RIC}({to_yyyymmdd(date)})"
     df = ld.get_data(chain, ["TR.RIC"])  # can add TR.CommonName if desired
-    # Normalize
+    # Handle column name - could be 'RIC' or 'TR.RIC'
+    ric_col = "RIC" if "RIC" in df.columns else "TR.RIC"
     out = pd.DataFrame({
         "date": [date] * len(df),
-        "ric": df["TR.RIC"].tolist()
+        "ric": df[ric_col].tolist()
     })
     return out
 

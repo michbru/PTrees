@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(.venv/Scripts/python.exe:*)",
+      "WebSearch"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

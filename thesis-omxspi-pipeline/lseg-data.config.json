@@ -1,5 +1,15 @@
 {
-  "session": {
-    "type": "desktop"
-  }
+  "sessions": {
+    "platform": {
+      "rdp": {
+        "app-key": "843bc404f3fe447eb359594f8f66faa215cf560b",
+        "username": "25895@student.hhs.se",
+        "password": "Flinschforce14",
+        "grant_type": "password",
+        "scope": "trapi",
+        "signon_control": true
+      }
+    }
+  },
+  "default-session": "platform.rdp"
 }
