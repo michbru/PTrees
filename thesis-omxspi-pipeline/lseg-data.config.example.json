@@ -1,0 +1,10 @@
+{
+  "session": {
+    "type": "desktop"
+  },
+  "platform": {
+    "appKey": "YOUR_RDP_APP_KEY",
+    "username": "YOUR_RDP_USERNAME",
+    "password": "YOUR_RDP_PASSWORD"
+  }
+}
