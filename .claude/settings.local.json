@@ -6,7 +6,8 @@
       "WebSearch",
       "Bash(python3:*)",
       "Bash(.venv/bin/python:*)",
-      "Bash(source:*)"
+      "Bash(source:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []
