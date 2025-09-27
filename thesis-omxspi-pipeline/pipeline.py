@@ -408,8 +408,13 @@ def get_stockholm_exchange_rics():
 
             current_rics = []
             if current_companies is not None and not current_companies.empty:
-                current_rics = [str(ric) for ric in current_companies.index.tolist()]
+                # Use the 'Instrument' column if it exists, otherwise use index
+                if 'Instrument' in current_companies.columns:
+                    current_rics = current_companies['Instrument'].dropna().astype(str).tolist()
+                else:
+                    current_rics = [str(ric) for ric in current_companies.index.tolist()]
                 print(f"Found {len(current_rics)} current OMX Stockholm companies")
+                print(f"Sample RICs: {current_rics[:5]}")
 
             # Get historical Stockholm Exchange companies (including delisted)
             print("Fetching historical/delisted Stockholm Exchange companies...")
@@ -420,7 +425,11 @@ def get_stockholm_exchange_rics():
 
             historical_rics = []
             if historical_companies is not None and not historical_companies.empty:
-                historical_rics = [str(ric) for ric in historical_companies.index.tolist()]
+                # Use the 'Instrument' column if it exists, otherwise use index
+                if 'Instrument' in historical_companies.columns:
+                    historical_rics = historical_companies['Instrument'].dropna().astype(str).tolist()
+                else:
+                    historical_rics = [str(ric) for ric in historical_companies.index.tolist()]
                 print(f"Found {len(historical_rics)} historical Stockholm Exchange companies")
 
             # Combine and deduplicate
@@ -438,8 +447,13 @@ def get_stockholm_exchange_rics():
                     fields=["TR.CommonName"]
                 )
                 if fallback is not None and not fallback.empty:
-                    fallback_rics = [str(ric) for ric in fallback.index.tolist()]
+                    # Use the 'Instrument' column if it exists, otherwise use index
+                    if 'Instrument' in fallback.columns:
+                        fallback_rics = fallback['Instrument'].dropna().astype(str).tolist()
+                    else:
+                        fallback_rics = [str(ric) for ric in fallback.index.tolist()]
                     print(f"Using fallback: {len(fallback_rics)} companies from OMXSPI")
+                    print(f"Sample fallback RICs: {fallback_rics[:5]}")
                     return fallback_rics
             except:
                 pass
