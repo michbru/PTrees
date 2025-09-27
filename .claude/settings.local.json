@@ -3,7 +3,9 @@
     "allow": [
       "Bash(python:*)",
       "Bash(.venv/Scripts/python.exe:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(python3:*)",
+      "Bash(.venv/bin/python:*)"
     ],
     "deny": [],
     "ask": []
