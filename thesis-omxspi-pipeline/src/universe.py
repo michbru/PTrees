@@ -5,11 +5,11 @@ from .lseg_session import session_scope
 import lseg.data as ld
 from .dates import month_ends, to_yyyymmdd
 
-INDEX_RIC = ".OMXSPI"  # OMX Stockholm All-Share
+INDEX_RIC = ".OMXS30"  # OMX Stockholm 30 (smaller universe for testing)
 
 
 def _fetch_constituents_asof(date: pd.Timestamp) -> pd.DataFrame:
-    """Return RIC list for .OMXSPI *as of* the given date (historical snapshot).
+    """Return RIC list for .OMXS30 *as of* the given date (historical snapshot).
     Uses chain syntax 0#.INDEXRIC(YYYYMMDD).
     """
     chain = f"0#{INDEX_RIC}({to_yyyymmdd(date)})"
@@ -29,7 +29,7 @@ def build_universe(start: str, end: str) -> pd.DataFrame:
     dates = month_ends(start, end)
     frames = []
     with session_scope():
-        for d in tqdm(dates, desc="OMXSPI constituents by month-end"):
+        for d in tqdm(dates, desc="OMXS30 constituents by month-end"):
             try:
                 frames.append(_fetch_constituents_asof(d))
             except Exception as e:

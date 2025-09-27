@@ -74,7 +74,21 @@ def _pull_block(rics: list[str], fields: list[str], start: str, end: str, frq: s
             return pd.DataFrame(columns=["ric", "date"])
         # Generic Date shape
         if "Date" in group_df.columns and inst_col in group_df.columns:
+            # Coalesce duplicate 'Date' columns if present
+            date_cols = [c for c in group_df.columns if c == "Date"]
+            if len(date_cols) > 1:
+                merged_date = group_df[date_cols[0]].copy()
+                for dc in date_cols[1:]:
+                    merged_date = merged_date.fillna(group_df[dc]).infer_objects(copy=False)
+                group_df = group_df.drop(columns=date_cols[1:]).copy()
+                group_df["Date"] = merged_date
+
+            # Drop any remaining duplicate column labels to avoid pandas selection errors
+            group_df = group_df.loc[:, ~group_df.columns.duplicated(keep='first')]
+
             out = group_df.rename(columns={inst_col: "ric", "Date": "date"}).copy()
+            # Ensure unique column labels
+            out = out.loc[:, ~out.columns.duplicated(keep='first')]
             col_map = {}
             for c in out.columns:
                 if c.startswith("TR."):
@@ -86,7 +100,15 @@ def _pull_block(rics: list[str], fields: list[str], start: str, end: str, frq: s
                 out = out.rename(columns=col_map)
             keep_cols = ["ric", "date"] + list(col_map.values())
             keep_cols = [c for c in keep_cols if c in out.columns]
-            return out[keep_cols].dropna(subset=["date"]) if keep_cols else pd.DataFrame(columns=["ric", "date"])
+            if keep_cols:
+                res = out[keep_cols].copy()
+                # Normalize date dtype
+                res["date"] = pd.to_datetime(res["date"], errors='coerce')
+                # Drop remaining duplicate column labels, if any
+                res = res.loc[:, ~res.columns.duplicated(keep='first')]
+                return res.dropna(subset=["date"]) 
+            else:
+                return pd.DataFrame(columns=["ric", "date"])
 
         # .date/value pairs
         date_cols = [c for c in group_df.columns if c.endswith(".date")]
@@ -106,6 +128,9 @@ def _pull_block(rics: list[str], fields: list[str], start: str, end: str, frq: s
         out = melted[0]
         for m in melted[1:]:
             out = out.merge(m, on=["ric", "date"], how="outer")
+        # Ensure unique columns and proper date dtype
+        out = out.loc[:, ~out.columns.duplicated(keep='first')]
+        out["date"] = pd.to_datetime(out["date"], errors='coerce')
         return out
 
     def fetch_group(group_fields: list[str]) -> pd.DataFrame:
@@ -117,7 +142,7 @@ def _pull_block(rics: list[str], fields: list[str], start: str, end: str, frq: s
             return pd.DataFrame(columns=["ric", "date"])  # let caller try splitting
 
     # Split fields into small groups to avoid parser issues
-    group_size = 6
+    group_size = 3
     groups = [fields[i:i+group_size] for i in range(0, len(fields), group_size)]
 
     group_results: list[pd.DataFrame] = []
@@ -151,7 +176,10 @@ def _pull_block(rics: list[str], fields: list[str], start: str, end: str, frq: s
     out = group_results[0]
     for part in group_results[1:]:
         out = out.merge(part, on=["ric", "date"], how="outer")
-    return out
+    # Final cleanup
+    out = out.loc[:, ~out.columns.duplicated(keep='first')]
+    out["date"] = pd.to_datetime(out["date"], errors='coerce')
+    return out.dropna(subset=["date"]) if not out.empty else out
 
 
 def pull_fundamentals(universe: pd.DataFrame, start: str, end: str, curn: str | None = "SEK") -> pd.DataFrame:
@@ -159,7 +187,7 @@ def pull_fundamentals(universe: pd.DataFrame, start: str, end: str, curn: str | 
     frames_q, frames_a = [], []
 
     with session_scope():
-        for batch in tqdm(list(chunks(rics, 25)), desc="Fundamentals Q"):
+        for batch in tqdm(list(chunks(rics, 15)), desc="Fundamentals Q"):
             try:
                 # Try full field set first
                 result = _pull_block(batch, FUND_Q_FIELDS, start, end, frq="Q", curn=curn)
@@ -177,7 +205,7 @@ def pull_fundamentals(universe: pd.DataFrame, start: str, end: str, curn: str | 
                 print(f"   Error in fundamentals batch: {e}")
                 frames_q.append(pd.DataFrame({"ric": batch, "error": str(e)}))
 
-        for batch in tqdm(list(chunks(rics, 25)), desc="Fundamentals A"):
+        for batch in tqdm(list(chunks(rics, 15)), desc="Fundamentals A"):
             try:
                 # Try full field set first (use 'Y' for yearly)
                 result = _pull_block(batch, FUND_A_FIELDS, start, end, frq="Y", curn=curn)

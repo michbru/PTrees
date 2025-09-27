@@ -35,7 +35,7 @@ def merge_all(universe: pd.DataFrame, prices: pd.DataFrame, fundamentals: pd.Dat
         if "date" in fund.columns:
             fund["date"] = pd.to_datetime(fund["date"]).dt.normalize()
             # forward-fill fundamentals to month-end per ric
-            fund = fund.sort_values(["ric", "date"]).groupby("ric", group_keys=False).apply(lambda g: g.ffill()).reset_index(drop=True)
+            fund = fund.sort_values(["ric", "date"]).groupby("ric", group_keys=False).apply(lambda g: g.ffill().infer_objects(copy=False)).reset_index(drop=True)
             panel = panel.merge(fund, on=["ric", "date"], how="left")
             print(f"   Merged fundamentals successfully")
         else:

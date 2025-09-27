@@ -2,6 +2,11 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 import pandas as pd
+import warnings
+
+# Suppress FutureWarning about downcasting in pandas operations
+pd.set_option('future.no_silent_downcasting', False)
+warnings.filterwarnings('ignore', message='.*Downcasting object dtype arrays.*', category=FutureWarning)
 from .universe import build_universe
 from .prices import pull_prices, pull_daily_aux
 from .corporate_actions import pull_corporate_actions

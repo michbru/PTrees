@@ -184,7 +184,7 @@ def fill_missing_values(panel: pd.DataFrame, char_cols: List[str],
             missing_count = df[col].isna().sum()
             if missing_count > 0:
                 print(f"  {col}: {missing_count} missing values filled")
-                df[col] = df[col].fillna(fill_value)
+                df[col] = df[col].fillna(fill_value).infer_objects(copy=False)
 
     return df
 
@@ -252,7 +252,7 @@ def compute_excess_returns(panel: pd.DataFrame, factors: Optional[pd.DataFrame])
 
     # Compute excess returns
     if 'ret' in df.columns:
-        df['excess_ret'] = df['ret'] - df['rf'].fillna(0)
+        df['excess_ret'] = df['ret'] - df['rf'].fillna(0).infer_objects(copy=False)
     else:
         print("Warning: No return column found for excess return calculation")
 
