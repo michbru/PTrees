@@ -5,7 +5,8 @@
       "Bash(.venv/Scripts/python.exe:*)",
       "WebSearch",
       "Bash(python3:*)",
-      "Bash(.venv/bin/python:*)"
+      "Bash(.venv/bin/python:*)",
+      "Bash(source:*)"
     ],
     "deny": [],
     "ask": []
