@@ -7,3 +7,5 @@ lseg-data.config.json
 
 # Don't ignore CSV files in analysis_dataset/results/
 !analysis_dataset/results/*.csv
+# Exclude large final dataset (>50MB GitHub limit)
+analysis_dataset/results/ptrees_final_dataset.csv
