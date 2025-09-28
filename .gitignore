@@ -1,1 +1,9 @@
+# Directories to ignore
 thesis-omxspi-pipeline/
+.claude/
+
+# Configuration files to ignore
+lseg-data.config.json
+
+# Don't ignore CSV files in analysis_dataset/results/
+!analysis_dataset/results/*.csv
