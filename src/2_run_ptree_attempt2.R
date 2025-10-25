@@ -62,8 +62,8 @@ cat("\nLoading Swedish stock data (relaxed NA)...\n")
 ##### Load Swedish Data #####
 
 # Load the prepared Swedish data (self-contained - relative path)
-script_dir = getwd()
-data_path = file.path(dirname(script_dir), "results", "ptree_ready_data_full.csv")
+# Use relative path from project root
+data_path = "results/ptree_ready_data_full.csv"
 cat(sprintf("Reading from: %s\n", data_path))
 cat(sprintf("File exists: %s\n", file.exists(data_path)))
 
@@ -208,7 +208,7 @@ cat(paste(rep("=", 70), collapse=""), "\n")
 cat("Saving Results\n")
 cat(paste(rep("=", 70), collapse=""), "\n")
 
-output_dir = file.path(dirname(script_dir), "results")
+output_dir = "results"
 dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
 
 # Save fitted models
