@@ -21,13 +21,14 @@ PTrees/
 │   └── ptrees_final_dataset.csv     # Swedish stock data (102,823 obs, 1997-2022)
 ├── src/
 │   ├── 1_prepare_data_relaxed.py    # Data preprocessing (Python)
-│   ├── 2_run_ptree_attempt2.R       # P-Tree analysis (R)
-│   └── 3_debug_factors.R            # Diagnostics (R)
+│   └── 2_run_ptree_attempt2.R       # P-Tree analysis (R)
 ├── results/
 │   ├── ptree_factors.csv            # Final factor returns (MAIN RESULT)
 │   ├── ptree_models.RData           # Fitted P-Tree models
 │   └── ptree_ready_data_*.csv       # Processed data files
 ├── PTree-2501/                      # R package (original implementation)
+├── run_analysis.sh                  # One-command replication (Linux/Mac)
+├── run_analysis.bat                 # One-command replication (Windows)
 └── README.md                        # This file
 ```
 
@@ -54,74 +55,73 @@ This is a **realistic finding**, not a failure. It demonstrates that P-Trees req
 
 ---
 
-## Replication Instructions
+## Quick Replication
+
+**One-Command Replication:**
+```bash
+# Linux/Mac
+./run_analysis.sh
+
+# Windows
+run_analysis.bat
+```
+
+That's it! The script will run both steps automatically and show you the results.
+
+---
+
+## Detailed Setup & Replication
 
 ### Prerequisites
 
-**Python Environment:**
-```bash
-# Activate virtual environment (if using one)
-source .venv/bin/activate  # Linux/Mac
-.venv\Scripts\activate     # Windows
+**1. Install Required Software:**
+- Python 3.8+ ([download](https://www.python.org/downloads/))
+- R 4.0+ ([download](https://cran.r-project.org/))
 
-# Install required packages
+**2. Install Python Packages:**
+```bash
 pip install pandas numpy pyarrow
 ```
 
-**R Environment:**
+**3. Install R Packages:**
 ```r
-# Install required packages
+# Open R and run:
 install.packages(c("arrow", "rpart", "ranger", "data.table"))
 
 # Install P-Tree package (from local source)
 install.packages("PTree-2501/PTree", repos = NULL, type = "source")
 ```
 
-### Running the Analysis
+### Manual Step-by-Step (if not using the script)
 
 **Step 1: Prepare Data** (Python)
 ```bash
-cd /path/to/PTrees
 python src/1_prepare_data_relaxed.py
 ```
-This script:
 - Loads `data/ptrees_final_dataset.csv` (102,823 observations)
 - Creates 19 cross-sectional ranked characteristics
-- Handles missing data (keeps stocks with 10+ characteristics)
 - Outputs `results/ptree_ready_data_full.csv` (95,514 observations)
 
 **Step 2: Run P-Tree Analysis** (R)
 ```bash
 Rscript src/2_run_ptree_attempt2.R
 ```
-This script:
-- Loads processed data from Step 1
-- Runs P-Tree algorithm with parameters:
-  - `min_leaf_size = 10` (prevents overfitting)
-  - `equal_weight = FALSE` (value-weighted portfolios)
-  - `num_cutpoints = 4` (standard setting)
+- Runs P-Tree algorithm with conservative parameters
 - Outputs `results/ptree_factors.csv` (factor returns)
 
 **Step 3: View Results**
 ```bash
-# Open the main result file
+# View factor returns
 cat results/ptree_factors.csv
-
-# Or in R/Python for analysis
-# R: factors <- read.csv("results/ptree_factors.csv")
-# Python: factors = pd.read_csv("results/ptree_factors.csv")
 ```
 
 ### Expected Output
 
-After running both scripts, you should see:
+After running the analysis, you should see:
 - `results/ptree_ready_data_full.csv` (95,514 rows)
 - `results/ptree_factors.csv` (311 months of returns)
-- Console output showing:
-  - 95,514 observations processed
-  - ~307 stocks per month (average)
-  - Sharpe Ratio: 1.20
-  - Win Rate: 67.5%
+- **Sharpe Ratio: 1.20**
+- **Win Rate: 67.5%** (210/311 months positive)
 
 ---
 
