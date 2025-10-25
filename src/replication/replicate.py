@@ -96,6 +96,7 @@ def run_ptree_analysis():
     rscript_paths = [
         "Rscript",  # In PATH
         "/usr/bin/Rscript",  # WSL/Linux
+        "wsl Rscript",  # Call WSL R from Windows
         "C:\\Program Files\\R\\R-4.3.0\\bin\\Rscript.exe",  # Common Windows location
         "C:\\Program Files\\R\\R-4.2.0\\bin\\Rscript.exe",
         "C:\\Program Files\\R\\R-4.1.0\\bin\\Rscript.exe",
