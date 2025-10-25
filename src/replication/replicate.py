@@ -68,6 +68,7 @@ def run_data_preparation():
     print("  (This will create ranked characteristics and handle missing data)\n")
 
     try:
+        # Try with current Python executable first
         result = subprocess.run(
             [sys.executable, "src/1_prepare_data_relaxed.py"],
             check=True,
@@ -77,9 +78,13 @@ def run_data_preparation():
         return True
     except subprocess.CalledProcessError as e:
         print(f"\n  ✗ Error: Data preparation failed")
+        print(f"     {str(e)}")
         return False
     except FileNotFoundError:
         print(f"\n  ✗ Error: Could not find src/1_prepare_data_relaxed.py")
+        return False
+    except Exception as e:
+        print(f"\n  ✗ Error: {str(e)}")
         return False
 
 def run_ptree_analysis():
@@ -87,20 +92,33 @@ def run_ptree_analysis():
     print("Running P-Tree analysis...")
     print("  (This will fit P-Tree models and generate factor returns)\n")
 
-    try:
-        result = subprocess.run(
-            ["Rscript", "src/2_run_ptree_attempt2.R"],
-            check=True,
-            capture_output=False
-        )
-        print("\n  ✓ P-Tree analysis complete")
-        return True
-    except subprocess.CalledProcessError as e:
-        print(f"\n  ✗ Error: P-Tree analysis failed")
-        return False
-    except FileNotFoundError:
-        print(f"\n  ✗ Error: Rscript not found. Is R installed and in PATH?")
-        return False
+    # Try multiple common R locations
+    rscript_paths = [
+        "Rscript",  # In PATH
+        "/usr/bin/Rscript",  # WSL/Linux
+        "C:\\Program Files\\R\\R-4.3.0\\bin\\Rscript.exe",  # Common Windows location
+        "C:\\Program Files\\R\\R-4.2.0\\bin\\Rscript.exe",
+        "C:\\Program Files\\R\\R-4.1.0\\bin\\Rscript.exe",
+    ]
+
+    for rscript_path in rscript_paths:
+        try:
+            result = subprocess.run(
+                [rscript_path, "src/2_run_ptree_attempt2.R"],
+                check=True,
+                capture_output=False
+            )
+            print("\n  ✓ P-Tree analysis complete")
+            return True
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            continue
+
+    # If we get here, none worked
+    print(f"\n  ✗ Error: Could not find Rscript")
+    print(f"     Tried: {', '.join(rscript_paths)}")
+    print(f"\n  💡 Manual workaround:")
+    print(f"     Open R/RStudio and run: source('src/2_run_ptree_attempt2.R')")
+    return False
 
 def verify_results():
     """Check that expected result files were created"""
