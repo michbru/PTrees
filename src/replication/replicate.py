@@ -93,19 +93,19 @@ def run_ptree_analysis():
     print("  (This will fit P-Tree models and generate factor returns)\n")
 
     # Try multiple common R locations
-    rscript_paths = [
-        "Rscript",  # In PATH
-        "/usr/bin/Rscript",  # WSL/Linux
-        "wsl Rscript",  # Call WSL R from Windows
-        "C:\\Program Files\\R\\R-4.3.0\\bin\\Rscript.exe",  # Common Windows location
-        "C:\\Program Files\\R\\R-4.2.0\\bin\\Rscript.exe",
-        "C:\\Program Files\\R\\R-4.1.0\\bin\\Rscript.exe",
+    rscript_commands = [
+        ["Rscript", "src/2_run_ptree_attempt2.R"],  # In PATH
+        ["wsl", "Rscript", "src/2_run_ptree_attempt2.R"],  # WSL (Git Bash on Windows)
+        ["/usr/bin/Rscript", "src/2_run_ptree_attempt2.R"],  # WSL/Linux direct
+        ["C:\\Program Files\\R\\R-4.3.0\\bin\\Rscript.exe", "src/2_run_ptree_attempt2.R"],
+        ["C:\\Program Files\\R\\R-4.2.0\\bin\\Rscript.exe", "src/2_run_ptree_attempt2.R"],
+        ["C:\\Program Files\\R\\R-4.1.0\\bin\\Rscript.exe", "src/2_run_ptree_attempt2.R"],
     ]
 
-    for rscript_path in rscript_paths:
+    for cmd in rscript_commands:
         try:
             result = subprocess.run(
-                [rscript_path, "src/2_run_ptree_attempt2.R"],
+                cmd,
                 check=True,
                 capture_output=False
             )
@@ -116,9 +116,10 @@ def run_ptree_analysis():
 
     # If we get here, none worked
     print(f"\n  ✗ Error: Could not find Rscript")
-    print(f"     Tried: {', '.join(rscript_paths)}")
-    print(f"\n  💡 Manual workaround:")
-    print(f"     Open R/RStudio and run: source('src/2_run_ptree_attempt2.R')")
+    print(f"     Tried multiple R locations")
+    print(f"\n  💡 Manual workarounds:")
+    print(f"     Option 1: wsl Rscript src/2_run_ptree_attempt2.R")
+    print(f"     Option 2: Open R/RStudio and run: source('src/2_run_ptree_attempt2.R')")
     return False
 
 def verify_results():
