@@ -19,7 +19,7 @@ This project replicates the P-Tree machine learning methodology on Swedish stock
 PTrees/
 ├── data/
 │   └── ptrees_final_dataset.csv     # Swedish stock data (102,823 obs, 1997-2022)
-├── scripts/
+├── src/
 │   ├── 1_prepare_data_relaxed.py    # Data preprocessing (Python)
 │   ├── 2_run_ptree_attempt2.R       # P-Tree analysis (R)
 │   └── 3_debug_factors.R            # Diagnostics (R)
@@ -27,9 +27,6 @@ PTrees/
 │   ├── ptree_factors.csv            # Final factor returns (MAIN RESULT)
 │   ├── ptree_models.RData           # Fitted P-Tree models
 │   └── ptree_ready_data_*.csv       # Processed data files
-├── docs/
-│   ├── FINAL_ANALYSIS_SUMMARY.md    # Complete analysis findings
-│   └── INVESTIGATION_FINDINGS.md    # Bug investigation (look-ahead bias)
 ├── PTree-2501/                      # R package (original implementation)
 └── README.md                        # This file
 ```
@@ -46,8 +43,6 @@ PTrees/
 
 ### Key Files
 - **Main Result:** `results/ptree_factors.csv` (factor returns by month)
-- **Full Analysis:** `docs/FINAL_ANALYSIS_SUMMARY.md`
-- **Bug Investigation:** `docs/INVESTIGATION_FINDINGS.md`
 
 ### Why No Tree Splits?
 The P-Tree algorithm defaulted to the market portfolio because:
@@ -87,7 +82,7 @@ install.packages("PTree-2501/PTree", repos = NULL, type = "source")
 **Step 1: Prepare Data** (Python)
 ```bash
 cd /path/to/PTrees
-python scripts/1_prepare_data_relaxed.py
+python src/1_prepare_data_relaxed.py
 ```
 This script:
 - Loads `data/ptrees_final_dataset.csv` (102,823 observations)
@@ -97,7 +92,7 @@ This script:
 
 **Step 2: Run P-Tree Analysis** (R)
 ```bash
-Rscript scripts/2_run_ptree_attempt2.R
+Rscript src/2_run_ptree_attempt2.R
 ```
 This script:
 - Loads processed data from Step 1
@@ -324,9 +319,9 @@ Bachelor Thesis, [Your University].
 ## Contact & Questions
 
 For questions about this implementation:
-1. Read `docs/FINAL_ANALYSIS_SUMMARY.md` for complete findings
-2. Read `docs/INVESTIGATION_FINDINGS.md` for bug details
-3. Check script comments in `scripts/` for technical details
+- Check script comments in `src/` for technical details
+- See the Results Summary section above for complete findings
+- Consult the original P-Tree paper for methodology details
 
 ---
 
