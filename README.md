@@ -7,26 +7,27 @@
 ## Quick Start
 
 ```bash
-# Run complete analysis
+# One-command replication
+python src/replication/replicate.py
+
+# Or manual steps:
+python src/1_prepare_data.py
 Rscript src/2_ptree_analysis.R
 python src/3_benchmark_analysis.py
-
-# View results
-cat RESULTS_SUMMARY.md
 ```
 
-**Runtime:** ~2 minutes | **Results:** Sharpe 2.7-4.3, Alpha 20-28%, t-stats > 9.6 (p < 0.001)
+**Runtime:** ~2 minutes | **Results:** Sharpe 2.7-4.3, Alpha 22-27%, t-stats 9.5-15.0 (p < 0.001)
 
 ---
 
 ## Key Results
 
-✅ **Sharpe Ratios:** 2.7-4.3 across all scenarios  
-✅ **Alphas:** 20-28% per year (vs CAPM, FF3, FF4)  
-✅ **Statistical Significance:** t-statistics 9.6-15.0 (p < 0.001)  
-✅ **Independence:** Low correlations (0.03-0.16) with traditional factors  
+✅ **Sharpe Ratios:** 2.7-4.3 across all scenarios
+✅ **Alphas:** 22-27% per year (vs CAPM, FF3, FF4)
+✅ **Statistical Significance:** t-statistics 9.5-15.0 (p < 0.001)
+✅ **Independence:** Low correlations (< 0.17) with traditional factors
 
-**Finding:** P-Trees successfully identify profitable strategies in the Swedish market that cannot be explained by traditional factor models.
+**Finding:** P-Trees successfully identify profitable strategies in the Swedish market generating 22-27% annual abnormal returns that cannot be explained by traditional factor models.
 
 ---
 
@@ -38,7 +39,7 @@ cat RESULTS_SUMMARY.md
 |----------|----------------|---------|
 | **A: Full Sample** | 1997-2022 (311 months) | Full sample analysis (P-Tree-a) |
 | **B: Time Split** | 1997-2010 (155 months) | Forward validation (P-Tree-b) |
-| **C: Reverse Split** | 2010-2020 (156 months) | Reverse validation (P-Tree-c) |
+| **C: Reverse Split** | 2010-2022 (156 months) | Reverse validation (P-Tree-c) |
 
 ### Parameter Scaling for Market Size
 
@@ -86,17 +87,17 @@ install.packages("PTree-2501/PTree", repos = NULL, type = "source")
 
 | Scenario | Period | Sharpe | Alpha (CAPM) | t-stat | Alpha (FF3) | t-stat |
 |----------|--------|--------|--------------|--------|-------------|--------|
-| **A: Full** | 1997-2022 | 2.71 | 20.08% | 9.95 | 20.04% | 9.83 |
-| **B: Split** | 1997-2010 | 4.33 | 27.18% | 11.23 | 26.95% | 11.31 |
-| **C: Reverse** | 2010-2020 | 4.28 | 27.99% | 15.01 | 27.96% | 14.90 |
+| **A: Full** | 1997-2022 | 2.74 | 21.84% | 9.92 | 21.78% | 9.82 |
+| **B: Split** | 1997-2010 | 4.21 | 21.70% | 11.29 | 21.48% | 11.51 |
+| **C: Reverse** | 2010-2022 | 4.27 | 26.58% | 15.00 | 26.55% | 14.90 |
 
-*All t-stats > 9.6 indicate p < 0.001 (highly significant)*
+*All t-stats > 9.5 indicate p < 0.001 (extremely statistically significant)*
 
 ### Tree Complexity
 
-- **Scenario A:** 7-9 nodes (full period with regime changes)
-- **Scenario B:** 19 nodes (shorter, more stationary period)
-- **Scenario C:** 7-9 nodes (recent period)
+- **Scenario A:** 9 nodes (moderate depth, consistent across all 3 factors)
+- **Scenario B:** 19 nodes (deeper trees in more stationary early period)
+- **Scenario C:** 9-11 nodes (moderate depth in recent period)
 
 ---
 
@@ -119,7 +120,6 @@ PTrees/
 │   ├── ptree_scenario_a_full/            # Full period results
 │   ├── ptree_scenario_b_split/           # Time split results
 │   └── ptree_scenario_c_reverse/         # Reverse split results
-├── RESULTS_SUMMARY.md                    # Detailed analysis
 └── README.md                             # This file
 ```
 
@@ -166,19 +166,17 @@ All t-statistics > 9.6 means p-value < 0.001:
 
 ### Economic Significance
 
-- **Alphas:** 20-28% per year after controlling for market and factor exposure
+- **Alphas:** 22-27% per year after controlling for market and factor exposure
 - **Sharpe Ratios:** 2.7-4.3 (excellent risk-adjusted returns)
-- **Independence:** Low correlations (0.03-0.16) with CAPM/FF3/FF4 factors
+- **Independence:** Low correlations (< 0.17) with CAPM/FF3/FF4 factors
 
 ### What Makes This Trustworthy?
 
-1. ✅ **Methodology validated** against published JFE paper
-2. ✅ **Parameters correctly scaled** for market size
-3. ✅ **Three scenarios tested** (not cherry-picked)
-4. ✅ **Highly significant** across all periods (t > 9.6)
-5. ✅ **Independent signal** (low correlation with benchmarks)
-
-See `RESULTS_SUMMARY.md` for complete validation details.
+1. ✅ **Methodology validated** against published JFE paper (Cong et al. 2024)
+2. ✅ **Parameters correctly scaled** for market size (min_leaf_size = 3)
+3. ✅ **Three scenarios tested** (full sample, forward split, reverse split)
+4. ✅ **Highly significant** across all periods (t-stats 9.5-15.0, p < 0.001)
+5. ✅ **Independent signal** (low correlation with traditional factors)
 
 ---
 
@@ -189,12 +187,12 @@ See `RESULTS_SUMMARY.md` for complete validation details.
    - Swedish market (300 stocks) requires `min_leaf_size = 3` vs. US (2500 stocks) using 20
 
 2. **Highly significant independent alphas**
-   - 20-28% per year, cannot be explained by CAPM, FF3, or FF4
-   - t-statistics 9.6-15.0 (p < 0.001)
+   - 22-27% per year, cannot be explained by CAPM, FF3, or FF4
+   - t-statistics 9.5-15.0 (p < 0.001)
 
 3. **Robust across methodologies**
    - Full period, forward split, and reverse split all significant
-   - Tree complexity adapts appropriately (7-19 nodes)
+   - Tree complexity adapts appropriately (9-19 nodes)
 
 4. **Critical implementation details**
    - Look-ahead bias prevention essential
@@ -215,15 +213,8 @@ Cong, L. W., Feng, G., He, J., & He, X. (2024). Growing the efficient frontier o
 
 ---
 
-## Documentation
+**Last Updated:** October 25, 2025
+**Status:** ✅ Analysis Complete - Validated Implementation
+**Main Finding:** P-Trees identify profitable strategies in Swedish market (Sharpe 2.7-4.3, Alpha 22-27%, t-stats 9.5-15.0)
 
-- **README.md** (this file) - Complete project overview
-- **RESULTS_SUMMARY.md** - Detailed results and validation
-
----
-
-**Last Updated:** October 25, 2025  
-**Status:** ✅ Analysis Complete - Validated Implementation  
-**Main Finding:** P-Trees identify profitable strategies in Swedish market (Sharpe 2.7-4.3, Alpha 20-28%, t > 9.6)
-
-For detailed results, see `RESULTS_SUMMARY.md`
+For detailed numerical results, see `results/cross_scenario_comparison.csv`
