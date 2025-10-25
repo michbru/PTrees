@@ -122,6 +122,30 @@ def run_ptree_analysis():
     print(f"     Option 2: Open R/RStudio and run: source('src/2_run_ptree_attempt2.R')")
     return False
 
+def run_benchmark_analysis():
+    """Run benchmark comparison analysis"""
+    print("Running benchmark analysis...")
+    print("  (Comparing P-Trees vs CAPM, FF3, FF4, and macro variables)\n")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "src/3_benchmark_analysis.py"],
+            check=True,
+            capture_output=False
+        )
+        print("\n  ✓ Benchmark analysis complete")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"\n  ✗ Error: Benchmark analysis failed")
+        print(f"     {str(e)}")
+        return False
+    except FileNotFoundError:
+        print(f"\n  ✗ Error: Could not find src/3_benchmark_analysis.py")
+        return False
+    except Exception as e:
+        print(f"\n  ✗ Error: {str(e)}")
+        return False
+
 def verify_results():
     """Check that expected result files were created"""
     print("Verifying results...")
@@ -143,6 +167,13 @@ def verify_results():
             print(f"  ✗ {file:<30} - MISSING!")
             all_found = False
 
+    # Check benchmark analysis results
+    benchmark_dir = results_dir / "benchmark_analysis"
+    if benchmark_dir.exists():
+        print(f"\n  ✓ Benchmark analysis results:")
+        for file in benchmark_dir.glob("*.csv"):
+            print(f"    - {file.name}")
+
     return all_found
 
 def main():
@@ -160,22 +191,28 @@ def main():
         return 1
 
     # Step 1: Clean previous results
-    print_step(1, 4, "Cleaning Previous Results")
+    print_step(1, 5, "Cleaning Previous Results")
     if not clean_results():
         return 1
 
     # Step 2: Data preparation
-    print_step(2, 4, "Data Preparation (Python)")
+    print_step(2, 5, "Data Preparation (Python)")
     if not run_data_preparation():
         return 1
 
     # Step 3: P-Tree analysis
-    print_step(3, 4, "P-Tree Analysis (R)")
+    print_step(3, 5, "P-Tree Analysis (R)")
     if not run_ptree_analysis():
         return 1
 
-    # Step 4: Verify results
-    print_step(4, 4, "Verifying Results")
+    # Step 4: Benchmark analysis
+    print_step(4, 5, "Benchmark Analysis (Python)")
+    if not run_benchmark_analysis():
+        print("\n⚠ Warning: Benchmark analysis failed, but P-Tree results are available")
+        # Don't return error - benchmark is supplementary
+
+    # Step 5: Verify results
+    print_step(5, 5, "Verifying Results")
     if not verify_results():
         print("\n✗ Warning: Some expected files were not created")
         return 1
@@ -183,10 +220,12 @@ def main():
     # Success!
     print_header("✓ REPLICATION COMPLETE")
     print("Results saved to:")
-    print("  📊 results/ptree_factors.csv        (factor returns - main result)")
-    print("  📦 results/ptree_models.RData       (fitted P-Tree models)")
-    print("  📄 results/ptree_ready_data_*.csv   (processed data)")
-    print("\nExpected result: Sharpe Ratio ≈ 1.20, Win Rate ≈ 67.5%\n")
+    print("  📊 results/ptree_factors.csv                    (factor returns - main result)")
+    print("  📦 results/ptree_models.RData                   (fitted P-Tree models)")
+    print("  📄 results/ptree_ready_data_*.csv               (processed data)")
+    print("  📈 results/benchmark_analysis/                  (comparison vs benchmarks)")
+    print("\nP-Tree Performance: Sharpe Ratio ≈ 1.20, Win Rate ≈ 67.5%")
+    print("See benchmark_analysis/summary_report.txt for detailed comparison\n")
 
     return 0
 

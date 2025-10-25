@@ -1,0 +1,4 @@
+"Scenario","Train_Months","Test_Months","Tree1_Nodes","Tree2_Nodes","Tree3_Nodes","Train_Sharpe","Runtime_Sec"
+"Swedish-Full",282,29,19,19,19,3.319,6.43
+"Swedish-Split",155,127,19,19,19,4.101,2.96
+"Swedish-Recent",132,55,19,19,19,7.255,4.71
