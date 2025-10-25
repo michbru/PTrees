@@ -1,6 +1,8 @@
 # Directories to ignore
 thesis-omxspi-pipeline/
 .claude/
+.idea/
+.venv/
 
 # Configuration files to ignore
 lseg-data.config.json
