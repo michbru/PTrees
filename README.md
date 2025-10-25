@@ -21,14 +21,14 @@ PTrees/
 │   └── ptrees_final_dataset.csv     # Swedish stock data (102,823 obs, 1997-2022)
 ├── src/
 │   ├── 1_prepare_data_relaxed.py    # Data preprocessing (Python)
-│   └── 2_run_ptree_attempt2.R       # P-Tree analysis (R)
+│   ├── 2_run_ptree_attempt2.R       # P-Tree analysis (R)
+│   └── replication/
+│       └── replicate.py             # One-command replication script
 ├── results/
 │   ├── ptree_factors.csv            # Final factor returns (MAIN RESULT)
 │   ├── ptree_models.RData           # Fitted P-Tree models
 │   └── ptree_ready_data_*.csv       # Processed data files
 ├── PTree-2501/                      # R package (original implementation)
-├── run_analysis.sh                  # One-command replication (Linux/Mac)
-├── run_analysis.bat                 # One-command replication (Windows)
 └── README.md                        # This file
 ```
 
@@ -59,14 +59,16 @@ This is a **realistic finding**, not a failure. It demonstrates that P-Trees req
 
 **One-Command Replication:**
 ```bash
-# Linux/Mac
-./run_analysis.sh
-
-# Windows
-run_analysis.bat
+python src/replication/replicate.py
 ```
 
-That's it! The script will run both steps automatically and show you the results.
+That's it! The script will:
+1. Clean previous results
+2. Run data preparation (Python)
+3. Run P-Tree analysis (R)
+4. Display results
+
+Runtime: ~3-5 minutes
 
 ---
 
