@@ -56,11 +56,11 @@ def run_ptree_analysis():
 
     # Try multiple R locations
     rscript_commands = [
-        ["Rscript", "src/4_complete_ptree_analysis.R"],
-        ["wsl", "Rscript", "src/4_complete_ptree_analysis.R"],
-        ["/usr/bin/Rscript", "src/4_complete_ptree_analysis.R"],
-        ["C:\\Program Files\\R\\R-4.3.0\\bin\\Rscript.exe", "src/4_complete_ptree_analysis.R"],
-        ["C:\\Program Files\\R\\R-4.2.0\\bin\\Rscript.exe", "src/4_complete_ptree_analysis.R"],
+        ["Rscript", "src/2_ptree_analysis.R"],
+        ["wsl", "Rscript", "src/2_ptree_analysis.R"],
+        ["/usr/bin/Rscript", "src/2_ptree_analysis.R"],
+        ["C:\\Program Files\\R\\R-4.3.0\\bin\\Rscript.exe", "src/2_ptree_analysis.R"],
+        ["C:\\Program Files\\R\\R-4.2.0\\bin\\Rscript.exe", "src/2_ptree_analysis.R"],
     ]
 
     for cmd in rscript_commands:
@@ -74,7 +74,7 @@ def run_ptree_analysis():
     # If none worked
     print(f"\n  ✗ Error: Could not find Rscript")
     print(f"\n  💡 Manual workaround:")
-    print(f"     Open R/RStudio and run: source('src/4_complete_ptree_analysis.R')")
+    print(f"     Open R/RStudio and run: source('src/2_ptree_analysis.R')")
     return False
 
 def run_benchmark_analysis():
@@ -84,7 +84,7 @@ def run_benchmark_analysis():
 
     try:
         subprocess.run(
-            [sys.executable, "src/5_benchmark_all_scenarios.py"],
+            [sys.executable, "src/3_benchmark_analysis.py"],
             check=True,
             capture_output=False
         )
@@ -94,7 +94,7 @@ def run_benchmark_analysis():
         print(f"\n  ✗ Error: Benchmark analysis failed - {str(e)}")
         return False
     except FileNotFoundError:
-        print(f"\n  ✗ Error: Could not find src/5_benchmark_all_scenarios.py")
+        print(f"\n  ✗ Error: Could not find src/3_benchmark_analysis.py")
         return False
 
 def verify_results():
@@ -161,7 +161,7 @@ def main():
     # Step 2: P-Tree analysis
     print_step(2, 3, "P-Tree Analysis (R) - All Scenarios")
     if not run_ptree_analysis():
-        print("\n⚠ Manual alternative: Open R and run: source('src/4_complete_ptree_analysis.R')")
+        print("\n⚠ Manual alternative: Open R and run: source('src/2_ptree_analysis.R')")
         return 1
 
     # Step 3: Benchmark analysis  

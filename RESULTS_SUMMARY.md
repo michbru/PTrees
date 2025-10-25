@@ -2,7 +2,7 @@
 
 **Implementation of:** Cong et al. (2024) "Growing the Efficient Frontier on Panel Trees" *Journal of Financial Economics*
 
-**Data:** Swedish stocks, 1997-2022, 1,091 unique stocks, 19 characteristics
+**Data:** Swedish stocks, 1997-2022, 1,176 unique stocks, 19 characteristics
 
 ---
 
@@ -26,9 +26,9 @@ Following the paper's approach, we implement three scenarios:
 
 | Scenario | Training Period | Months | Tree Nodes | Sharpe Ratio |
 |----------|----------------|--------|------------|--------------|
-| A: Full Sample | 1997-2022 | 311 | 7 | 2.71 |
-| B: Time Split | 1997-2010 | 155 | 19 | 4.33 |
-| C: Reverse Split | 2010-2020 | 156 | 7 | 4.28 |
+| A: Full Sample | 1997-2022 | 311 | 9 | 2.74 |
+| B: Time Split | 1997-2010 | 155 | 19 | 4.21 |
+| C: Reverse Split | 2010-2022 | 156 | 9 | 4.27 |
 
 ### Alpha Analysis (Factor 1)
 
@@ -36,9 +36,9 @@ Following the paper's approach, we implement three scenarios:
 
 | Scenario | vs CAPM | t-stat | vs FF3 | t-stat | vs FF4 | t-stat |
 |----------|---------|--------|--------|--------|--------|--------|
-| A: Full | 20.08% | 9.95 | 20.04% | 9.83 | 19.67% | 9.64 |
-| B: Split | 27.18% | 11.23 | 26.95% | 11.31 | 26.80% | 11.49 |
-| C: Reverse | 27.99% | 15.01 | 27.96% | 14.90 | 26.79% | 13.54 |
+| A: Full | 21.84% | 9.92 | 21.78% | 9.82 | 21.29% | 9.54 |
+| B: Split | 21.70% | 11.29 | 21.48% | 11.51 | 21.34% | 11.41 |
+| C: Reverse | 26.58% | 15.00 | 26.55% | 14.90 | 25.43% | 13.53 |
 
 **Interpretation:** P-Tree factors generate 20-28% annual abnormal returns that CANNOT be explained by traditional factor models.
 
@@ -46,11 +46,11 @@ Following the paper's approach, we implement three scenarios:
 
 | Scenario | Corr(F1, MKT) | Corr(F1, SMB) | Corr(F1, HML) | Corr(F1, MOM) |
 |----------|---------------|---------------|---------------|---------------|
-| A: Full | 0.113 | -0.093 | -0.003 | 0.010 |
-| B: Split | 0.156 | -0.065 | 0.087 | -0.086 |
-| C: Reverse | 0.029 | -0.035 | 0.100 | 0.106 |
+| A: Full | 0.093 | -0.080 | 0.007 | 0.021 |
+| B: Split | 0.167 | -0.055 | 0.105 | -0.099 |
+| C: Reverse | 0.030 | -0.031 | 0.100 | 0.107 |
 
-**Low correlations** (all < 0.16) indicate P-Trees capture **different information** than traditional factors.
+**Low correlations** (all < 0.17) indicate P-Trees capture **different information** than traditional factors.
 
 ### Mean-Variance Efficient (MVE) Portfolios
 
@@ -58,32 +58,32 @@ Combining all 3 P-Tree factors:
 
 | Scenario | MVE Sharpe | MVE Mean Return | MVE Volatility |
 |----------|------------|-----------------|----------------|
-| A: Full | 2.93 | 17.66% | 6.60% |
-| B: Split | 5.14 | 37.00% | 7.88% |
-| C: Reverse | 5.04 | 33.58% | 7.30% |
+| A: Full | 2.90 | 11.90% | 4.11% |
+| B: Split | 4.97 | 11.70% | 2.35% |
+| C: Reverse | 5.18 | 12.36% | 2.39% |
 
 ---
 
 ## Tree Structure Analysis
 
 ### Scenario A (Full Sample)
-- **Tree 1:** 7 nodes, Sharpe 2.69
-- **Tree 2:** 9 nodes, Sharpe 2.22
-- **Tree 3:** 7 nodes, Sharpe 1.66
+- **Tree 1:** 9 nodes, Sharpe 2.70
+- **Tree 2:** 9 nodes, Sharpe 2.56
+- **Tree 3:** 9 nodes, Sharpe 2.36
 
-**Interpretation:** Shallower trees due to regime changes across 26-year period
+**Interpretation:** Moderate tree depth - consistent structure across all 3 factors
 
 ### Scenario B (Time Split - 1997-2010)
-- **Tree 1:** 19 nodes, Sharpe 4.30
-- **Tree 2:** 19 nodes, Sharpe 2.59
-- **Tree 3:** 19 nodes, Sharpe 3.21
+- **Tree 1:** 19 nodes, Sharpe 4.23
+- **Tree 2:** 19 nodes, Sharpe 2.61
+- **Tree 3:** 19 nodes, Sharpe 2.87
 
 **Interpretation:** Deeper trees in more stationary earlier period
 
-### Scenario C (Reverse - 2010-2020)
-- **Tree 1:** 7 nodes, Sharpe 4.13
-- **Tree 2:** 9 nodes, Sharpe 1.90
-- **Tree 3:** 9 nodes, Sharpe 0.98
+### Scenario C (Reverse - 2010-2022)
+- **Tree 1:** 9 nodes, Sharpe 4.12
+- **Tree 2:** 11 nodes, Sharpe 1.66
+- **Tree 3:** 9 nodes, Sharpe 1.00
 
 **Interpretation:** Moderate depth in recent period
 
@@ -92,24 +92,29 @@ Combining all 3 P-Tree factors:
 ## Key Findings
 
 ### 1. **P-Trees Work on Swedish Market**
-- Successfully generate splits (7-19 nodes depending on period)
+- Successfully generate splits (9-19 nodes depending on period)
 - Parameter scaling (min_leaf_size = 3) is crucial for smaller markets
 
 ### 2. **Significant Abnormal Returns**
-- 20-28% annual alpha vs CAPM
-- 20-27% annual alpha vs Fama-French 3-Factor
-- All highly significant (t-stats 9.6-15.0)
+- 22-27% annual alpha vs CAPM
+- 21-27% annual alpha vs Fama-French 3-Factor
+- All highly significant (t-stats 9.5-15.0)
 
 ### 3. **Independent Signal**
-- Low correlation with traditional factors (< 0.16)
+- Low correlation with traditional factors (< 0.17)
 - Captures information not in CAPM, FF3, or FF4 models
 
 ### 4. **Period Matters**
-- Shorter, more stationary periods → deeper trees
-- Full 26-year period → shallower trees (regime changes)
+- Shorter periods (1997-2010) → deeper trees (19 nodes)
+- Full 26-year period → moderate trees (9 nodes)
 - Both approaches generate significant alphas
 
-### 5. **Robust Across Specifications**
+### 5. **Exceptional Risk-Adjusted Performance**
+- Sharpe ratios: 2.7-4.3 (individual factors)
+- MVE Sharpe ratios: 2.9-5.2 (combined factors)
+- Low volatility: 2.4-4.1% for MVE portfolios
+
+### 6. **Robust Across Specifications**
 - All three scenarios produce consistent results
 - Forward/reverse time splits show similar performance
 - Methodology is robust to sample period choice
@@ -120,7 +125,7 @@ Combining all 3 P-Tree factors:
 
 | Metric | US Market (Paper) | Swedish Market (Ours) | Notes |
 |--------|-------------------|----------------------|-------|
-| **Data Size** | 2.2M obs, 2500 stocks | 95K obs, 300 stocks | 25x smaller |
+| **Data Size** | 2.2M obs, 2500 stocks | 102K obs, 300 stocks | 22x smaller |
 | **Characteristics** | 61 | 19 | 31% of original |
 | **min_leaf_size** | 20 | 3 | Scaled for market size |
 | **Tree Nodes** | Deep (many splits) | 7-19 nodes | Appropriate for data size |
@@ -181,8 +186,8 @@ python src/replication/replicate.py
 
 # Or manual steps
 python src/1_prepare_data.py             # Data preparation
-Rscript src/4_complete_ptree_analysis.R  # P-Tree analysis
-python src/5_benchmark_all_scenarios.py  # Benchmarks
+Rscript src/2_ptree_analysis.R           # P-Tree analysis
+python src/3_benchmark_analysis.py       # Benchmarks
 ```
 
 **Requirements:** R with PTree package, Python with pandas/numpy/statsmodels

@@ -8,8 +8,8 @@
 
 ```bash
 # Run complete analysis
-Rscript src/4_complete_ptree_analysis.R
-python src/5_benchmark_all_scenarios.py
+Rscript src/2_ptree_analysis.R
+python src/3_benchmark_analysis.py
 
 # View results
 cat RESULTS_SUMMARY.md
@@ -109,40 +109,18 @@ PTrees/
 │   ├── macro_variables_with_dates.csv    # Fama-French factors
 │   └── FamaFrench2020/                   # Benchmark data
 ├── src/
-│   ├── 4_complete_ptree_analysis.R       # Main P-Tree analysis
-│   └── 5_benchmark_all_scenarios.py      # Benchmark comparisons
+│   ├── 1_prepare_data.py                 # Data preparation
+│   ├── 2_ptree_analysis.R                # Main P-Tree analysis
+│   ├── 3_benchmark_analysis.py           # Benchmark comparisons
+│   └── replication/
+│       └── replicate.py                  # One-command replication script
 ├── results/
 │   ├── cross_scenario_comparison.csv     # Summary table
 │   ├── ptree_scenario_a_full/            # Full period results
 │   ├── ptree_scenario_b_split/           # Time split results
 │   └── ptree_scenario_c_reverse/         # Reverse split results
 ├── RESULTS_SUMMARY.md                    # Detailed analysis
-├── METHODOLOGY_VALIDATION.md             # Validation report
 └── README.md                             # This file
-```
-
----
-
----
-
-## Installation & Prerequisites
-
-### Software Requirements
-- **R:** 4.0+ ([download](https://cran.r-project.org/))
-- **Python:** 3.8+ ([download](https://www.python.org/downloads/))
-
-### R Packages
-```r
-# Open R and run:
-install.packages(c("arrow", "rpart", "ranger", "data.table"))
-
-# Install P-Tree package from local source
-install.packages("PTree-2501/PTree", repos = NULL, type = "source")
-```
-
-### Python Packages
-```bash
-pip install pandas numpy statsmodels
 ```
 
 ---
@@ -151,7 +129,7 @@ pip install pandas numpy statsmodels
 
 **Source:** Swedish stock market (1997-2022)
 - **Observations:** 102,823 stock-month observations
-- **Stocks:** 1,091 unique companies
+- **Stocks:** 1,176 unique companies
 - **Average:** ~300 stocks per month
 - **Characteristics:** 19 stock-level features
 
@@ -174,8 +152,6 @@ pip install pandas numpy statsmodels
 - Market data: Finbas (Swedish market database)
 - Fundamentals: LSEG/Refinitiv
 - Fama-French factors: Computed for Swedish market
-
----
 
 ---
 
