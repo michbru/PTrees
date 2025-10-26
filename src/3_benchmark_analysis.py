@@ -26,21 +26,25 @@ lambda_cov = 1e-5
 lambda_mean = 0
 
 # Scenarios to analyze
+# NOTE: P-Tree factors extend to 2022, but benchmark analysis limited by Fama-French data (ends 2020-07)
 scenarios = {
     'A_Full': {
-        'name': 'Scenario A: Full Sample (1997-2022)',
+        'name': 'Scenario A: Full Sample (P-Tree: 1997-2022, Benchmark: 1997-2020)',
         'folder': 'results/ptree_scenario_a_full',
-        'period': '1997-02 to 2022-12'
+        'period': '1997-02 to 2022-12',
+        'benchmark_note': 'Benchmark limited to 1997-09 to 2020-07 (FF data availability)'
     },
     'B_Split': {
         'name': 'Scenario B: Time Split (Train 1997-2010)',
         'folder': 'results/ptree_scenario_b_split',
-        'period': '1997-02 to 2009-12'
+        'period': '1997-02 to 2009-12',
+        'benchmark_note': 'Benchmark: 1997-09 to 2009-12'
     },
     'C_Reverse': {
-        'name': 'Scenario C: Reverse Split (Train 2010-2020)',
+        'name': 'Scenario C: Reverse Split (P-Tree: 2010-2022, Benchmark: 2010-2020)',
         'folder': 'results/ptree_scenario_c_reverse',
-        'period': '2010-01 to 2022-12'
+        'period': '2010-01 to 2022-12',
+        'benchmark_note': 'Benchmark limited to 2010-01 to 2020-07 (FF data availability)'
     }
 }
 
