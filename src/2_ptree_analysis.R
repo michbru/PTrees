@@ -7,7 +7,8 @@
 # - Scenario B (Split): Train 1997-2010, Test 2010-2022 (like P-Tree-b)
 # - Scenario C (Reverse): Train 2010-2022, Test 1997-2010 (like P-Tree-c)
 #
-# NOTE: Benchmark analysis limited to 1997-2020 due to Fama-French data availability
+# NOTE: Benchmark analysis is limited to 1997-2020 due to Fama-French factor
+# data availability (FF factors only available through 2020-07).
 ############################################################################
 
 t_total = proc.time()
