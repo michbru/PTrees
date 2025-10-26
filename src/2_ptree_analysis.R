@@ -3,9 +3,11 @@
 # Following Cong et al. (2024) JFE Paper
 #
 # Three scenarios:
-# - Scenario A (Full): Train on entire period (like P-Tree-a)
-# - Scenario B (Split): Train 1997-2010, Test 2010-2020 (like P-Tree-b)
-# - Scenario C (Reverse): Train 2010-2020, Test 1997-2010 (like P-Tree-c)
+# - Scenario A (Full): Train on entire period 1997-2022 (like P-Tree-a)
+# - Scenario B (Split): Train 1997-2010, Test 2010-2022 (like P-Tree-b)
+# - Scenario C (Reverse): Train 2010-2022, Test 1997-2010 (like P-Tree-c)
+#
+# NOTE: Benchmark analysis limited to 1997-2020 due to Fama-French data availability
 ############################################################################
 
 t_total = proc.time()

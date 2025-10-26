@@ -1,6 +1,6 @@
 # P-Tree Analysis - Swedish Stock Market
 
-**Bachelor Thesis Project:** Implementation of Cong et al. (2024) "Growing the Efficient Frontier on Panel Trees" (*Journal of Financial Economics*) on Swedish stock market data (1997-2022).
+**Bachelor Thesis Project:** Implementation of Cong et al. (2024) "Growing the Efficient Frontier on Panel Trees" (*Journal of Financial Economics*) on Swedish stock market data (1997-2020).
 
 ---
 
@@ -35,11 +35,13 @@ python src/3_benchmark_analysis.py
 
 ### Three Scenarios (Following Cong et al. 2024)
 
-| Scenario | Training Period | Purpose |
-|----------|----------------|---------|
-| **A: Full Sample** | 1997-2022 (311 months) | Full sample analysis (P-Tree-a) |
-| **B: Time Split** | 1997-2010 (155 months) | Forward validation (P-Tree-b) |
-| **C: Reverse Split** | 2010-2022 (156 months) | Reverse validation (P-Tree-c) |
+| Scenario | Training Period | Benchmark Period | Purpose |
+|----------|----------------|------------------|---------|
+| **A: Full Sample** | 1997-2022 (311 months) | 1997-2020 (275 months) | Full sample analysis (P-Tree-a) |
+| **B: Time Split** | 1997-2010 (155 months) | 1997-2010 (148 months) | Forward validation (P-Tree-b) |
+| **C: Reverse Split** | 2010-2022 (156 months) | 2010-2020 (127 months) | Reverse validation (P-Tree-c) |
+
+**Note:** Benchmark analysis (CAPM, FF3, FF4) limited to 1997-2020 due to Fama-French factor availability. P-Tree factors extend to 2022 but lack benchmark comparisons for 2020-2022.
 
 ### Parameter Scaling for Market Size
 
@@ -85,11 +87,11 @@ install.packages("PTree-2501/PTree", repos = NULL, type = "source")
 
 ### Performance Across All Scenarios
 
-| Scenario | Period | Sharpe | Alpha (CAPM) | t-stat | Alpha (FF3) | t-stat |
-|----------|--------|--------|--------------|--------|-------------|--------|
-| **A: Full** | 1997-2022 | 2.74 | 21.84% | 9.92 | 21.78% | 9.82 |
+| Scenario | Benchmark Period | Sharpe | Alpha (CAPM) | t-stat | Alpha (FF3) | t-stat |
+|----------|------------------|--------|--------------|--------|-------------|--------|
+| **A: Full** | 1997-2020 | 2.74 | 21.84% | 9.92 | 21.78% | 9.82 |
 | **B: Split** | 1997-2010 | 4.21 | 21.70% | 11.29 | 21.48% | 11.51 |
-| **C: Reverse** | 2010-2022 | 4.27 | 26.58% | 15.00 | 26.55% | 14.90 |
+| **C: Reverse** | 2010-2020 | 4.27 | 26.58% | 15.00 | 26.55% | 14.90 |
 
 *All t-stats > 9.5 indicate p < 0.001 (extremely statistically significant)*
 
@@ -127,11 +129,12 @@ PTrees/
 
 ## Data Description
 
-**Source:** Swedish stock market (1997-2022)
+**Source:** Swedish stock market (1997-2022 for stock data, 1997-2020 for benchmark analysis)
 - **Observations:** 102,823 stock-month observations
 - **Stocks:** 1,176 unique companies
 - **Average:** ~300 stocks per month
 - **Characteristics:** 19 stock-level features
+- **Note:** Fama-French benchmark factors available only through 2020-07; P-Tree factors generated through 2022-12
 
 ### 19 Stock Characteristics
 
