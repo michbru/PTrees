@@ -29,22 +29,25 @@ lambda_mean = 0
 # NOTE: P-Tree factors extend to 2022, but benchmark analysis limited by Fama-French data (ends 2020-07)
 scenarios = {
     'A_Full': {
-        'name': 'Scenario A: Full Sample (P-Tree: 1997-2022, Benchmark: 1997-2020)',
+        'name': 'Scenario A: Full Sample (IS)',
         'folder': 'results/ptree_scenario_a_full',
-        'period': '1997-02 to 2022-12',
-        'benchmark_note': 'Benchmark limited to 1997-09 to 2020-07 (FF data availability)'
+        'prefer_oos': False,
+        'period_hint': '1997-02 to 2022-12',
+        'benchmark_note': 'Benchmarks limited to overlap (FF data through 2020-07)'
     },
     'B_Split': {
-        'name': 'Scenario B: Time Split (Train 1997-2010)',
+        'name': 'Scenario B: Time Split (Train 1997-2009; OOS 2010-2020)',
         'folder': 'results/ptree_scenario_b_split',
-        'period': '1997-02 to 2009-12',
-        'benchmark_note': 'Benchmark: 1997-09 to 2009-12'
+        'prefer_oos': True,
+        'period_hint': 'IS 1997-02 to 2009-12; OOS 2010-01 to 2020-07',
+        'benchmark_note': 'Prefer OOS; aligns to FF overlap'
     },
     'C_Reverse': {
-        'name': 'Scenario C: Reverse Split (P-Tree: 2010-2022, Benchmark: 2010-2020)',
+        'name': 'Scenario C: Reverse Split (Train 2010-2022; OOS 1997-2010)',
         'folder': 'results/ptree_scenario_c_reverse',
-        'period': '2010-01 to 2022-12',
-        'benchmark_note': 'Benchmark limited to 2010-01 to 2020-07 (FF data availability)'
+        'prefer_oos': True,
+        'period_hint': 'IS 2010-01 to 2022-12; OOS 1997-02 to ~2010-01',
+        'benchmark_note': 'Prefer OOS; aligns to FF overlap'
     }
 }
 
@@ -89,18 +92,33 @@ for scenario_key, scenario_info in scenarios.items():
     print(f"{scenario_info['name']}")
     print("="*80)
 
-    # Load P-Tree factors for this scenario
-    ptree_path = os.path.join(scenario_info['folder'], 'ptree_factors.csv')
+    # Load P-Tree factors for this scenario. Prefer OOS for B/C if available
+    ptree_path_candidates = []
+    if scenario_info.get('prefer_oos', False):
+        ptree_path_candidates += [
+            os.path.join(scenario_info['folder'], 'ptree_factors_oos.csv'),
+        ]
+    ptree_path_candidates += [
+        os.path.join(scenario_info['folder'], 'ptree_factors.csv'),
+        os.path.join(scenario_info['folder'], 'ptree_factors_is.csv'),
+    ]
 
-    if not os.path.exists(ptree_path):
-        print(f"  [SKIP] File not found: {ptree_path}")
+    ptree_path = None
+    for p in ptree_path_candidates:
+        if os.path.exists(p):
+            ptree_path = p
+            break
+
+    if ptree_path is None:
+        print(f"  [SKIP] No P-Tree factor file found in {scenario_info['folder']}")
         continue
 
     ptree = pd.read_csv(ptree_path)
     ptree['month'] = pd.to_datetime(ptree['month'])
     ptree = ptree.set_index('month')
 
-    print(f"\n  P-Tree factors: {len(ptree)} months")
+    label = 'OOS' if ptree_path.endswith('_oos.csv') else ('IS' if ptree_path.endswith('_is.csv') else 'IS')
+    print(f"\n  Using factors ({label}): {len(ptree)} months | file: {os.path.basename(ptree_path)}")
     print(f"  Period: {ptree.index[0].strftime('%Y-%m')} to {ptree.index[-1].strftime('%Y-%m')}")
 
     # Align with macro data
@@ -244,7 +262,7 @@ for scenario_key, scenario_info in scenarios.items():
 
     comparison_data.append({
         'Scenario': scenario_info['name'].split(':')[0],
-        'Period': scenario_info['period'],
+        'Period': f"{ptree.index[0].strftime('%Y-%m')} to {ptree.index[-1].strftime('%Y-%m')}",
         'F1_Sharpe': f1_sharpe['Individual_SR'],
         'F1_Alpha_CAPM': f1_alpha['CAPM_alpha'],
         'F1_tstat_CAPM': f1_alpha['CAPM_tstat'],

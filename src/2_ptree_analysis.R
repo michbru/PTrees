@@ -70,21 +70,56 @@ calculate_sharpe <- function(returns) {
   return(mean(returns) / sd(returns) * sqrt(12))
 }
 
+prepare_design <- function(df, all_chars, instruments) {
+  X = df[, all_chars]
+  R = df[, "xret"]
+  months = as.numeric(as.factor(df$date)) - 1
+  stocks = as.numeric(as.factor(df$permno)) - 1
+  Z = cbind(1, df[, instruments])
+  portfolio_weight = df[, "lag_me"]
+  loss_weight = df[, "lag_me"]
+  num_months = length(unique(months))
+  num_stocks = length(unique(stocks))
+  list(X=X, R=R, months=months, stocks=stocks, Z=Z,
+       portfolio_weight=portfolio_weight, loss_weight=loss_weight,
+       num_months=num_months, num_stocks=num_stocks)
+}
+
+ptree_predict_oos <- function(fit, test_data, all_chars) {
+  # Use the actual PTree predict function signature from the package:
+  # predict.PTree(model, X, R, months, weight = NULL)
+
+  X_test <- test_data[, all_chars]
+  R_test <- test_data[, "xret"]
+  months_test <- as.numeric(as.factor(test_data$date)) - 1
+  weight_test <- test_data[, "lag_me"]
+
+  # Call predict with correct signature
+  pred <- try(predict(fit, X_test, R_test, months_test, weight_test), silent=TRUE)
+
+  if (inherits(pred, "try-error")) {
+    return(NULL)
+  }
+
+  return(pred$ft)
+}
+
 train_ptree_trio <- function(train_data, scenario_name) {
   cat(paste(rep("-", 80), collapse=""), "\n")
   cat("Training 3 P-Trees for:", scenario_name, "\n")
   cat(paste(rep("-", 80), collapse=""), "\n\n")
 
   # Prepare training data
-  X_train = train_data[, all_chars]
-  R_train = train_data[, "xret"]
-  months_train = as.numeric(as.factor(train_data$date)) - 1
-  stocks_train = as.numeric(as.factor(train_data$permno)) - 1
-  Z_train = cbind(1, train_data[, instruments])
-  portfolio_weight_train = train_data[, "lag_me"]
-  loss_weight_train = train_data[, "lag_me"]
-  num_months_train = length(unique(months_train))
-  num_stocks_train = length(unique(stocks_train))
+  dl_train <- prepare_design(train_data, all_chars, instruments)
+  X_train = dl_train$X
+  R_train = dl_train$R
+  months_train = dl_train$months
+  stocks_train = dl_train$stocks
+  Z_train = dl_train$Z
+  portfolio_weight_train = dl_train$portfolio_weight
+  loss_weight_train = dl_train$loss_weight
+  num_months_train = dl_train$num_months
+  num_stocks_train = dl_train$num_stocks
 
   cat("Training data:\n")
   cat("  Observations:", nrow(train_data), "\n")
@@ -167,6 +202,46 @@ train_ptree_trio <- function(train_data, scenario_name) {
   ))
 }
 
+apply_ptree_trio_oos <- function(fits, test_data, all_chars) {
+  # Apply trained P-Trees to test data using the predict() function
+  # This generates TRUE out-of-sample predictions
+
+  cat("Generating out-of-sample predictions...\n")
+
+  # Tree 1: predict on test data
+  ft1 <- ptree_predict_oos(fits$fit1, test_data, all_chars)
+
+  if (is.null(ft1)) {
+    cat("ERROR: predict() failed for Tree 1\n")
+    return(NULL)
+  }
+
+  # Tree 2: predict on test data
+  ft2 <- ptree_predict_oos(fits$fit2, test_data, all_chars)
+
+  if (is.null(ft2)) {
+    cat("ERROR: predict() failed for Tree 2\n")
+    return(NULL)
+  }
+
+  # Tree 3: predict on test data
+  ft3 <- ptree_predict_oos(fits$fit3, test_data, all_chars)
+
+  if (is.null(ft3)) {
+    cat("ERROR: predict() failed for Tree 3\n")
+    return(NULL)
+  }
+
+  cat("Out-of-sample predictions successful!\n")
+
+  data.frame(
+    month = sort(unique(test_data$date)),
+    factor1 = as.numeric(ft1),
+    factor2 = as.numeric(ft2),
+    factor3 = as.numeric(ft3)
+  )
+}
+
 ###### SCENARIO A: Full Sample (1997-2022) #####
 
 cat(paste(rep("=", 80), collapse=""), "\n")
@@ -206,20 +281,30 @@ cat("Split date:", as.character(split_date), "\n\n")
 
 results_b <- train_ptree_trio(train_data_b, "Time Split (First Half)")
 
-# Save results
+# Save IS (training) factors
 output_dir_b = "results/ptree_scenario_b_split"
 dir.create(output_dir_b, showWarnings = FALSE, recursive = TRUE)
 save(results_b, file = file.path(output_dir_b, "ptree_models.RData"))
 
 all_dates_b <- sort(unique(train_data_b$date))
-factors_b = data.frame(
+factors_b_is = data.frame(
   month = all_dates_b,
   factor1 = results_b$fit1$ft,
   factor2 = results_b$fit2$ft,
   factor3 = results_b$fit3$ft
 )
-write.csv(factors_b, file.path(output_dir_b, "ptree_factors.csv"), row.names = FALSE)
-cat("Saved to:", output_dir_b, "\n\n")
+write.csv(factors_b_is, file.path(output_dir_b, "ptree_factors_is.csv"), row.names = FALSE)
+
+# Attempt OOS on test_data_b
+factors_b_oos <- apply_ptree_trio_oos(results_b, test_data_b, all_chars)
+if (!is.null(factors_b_oos)) {
+  write.csv(factors_b_oos, file.path(output_dir_b, "ptree_factors_oos.csv"), row.names = FALSE)
+  cat("Saved IS+OOS to:", output_dir_b, "(B)\n\n")
+} else {
+  # Backward-compatible: write legacy filename for IS too
+  write.csv(factors_b_is, file.path(output_dir_b, "ptree_factors.csv"), row.names = FALSE)
+  cat("Note: OOS prediction unavailable (no predict() in PTree). Wrote IS only.\n\n")
+}
 
 ###### SCENARIO C: Reverse Split (Train: 2010-2020, Test: 1997-2010) #####
 
@@ -233,20 +318,30 @@ test_data_c <- data[data$date < split_date, ]
 
 results_c <- train_ptree_trio(train_data_c, "Reverse Split (Second Half)")
 
-# Save results
+# Save IS (training) factors
 output_dir_c = "results/ptree_scenario_c_reverse"
 dir.create(output_dir_c, showWarnings = FALSE, recursive = TRUE)
 save(results_c, file = file.path(output_dir_c, "ptree_models.RData"))
 
 all_dates_c <- sort(unique(train_data_c$date))
-factors_c = data.frame(
+factors_c_is = data.frame(
   month = all_dates_c,
   factor1 = results_c$fit1$ft,
   factor2 = results_c$fit2$ft,
   factor3 = results_c$fit3$ft
 )
-write.csv(factors_c, file.path(output_dir_c, "ptree_factors.csv"), row.names = FALSE)
-cat("Saved to:", output_dir_c, "\n\n")
+write.csv(factors_c_is, file.path(output_dir_c, "ptree_factors_is.csv"), row.names = FALSE)
+
+# Attempt OOS on test_data_c
+factors_c_oos <- apply_ptree_trio_oos(results_c, test_data_c, all_chars)
+if (!is.null(factors_c_oos)) {
+  write.csv(factors_c_oos, file.path(output_dir_c, "ptree_factors_oos.csv"), row.names = FALSE)
+  cat("Saved IS+OOS to:", output_dir_c, "(C)\n\n")
+} else {
+  # Backward-compatible: write legacy filename for IS too
+  write.csv(factors_c_is, file.path(output_dir_c, "ptree_factors.csv"), row.names = FALSE)
+  cat("Note: OOS prediction unavailable (no predict() in PTree). Wrote IS only.\n\n")
+}
 
 ###### Final Summary Table #####
 

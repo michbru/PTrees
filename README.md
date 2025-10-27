@@ -41,7 +41,9 @@ python src/3_benchmark_analysis.py
 | **B: Time Split** | 1997-2010 (155 months) | 1997-2010 (148 months) | Forward validation (P-Tree-b) |
 | **C: Reverse Split** | 2010-2022 (156 months) | 2010-2020 (127 months) | Reverse validation (P-Tree-c) |
 
-**Note:** Benchmark analysis (CAPM, FF3, FF4) limited to 1997-2020 due to Fama-French factor availability. P-Tree factors extend to 2022 but lack benchmark comparisons for 2020-2022.
+Notes:
+- Benchmark analysis (CAPM, FF3, FF4) is limited by Fama-French factor availability (ends 2020-07). Results use overlapping dates only.
+- For split scenarios B/C, the pipeline attempts out-of-sample (OOS) factor series (files `ptree_factors_oos.csv`). If prediction is unavailable in your installed PTree package, it will save in-sample (IS) factors only.
 
 ### Parameter Scaling for Market Size
 
@@ -69,7 +71,7 @@ This parameter scaling allows trees to split properly in the smaller Swedish mar
 
 **2. Install Python Packages:**
 ```bash
-pip install pandas numpy pyarrow
+pip install pandas numpy pyarrow statsmodels
 ```
 
 **3. Install R Packages:**
@@ -77,8 +79,12 @@ pip install pandas numpy pyarrow
 # Open R and run:
 install.packages(c("arrow", "rpart", "ranger", "data.table"))
 
-# Install P-Tree package (from local source)
-install.packages("PTree-2501/PTree", repos = NULL, type = "source")
+# Install P-Tree package (from local source or provided tar.gz)
+# NOTE: Ensure the PTree package source is available locally.
+# Example:
+# install.packages("PTree-2501/PTree", repos = NULL, type = "source")
+# or
+# install.packages("PTree_*.tar.gz", repos = NULL, type = "source")
 ```
 
 ---
@@ -120,8 +126,8 @@ PTrees/
 ├── results/
 │   ├── cross_scenario_comparison.csv     # Summary table
 │   ├── ptree_scenario_a_full/            # Full period results
-│   ├── ptree_scenario_b_split/           # Time split results
-│   └── ptree_scenario_c_reverse/         # Reverse split results
+│   ├── ptree_scenario_b_split/           # Time split results (IS + OOS if available)
+│   └── ptree_scenario_c_reverse/         # Reverse split results (IS + OOS if available)
 └── README.md                             # This file
 ```
 
@@ -216,7 +222,7 @@ Cong, L. W., Feng, G., He, J., & He, X. (2024). Growing the efficient frontier o
 
 ---
 
-**Last Updated:** October 25, 2025
+**Last Updated:** October 27, 2025
 **Status:** ✅ Analysis Complete - Validated Implementation
 **Main Finding:** P-Trees identify profitable strategies in Swedish market (Sharpe 2.7-4.3, Alpha 22-27%, t-stats 9.5-15.0)
 
