@@ -126,7 +126,11 @@ def verify_results():
             print(f"  ✓ {scenario:<35}")
             # Check for key files
             if (scenario_dir / "ptree_factors.csv").exists():
-                print(f"    - ptree_factors.csv")
+                print(f"    - ptree_factors.csv (legacy)")
+            if (scenario_dir / "ptree_factors_is.csv").exists():
+                print(f"    - ptree_factors_is.csv")
+            if (scenario_dir / "ptree_factors_oos.csv").exists():
+                print(f"    - ptree_factors_oos.csv")
             if (scenario_dir / "benchmark_analysis").exists():
                 print(f"    - benchmark_analysis/")
         else:
@@ -178,10 +182,10 @@ def main():
     # Success!
     print_header("✓ REPLICATION COMPLETE")
     print("Results Summary:")
-    print("  📊 results/cross_scenario_comparison.csv    (Main summary table)")
-    print("  � results/ptree_scenario_a_full/           (Full period: 1997-2022)")
-    print("  � results/ptree_scenario_b_split/          (Train/test split)")
-    print("  � results/ptree_scenario_c_reverse/        (Reverse chronology)")
+    print("  - results/cross_scenario_comparison.csv    (Main summary table)")
+    print("  - results/ptree_scenario_a_full/           (Full period: 1997-2022)")
+    print("  - results/ptree_scenario_b_split/          (Train/test split)")
+    print("  - results/ptree_scenario_c_reverse/        (Reverse chronology)")
     print("\nKey Findings:")
     print("  ✓ Sharpe Ratios: 2.7-4.3")
     print("  ✓ Alphas: 20-28% per year (vs CAPM/FF3/FF4)")
