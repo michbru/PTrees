@@ -143,7 +143,14 @@ for scenario_key, scenario_info in scenarios.items():
     scenario_results = {
         'sharpe': [],
         'alphas': [],
-        'correlations': {}
+        'correlations': {},
+        'metadata': {
+            'file_used': os.path.basename(ptree_path),
+            'is_oos': label == 'OOS',
+            'period_start': ptree_aligned.index[0],
+            'period_end': ptree_aligned.index[-1],
+            'n_months': len(ptree_aligned)
+        }
     }
 
     # ----- TABLE 1: SHARPE RATIOS -----
@@ -260,9 +267,12 @@ for scenario_key, scenario_info in scenarios.items():
     f1_sharpe = results['sharpe'][0]
     f1_alpha = results['alphas'][0]
 
+    metadata = results['metadata']
     comparison_data.append({
         'Scenario': scenario_info['name'].split(':')[0],
-        'Period': f"{ptree.index[0].strftime('%Y-%m')} to {ptree.index[-1].strftime('%Y-%m')}",
+        'Data_Type': 'OOS' if metadata['is_oos'] else 'IS',
+        'Period': f"{metadata['period_start'].strftime('%Y-%m')} to {metadata['period_end'].strftime('%Y-%m')}",
+        'N_Months': metadata['n_months'],
         'F1_Sharpe': f1_sharpe['Individual_SR'],
         'F1_Alpha_CAPM': f1_alpha['CAPM_alpha'],
         'F1_tstat_CAPM': f1_alpha['CAPM_tstat'],
