@@ -1,5 +1,5 @@
 ############################################################################
-# COMPLETE P-TREE ANALYSIS - CORRECT METHODOLOGY
+# COMPLETE P-TREE ANALYSIS 
 # Following Cong et al. (2024) JFE Paper
 #
 # Three scenarios:

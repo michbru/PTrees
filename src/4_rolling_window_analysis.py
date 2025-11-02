@@ -21,7 +21,7 @@ print("ROLLING WINDOW ANALYSIS - ROBUSTNESS CHECK")
 print("="*80)
 
 # Configuration
-TRAIN_WINDOW = 60  # months
+TRAIN_WINDOW = 24  # months
 TEST_WINDOW = 12   # months
 STEP_SIZE = 12     # months
 
@@ -46,7 +46,7 @@ def run_regression(Y, X, add_constant=True, hac_lags=3):
 
 # Load data
 print("\nLoading data...")
-data = pd.read_csv('results/ptree_ready_data_full.csv')
+data = pd.read_csv('results/4_rolling_window_analysis.csv')
 data['date'] = pd.to_datetime(data['date'])
 data = data.sort_values('date')
 
