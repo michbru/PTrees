@@ -82,6 +82,9 @@ PTrees/
 │       ├── transaction_cost_analysis.csv
 │       ├── subperiod_analysis.csv
 │       └── plots/
+├── notebooks/
+│   ├── data_preprocessing.ipynb      # Data exploration & macro variable construction
+│   └── README.md                     # Notebook documentation
 └── docs/
     ├── pdfs/
     │   ├── Bachelor_Thesis_SSE.pdf
