@@ -86,14 +86,10 @@ PTrees/
 │   ├── data_preprocessing.ipynb      # Data exploration & macro variable construction
 │   └── README.md                     # Notebook documentation
 └── docs/
-    ├── pdfs/
-    │   ├── Bachelor_Thesis_SSE.pdf
-    │   ├── Bachelor_Thesis_SSE_Midterm_Presentation.pdf
-    │   └── trees.pdf                 # Cong et al. (2024) reference paper
-    └── analysis_reports/
-        ├── ANALYSIS_COMPLETE_README.md
-        ├── FINAL_RESULTS_SUMMARY.md
-        └── CRITICAL_FINDINGS_REPORT.md
+    └── pdfs/
+        ├── Bachelor_Thesis_SSE.pdf
+        ├── Bachelor_Thesis_SSE_Midterm_Presentation.pdf
+        └── trees.pdf                 # Cong et al. (2024) reference paper
 ```
 
 ---
@@ -309,5 +305,3 @@ Implementation of Cong et al. (2024) "Growing the Efficient Frontier on Panel Tr
 **Last Updated:** 2025-11-09
 **Status:** ✅ Analysis Complete with Full Robustness Checks
 **Main Finding:** P-Trees show strong rolling window performance (Sharpe 4.60, net 27.8% after costs) but with significant regime dependence
-
-For detailed reports, see `docs/analysis_reports/`
