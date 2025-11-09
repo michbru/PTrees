@@ -34,20 +34,24 @@
 
 ### Run Complete Analysis
 ```bash
-# Data preparation
+# Option 1: Run everything automatically (scripts 3-7)
+python src/run_complete_analysis.py
+
+# Option 2: Run scripts individually
+# Data preparation (only needed once)
 python src/1_prepare_data.py
 
-# Train P-Tree models (3 scenarios)
+# Train P-Tree models - 3 scenarios (only needed once)
 Rscript src/2_ptree_analysis.R
 
 # Benchmark analysis
 python src/3_benchmark_analysis.py
 
 # Robustness checks
-python src/5_transaction_cost_analysis.py
-python src/6_subperiod_analysis.py
-Rscript src/7_rolling_window_ptree.R
-python src/8_visualize_rolling_window.py
+python src/4_transaction_cost_analysis.py
+python src/5_subperiod_analysis.py
+Rscript src/6_rolling_window_ptree.R
+python src/7_visualize_rolling_window.py
 ```
 
 **Estimated Runtime:** 25-30 minutes total
@@ -67,11 +71,11 @@ PTrees/
 │   ├── 1_prepare_data.py             # Data preparation & cross-sectional ranking
 │   ├── 2_ptree_analysis.R            # P-Tree training (3 scenarios)
 │   ├── 3_benchmark_analysis.py       # CAPM/FF3/FF4 benchmark regressions
-│   ├── 4_rolling_window_analysis.py  # Rolling window setup
-│   ├── 5_transaction_cost_analysis.py # Net returns after costs
-│   ├── 6_subperiod_analysis.py       # Performance by regime
-│   ├── 7_rolling_window_ptree.R      # Rolling window P-Trees (most robust)
-│   └── 8_visualize_rolling_window.py # Visualizations
+│   ├── 4_transaction_cost_analysis.py # Net returns after costs
+│   ├── 5_subperiod_analysis.py       # Performance by regime
+│   ├── 6_rolling_window_ptree.R      # Rolling window P-Trees (most robust)
+│   ├── 7_visualize_rolling_window.py # Visualizations
+│   └── run_complete_analysis.py      # Master script (runs 3-7 automatically)
 ├── results/
 │   ├── cross_scenario_comparison.csv # Main results table
 │   ├── ptree_scenario_a_full/        # Full sample (1997-2022)

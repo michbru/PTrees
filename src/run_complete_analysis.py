@@ -28,10 +28,10 @@ scripts_to_run = [
     ("1_prepare_data.py", "Data Preparation", False, "python"),
     ("2_ptree_analysis.R", "P-Tree Model Training (3 scenarios)", False, "r"),
     ("3_benchmark_analysis.py", "Benchmark Analysis (CAPM/FF3/FF4)", True, "python"),
-    ("5_transaction_cost_analysis.py", "Transaction Cost Analysis", True, "python"),
-    ("6_subperiod_analysis.py", "Subperiod Analysis", True, "python"),
-    ("7_rolling_window_ptree.R", "Rolling Window P-Trees (Most Robust)", True, "r"),
-    ("8_visualize_rolling_window.py", "Visualize Rolling Window Results", True, "python")
+    ("4_transaction_cost_analysis.py", "Transaction Cost Analysis", True, "python"),
+    ("5_subperiod_analysis.py", "Subperiod Analysis", True, "python"),
+    ("6_rolling_window_ptree.R", "Rolling Window P-Trees (Most Robust)", True, "r"),
+    ("7_visualize_rolling_window.py", "Visualize Rolling Window Results", True, "python")
 ]
 
 print("\nAnalysis Pipeline:")
