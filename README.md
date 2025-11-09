@@ -218,13 +218,13 @@ Calculation: (300 / 2,500) × 20 = 2.4 ≈ 3 (conservative)
 ## ✅ Implementation Validation
 
 ### Correctness Checks
-- ✅ **No look-ahead bias:** All characteristics properly lagged
+- ✅ **No look-ahead bias:** All characteristics lagged by 1 month; cross-sectional ranks use lagged values
 - ✅ **Clean temporal split:** Zero overlap between train/test periods
 - ✅ **Proper value-weighting:** Uses lagged market cap (`lag_me`)
 - ✅ **Cross-sectional ranking:** Percentile ranks computed within each month
 - ✅ **Parameter scaling:** Correctly adjusted for market size
 - ✅ **OOS prediction:** True out-of-sample using `predict()` function
-- ✅ **Statistical calculations:** Sharpe ratios and alphas manually verified
+- ✅ **Statistical calculations:** Sharpe ratios and alphas verified; Newey–West HAC with 12 lags for monthly data
 
 ### Data Quality
 - **Total observations:** 101,445

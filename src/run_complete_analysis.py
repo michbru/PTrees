@@ -25,18 +25,19 @@ print("="*80)
 # Define all scripts in execution order
 # Format: (script_name, description, run_by_default, script_type)
 scripts_to_run = [
-    ("1_prepare_data.py", "Data Preparation", False, "python"),
-    ("2_ptree_analysis.R", "P-Tree Model Training (3 scenarios)", False, "r"),
+    ("1_prepare_data.py", "Data Preparation", True, "python"),
+    ("2_ptree_analysis.R", "P-Tree Model Training (3 scenarios)", True, "r"),
     ("3_benchmark_analysis.py", "Benchmark Analysis (CAPM/FF3/FF4)", True, "python"),
     ("4_transaction_cost_analysis.py", "Transaction Cost Analysis", True, "python"),
     ("5_subperiod_analysis.py", "Subperiod Analysis", True, "python"),
-    ("6_rolling_window_ptree.R", "Rolling Window P-Trees (Most Robust)", True, "r"),
-    ("7_visualize_rolling_window.py", "Visualize Rolling Window Results", True, "python")
+    ("6_rolling_window_ptree.R", "Rolling Window P-Trees (Most Robust)", False, "r"),  # Optional: takes time
+    ("7_visualize_rolling_window.py", "Visualize Rolling Window Results", False, "python"),
+    ("8_visualize_main_results.py", "Visualize Main Results & Benchmarks", True, "python")
 ]
 
 print("\nAnalysis Pipeline:")
 for i, (script_name, description, will_run, _) in enumerate(scripts_to_run, 1):
-    status = "✓ WILL RUN" if will_run else "○ SKIP (already done)"
+    status = "[RUN]" if will_run else "[SKIP]"
     print(f"  {i}. {description:50} {status}")
 
 print("\nNote: Scripts 1 & 2 are skipped by default (run once, outputs cached).")
@@ -69,7 +70,10 @@ for script_name, description, run, script_type in scripts_to_run:
         if script_type == "python":
             cmd = [sys.executable, str(script_path)]
         elif script_type == "r":
-            cmd = ["Rscript", str(script_path)]
+            # On WSL, use 'wsl Rscript' to run R scripts
+            # Convert Windows path to forward slashes for WSL
+            script_path_str = str(script_path).replace("\\", "/")
+            cmd = ["wsl", "Rscript", script_path_str]
         else:
             print(f"[ERROR] Unknown script type: {script_type}")
             results[script_name] = "ERROR - Unknown type"
@@ -111,7 +115,7 @@ print("ANALYSIS PIPELINE SUMMARY")
 print("="*80)
 
 for script_name, status in results.items():
-    status_symbol = "✓" if "SUCCESS" in status else ("○" if status == "SKIPPED" else "✗")
+    status_symbol = "[OK]" if "SUCCESS" in status else ("[SKIP]" if status == "SKIPPED" else "[FAIL]")
     print(f"  {status_symbol} {script_name:45} {status}")
 
 print("\n" + "="*80)
@@ -136,9 +140,9 @@ output_files = [
 print()
 for file_path, description in output_files:
     if Path(file_path).exists():
-        print(f"  ✓ {description:50} {file_path}")
+        print(f"  [OK] {description:50} {file_path}")
     else:
-        print(f"  ✗ {description:50} {file_path} [MISSING]")
+        print(f"  [MISS] {description:50} {file_path}")
 
 print("\n" + "="*80)
 print("NEXT STEPS")
@@ -175,8 +179,8 @@ total_run = sum(1 for status in results.values() if status != "SKIPPED")
 if total_run > 0:
     print(f"\nSuccess rate: {successes}/{total_run} scripts completed successfully")
     if successes == total_run:
-        print("🎉 All scripts completed successfully!")
+        print("SUCCESS: All scripts completed successfully!")
     elif successes > 0:
-        print("⚠️  Some scripts had issues. Review the errors above.")
+        print("WARNING: Some scripts had issues. Review the errors above.")
     else:
-        print("❌ No scripts completed successfully. Check errors above.")
+        print("ERROR: No scripts completed successfully. Check errors above.")

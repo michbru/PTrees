@@ -26,7 +26,7 @@ cat(paste(rep("=", 80), collapse=""), "\n\n")
 # US paper: min_leaf_size = 20
 # Swedish: 300/2500 * 20 = 2.4 → use 3 (conservative)
 
-min_leaf_size = 3
+min_leaf_size = 3  # Scaled for Swedish market: 300/2500 * 20 ≈ 3
 max_depth = 10
 max_depth_boosting = 10
 num_iter = 9

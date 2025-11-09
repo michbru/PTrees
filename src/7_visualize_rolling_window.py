@@ -32,7 +32,7 @@ returns_file = results_dir / 'rolling_window_all_returns.csv'
 if not rolling_file.exists():
     print("\nERROR: Rolling window results not found!")
     print(f"  Expected: {rolling_file}")
-    print("\nRun: Rscript src/7_rolling_window_ptree.R")
+    print("\nRun: Rscript src/6_rolling_window_ptree.R")
     exit(1)
 
 # Load data
@@ -202,13 +202,13 @@ sharpe_std = df_rolling['Sharpe_Ratio'].std()
 
 print("\n1. PERFORMANCE CONSISTENCY:")
 if pct_positive >= 80 and sharpe_std < 0.5:
-    print("   ✓ EXCELLENT: High consistency (>80% positive, low variance)")
+    print("   [OK] EXCELLENT: High consistency (>80% positive, low variance)")
 elif pct_positive >= 70 and sharpe_std < 1.0:
-    print("   ✓ GOOD: Reasonable consistency (>70% positive, moderate variance)")
+    print("   [OK] GOOD: Reasonable consistency (>70% positive, moderate variance)")
 elif pct_positive >= 60:
-    print("   ~ MODERATE: Some inconsistency")
+    print("   [~] MODERATE: Some inconsistency")
 else:
-    print("   ✗ POOR: Highly inconsistent performance")
+    print("   [X] POOR: Highly inconsistent performance")
 
 print(f"   - {pct_positive:.1f}% of windows have positive Sharpe")
 print(f"   - Standard deviation: {sharpe_std:.3f}")
@@ -217,23 +217,23 @@ print(f"   - Standard deviation: {sharpe_std:.3f}")
 print("\n2. COMPARISON TO SINGLE SPLIT (Scenario B):")
 diff_pct = (aggregate_sharpe - 1.69) / 1.69 * 100
 if abs(diff_pct) < 10:
-    print(f"   ✓ CONSISTENT: Rolling avg ({aggregate_sharpe:.3f}) ≈ Single split (1.69)")
+    print(f"   [OK] CONSISTENT: Rolling avg ({aggregate_sharpe:.3f}) ~= Single split (1.69)")
     print(f"     Difference: {diff_pct:+.1f}%")
 elif aggregate_sharpe < 1.69:
-    print(f"   ⚠ LOWER: Rolling avg ({aggregate_sharpe:.3f}) < Single split (1.69)")
+    print(f"   [!] LOWER: Rolling avg ({aggregate_sharpe:.3f}) < Single split (1.69)")
     print(f"     Difference: {diff_pct:+.1f}% (more conservative)")
 else:
-    print(f"   ⚠ HIGHER: Rolling avg ({aggregate_sharpe:.3f}) > Single split (1.69)")
+    print(f"   [!] HIGHER: Rolling avg ({aggregate_sharpe:.3f}) > Single split (1.69)")
     print(f"     Difference: {diff_pct:+.1f}% (less conservative)")
 
 # Economic significance
 print("\n3. ECONOMIC SIGNIFICANCE:")
 if aggregate_return > 10:
-    print(f"   ✓ STRONG: {aggregate_return:.2f}% annual return (economically significant)")
+    print(f"   [OK] STRONG: {aggregate_return:.2f}% annual return (economically significant)")
 elif aggregate_return > 5:
-    print(f"   ~ MODERATE: {aggregate_return:.2f}% annual return")
+    print(f"   [~] MODERATE: {aggregate_return:.2f}% annual return")
 else:
-    print(f"   ✗ WEAK: {aggregate_return:.2f}% annual return (may not cover costs)")
+    print(f"   [X] WEAK: {aggregate_return:.2f}% annual return (may not cover costs)")
 
 # Transaction costs
 annual_cost_medium = 9.0  # 9% annual drag from medium TC scenario
@@ -245,11 +245,11 @@ print(f"   TC drag:      -{annual_cost_medium:6.2f}%")
 print(f"   Net return:   {net_return:6.2f}%")
 
 if net_return > 5:
-    print("   ✓ Still profitable after costs")
+    print("   [OK] Still profitable after costs")
 elif net_return > 0:
-    print("   ~ Marginally profitable after costs")
+    print("   [~] Marginally profitable after costs")
 else:
-    print("   ✗ Unprofitable after costs")
+    print("   [X] Unprofitable after costs")
 
 print("\n" + "="*80)
 print("ROLLING WINDOW VISUALIZATION COMPLETE")

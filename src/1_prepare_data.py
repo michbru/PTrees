@@ -74,24 +74,33 @@ characteristics = [
 print(f"\nCreating ranked characteristics...")
 print(f"  Processing {len(characteristics)} characteristics")
 
-# Cross-sectional ranking by month
+# Lag characteristics by 1 month (following Cong et al. 2024)
+print("  Step 1: Lagging all characteristics by 1 month...")
 for char in characteristics:
     if char in data.columns:
-        data[f'rank_{char}'] = data.groupby('date')[char].rank(pct=True)
-        print(f"  [OK] rank_{char}")
+        data[f'lag_{char}'] = data.groupby('permno')[char].shift(1)
+
+# Cross-sectional ranking by month using LAGGED values
+print("  Step 2: Ranking lagged characteristics within each month...")
+for char in characteristics:
+    lag_col = f'lag_{char}'
+    if lag_col in data.columns:
+        data[f'rank_{char}'] = data.groupby('date')[lag_col].rank(pct=True)
+        print(f"  [OK] rank_{char} (from {lag_col})")
 
 # Handle missing values in ranked characteristics
 print("\nHandling missing values in ranked characteristics...")
 ranked_cols = [c for c in data.columns if c.startswith('rank_')]
 nan_before = data[ranked_cols].isna().sum().sum()
 
-# Fill NaN ranks with 0.5 (median/neutral rank)
-# This is standard practice when characteristics are missing
-for col in ranked_cols:
-    data[col] = data[col].fillna(0.5)
+# REMOVE observations where ANY ranked characteristic is NaN
+# This removes first observation per stock (which has no prior data)
+# instead of filling with 0.5 which creates uninformative observations
+data = data[data[ranked_cols].notna().all(axis=1)].copy()
 
 nan_after = data[ranked_cols].isna().sum().sum()
-print(f"  Filled {nan_before:,} NaN values with 0.5 (median rank)")
+print(f"  Removed {nan_before:,} observations with NaN ranks")
+print(f"  Remaining observations: {len(data):,}")
 print(f"  Remaining NaN values: {nan_after}")
 
 # Create output directory

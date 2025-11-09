@@ -200,9 +200,9 @@ print("   - Early period (1997-2003) vs late period (2015-2020)")
 
 print("\n3. OVERFITTING RED FLAGS:")
 print("   - If performance is strong in 1-2 periods but weak in others:")
-print("     → Suggests model may be overfit to specific regimes")
+print("     -> Suggests model may be overfit to specific regimes")
 print("   - If crisis period has best performance:")
-print("     → Unusual and may indicate data issues")
+print("     -> Unusual and may indicate data issues")
 
 print("\n4. SAMPLE SIZE:")
 print("   - Short subperiods have fewer observations")
