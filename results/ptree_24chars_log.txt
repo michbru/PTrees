@@ -1,0 +1,315 @@
+================================================================================ 
+P-TREE ANALYSIS - 24 MATCHED CHARACTERISTICS (US STUDY)
+Following Cong et al. (2024) Journal of Financial Economics
+================================================================================ 
+
+PARAMETERS:
+  min_leaf_size = 3 
+  max_depth = 10 
+  num_iter = 9 
+  num_cutpoints = 4 
+  Regularization: lambda_cov = 1e-04 
+
+Loading 24-characteristic dataset...
+  Total observations: 48231 
+  Date range: 1998-02-27 to 2022-12-30 
+  Unique stocks: 535 
+  Characteristics: 23 (matched to US study)
+
+================================================================================ 
+SCENARIO A: FULL PERIOD TRAINING (24 MATCHED CHARACTERISTICS)
+================================================================================ 
+
+-------------------------------------------------------------------------------- 
+Training 3 P-Trees for: Full Sample (24 chars) 
+-------------------------------------------------------------------------------- 
+
+Training data:
+  Observations: 48231 
+  Months: 299 
+  Stocks: 535 
+
+P-Tree 1 (No Benchmark)...
+The split value candidates are -0.6, -0.2, 0.2, 0.6
+break of no good candidate
+fitted tree 
+5
+1 14 0.6 3 0
+2 19 0.6 3 1
+4 0 0 0 0
+5 0 0 0 0
+3 0 0 0 0
+
+  Nodes: 5 | Sharpe: 1.067 | Time: 1.4 sec
+P-Tree 2 (Boosting on P-Tree 1)...
+The split value candidates are -0.6, -0.2, 0.2, 0.6
+break of no good candidate
+fitted tree 
+5
+1 2 0.6 3 0
+2 5 0.6 3 1
+4 0 0 0 0
+5 0 0 0 0
+3 0 0 0 0
+
+  Nodes: 5 | Sharpe: 0.748 
+P-Tree 3 (Boosting on P-Trees 1-2)...
+The split value candidates are -0.6, -0.2, 0.2, 0.6
+break of no good candidate
+fitted tree 
+5
+1 7 0.6 3 0
+2 13 0.6 3 1
+4 0 0 0 0
+5 0 0 0 0
+3 0 0 0 0
+
+  Nodes: 5 | Sharpe: 0.427 
+
+Saved to: results/ptree_24chars_scenario_a_full 
+
+   Tree Nodes Sharpe
+1 Tree1     5  1.067
+2 Tree2     5  0.748
+3 Tree3     5  0.427
+
+[SUCCESS] 24-char analysis complete in 19.6 seconds (0.3 minutes)
+================================================================================ 
+================================================================================ 
+P-TREE ANALYSIS - 24 MATCHED CHARACTERISTICS (US STUDY)
+Following Cong et al. (2024) Journal of Financial Economics
+================================================================================ 
+
+PARAMETERS:
+  min_leaf_size = 3 
+  max_depth = 10 
+  num_iter = 9 
+  num_cutpoints = 4 
+  Regularization: lambda_cov = 1e-04 
+
+Loading 24-characteristic dataset...
+  Total observations: 48231 
+  Date range: 1998-02-27 to 2022-12-30 
+  Unique stocks: 535 
+  Characteristics: 23 (matched to US study)
+
+================================================================================ 
+SCENARIO A: FULL PERIOD TRAINING (24 MATCHED CHARACTERISTICS)
+================================================================================ 
+
+-------------------------------------------------------------------------------- 
+Training 3 P-Trees for: Full Sample (24 chars) 
+-------------------------------------------------------------------------------- 
+
+Training data:
+  Observations: 48231 
+  Months: 299 
+  Stocks: 535 
+
+P-Tree 1 (No Benchmark)...
+The split value candidates are -0.6, -0.2, 0.2, 0.6
+break of no good candidate
+fitted tree 
+5
+1 14 0.6 3 0
+2 19 0.6 3 1
+4 0 0 0 0
+5 0 0 0 0
+3 0 0 0 0
+
+  Nodes: 5 | Sharpe: 1.067 | Time: 1.6 sec
+P-Tree 2 (Boosting on P-Tree 1)...
+The split value candidates are -0.6, -0.2, 0.2, 0.6
+break of no good candidate
+fitted tree 
+5
+1 2 0.6 3 0
+2 5 0.6 3 1
+4 0 0 0 0
+5 0 0 0 0
+3 0 0 0 0
+
+  Nodes: 5 | Sharpe: 0.748 
+P-Tree 3 (Boosting on P-Trees 1-2)...
+The split value candidates are -0.6, -0.2, 0.2, 0.6
+break of no good candidate
+fitted tree 
+5
+1 7 0.6 3 0
+2 13 0.6 3 1
+4 0 0 0 0
+5 0 0 0 0
+3 0 0 0 0
+
+  Nodes: 5 | Sharpe: 0.427 
+
+Saved to: results/ptree_24chars_scenario_a_full 
+
+   Tree Nodes Sharpe
+1 Tree1     5  1.067
+2 Tree2     5  0.748
+3 Tree3     5  0.427
+
+[SUCCESS] 24-char analysis complete in 20.3 seconds (0.3 minutes)
+================================================================================ 
+================================================================================ 
+SCENARIO B: TIME SPLIT (24 MATCHED CHARACTERISTICS)
+Train: 1997-2010 | Test: 2010-2020
+================================================================================ 
+
+Split date: 2010-01-01 
+
+-------------------------------------------------------------------------------- 
+Training 3 P-Trees for: Time Split (First Half, 24 chars) 
+-------------------------------------------------------------------------------- 
+
+Training data:
+  Observations: 19794 
+  Months: 143 
+  Stocks: 310 
+
+P-Tree 1 (No Benchmark)...
+The split value candidates are -0.6, -0.2, 0.2, 0.6
+fitted tree 
+19
+1 14 0.2 2 0
+2 18 0.6 3 2
+4 0 0 0 0
+5 0 0 0 0
+3 8 0.2 2 1
+6 0 0 0 0
+7 18 0.2 2 3
+14 9 0.6 3 4
+28 0 0 0 0
+29 0 0 0 0
+15 4 0.2 2 5
+30 0 0 0 0
+31 22 0.6 3 6
+62 18 0.6 3 8
+124 0 0 0 0
+125 0 0 0 0
+63 12 0.6 3 7
+126 0 0 0 0
+127 0 0 0 0
+
+  Nodes: 19 | Sharpe: 2.459 | Time: 1.4 sec
+P-Tree 2 (Boosting on P-Tree 1)...
+The split value candidates are -0.6, -0.2, 0.2, 0.6
+fitted tree 
+19
+1 0 0.6 3 0
+2 2 0.6 3 1
+4 4 0.6 3 7
+8 8 0.6 3 8
+16 0 0 0 0
+17 0 0 0 0
+9 0 0 0 0
+5 12 0.6 3 3
+10 6 0.6 3 4
+20 0 0 0 0
+21 0 0 0 0
+11 0 0 0 0
+3 10 0.2 2 2
+6 0 0 0 0
+7 15 0.6 3 5
+14 0 0 0 0
+15 13 0.6 3 6
+30 0 0 0 0
+31 0 0 0 0
+
+  Nodes: 19 | Sharpe: 2.13 
+P-Tree 3 (Boosting on P-Trees 1-2)...
+The split value candidates are -0.6, -0.2, 0.2, 0.6
+fitted tree 
+19
+1 12 0.6 3 0
+2 10 0.6 3 2
+4 12 0.2 2 3
+8 0 0 0 0
+9 16 0.6 3 7
+18 0 0 0 0
+19 0 0 0 0
+5 9 0.6 3 6
+10 0 0 0 0
+11 0 0 0 0
+3 13 0.6 3 1
+6 3 0.6 3 4
+12 2 0.6 3 5
+24 0 0 0 0
+25 0 0 0 0
+13 0 0 0 0
+7 20 0.6 3 8
+14 0 0 0 0
+15 0 0 0 0
+
+  Nodes: 19 | Sharpe: 1.016 
+
+Saved IS+OOS to: results/ptree_24chars_scenario_b_split (B)
+
+================================================================================ 
+SCENARIO C: REVERSE SPLIT (24 MATCHED CHARACTERISTICS)
+Train: 2010-2020 | Test: 1997-2010
+================================================================================ 
+
+-------------------------------------------------------------------------------- 
+Training 3 P-Trees for: Reverse Split (Second Half, 24 chars) 
+-------------------------------------------------------------------------------- 
+
+Training data:
+  Observations: 28437 
+  Months: 156 
+  Stocks: 397 
+
+P-Tree 1 (No Benchmark)...
+The split value candidates are -0.6, -0.2, 0.2, 0.6
+break of no good candidate
+fitted tree 
+5
+1 14 0.6 3 0
+2 7 0.6 3 1
+4 0 0 0 0
+5 0 0 0 0
+3 0 0 0 0
+
+  Nodes: 5 | Sharpe: 1.083 | Time: 0.8 sec
+P-Tree 2 (Boosting on P-Tree 1)...
+The split value candidates are -0.6, -0.2, 0.2, 0.6
+break of no good candidate
+fitted tree 
+5
+1 5 0.6 3 0
+2 2 0.6 3 1
+4 0 0 0 0
+5 0 0 0 0
+3 0 0 0 0
+
+  Nodes: 5 | Sharpe: 0.82 
+P-Tree 3 (Boosting on P-Trees 1-2)...
+The split value candidates are -0.6, -0.2, 0.2, 0.6
+break of no good candidate
+fitted tree 
+5
+1 1 0.2 2 0
+2 0 0 0 0
+3 13 0.6 3 1
+6 0 0 0 0
+7 0 0 0 0
+
+  Nodes: 5 | Sharpe: 0.591 
+
+Saved IS+OOS to: results/ptree_24chars_scenario_c_reverse (C)
+
+================================================================================ 
+FINAL SUMMARY - 24 MATCHED CHARACTERISTICS (A/B/C)
+================================================================================ 
+
+          Scenario                   Period Months Tree1_Nodes Tree1_Sharpe
+1   A: Full Sample 1998-02-27 to 2022-12-30    299           5        1.067
+2    B: Time Split 1998-02-27 to 2009-12-30    143          19        2.459
+3 C: Reverse Split 2010-01-29 to 2022-12-30    156           5        1.083
+  Tree2_Sharpe Tree3_Sharpe
+1        0.748        0.427
+2        2.130        1.016
+3        0.820        0.591
+
+Summary saved to: results/ptree_24chars_all_scenarios_summary.csv

@@ -1,0 +1,7 @@
+"Dataset","Scenario","Months","Tree1_Nodes","Tree1_Sharpe","Tree2_Sharpe","Tree3_Sharpe"
+"Full (54)","A: Full Sample",299,7,1.271,1.347,1.207
+"Full (54)","B: Time Split",143,19,2.836,1.497,2.498
+"Full (54)","C: Reverse Split",156,7,1.152,0.986,0.823
+"Matched (24)","A: Full Sample",299,5,1.067,0.748,0.427
+"Matched (24)","B: Time Split",143,19,2.459,2.13,1.016
+"Matched (24)","C: Reverse Split",156,5,1.083,0.82,0.591
