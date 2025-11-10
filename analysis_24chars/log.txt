@@ -1,0 +1,261 @@
+================================================================================ 
+P-TREE ANALYSIS - 24 MATCHED CHARACTERISTICS (US STUDY)
+Following Cong et al. (2024) Journal of Financial Economics
+================================================================================ 
+
+PARAMETERS:
+  min_leaf_size = 3 
+  max_depth = 10 
+  num_iter = 9 
+  num_cutpoints = 4 
+
+Loading 24-characteristic dataset...
+  Total observations: 48219 
+  Date range: 1998-02-27 to 2022-12-30 
+  Unique stocks: 535 
+  Characteristics: 22 
+  Characteristic list:
+    - rank_asset_growth 
+    - rank_asset_turnover 
+    - rank_book_to_market 
+    - rank_cash_liquidity 
+    - rank_cfp_ratio 
+    - rank_ep_ratio 
+    - rank_gross_profitability 
+    - rank_debt_to_equity 
+    - rank_market_cap 
+    - rank_momentum_12m 
+    - rank_return_1m 
+    - rank_operating_margin 
+    - rank_net_margin 
+    - rank_roa 
+    - rank_roe 
+    - rank_sales_growth 
+    - rank_sp_ratio 
+    - rank_turnover 
+    - rank_capex 
+    - rank_volume 
+    - rank_revenue_per_employee 
+    - rank_volatility_12m 
+
+================================================================================ 
+SCENARIO A: FULL SAMPLE
+================================================================================ 
+
+-------------------------------------------------------------------------------- 
+Training 3 P-Trees for: Full Sample (24 chars) 
+-------------------------------------------------------------------------------- 
+
+Training data:
+  Observations: 48219 
+  Months: 299 
+  Stocks: 535 
+
+P-Tree 1 (No Benchmark)...
+The split value candidates are -0.6, -0.2, 0.2, 0.6
+break of no good candidate
+fitted tree 
+5
+1 14 0.6 3 0
+2 19 0.6 3 1
+4 0 0 0 0
+5 0 0 0 0
+3 0 0 0 0
+
+  Nodes: 5 | Sharpe: 1.13 | Time: 1.1 sec
+P-Tree 2 (Boosting on P-Tree 1)...
+The split value candidates are -0.6, -0.2, 0.2, 0.6
+break of no good candidate
+fitted tree 
+5
+1 2 0.6 3 0
+2 6 0.6 3 1
+4 0 0 0 0
+5 0 0 0 0
+3 0 0 0 0
+
+  Nodes: 5 | Sharpe: 0.79 
+P-Tree 3 (Boosting on P-Trees 1-2)...
+The split value candidates are -0.6, -0.2, 0.2, 0.6
+break of no good candidate
+fitted tree 
+5
+1 7 0.6 3 0
+2 15 0.6 3 1
+4 0 0 0 0
+5 0 0 0 0
+3 0 0 0 0
+
+  Nodes: 5 | Sharpe: 0.58 
+
+Saved to: results/ptree_24chars_scenario_a_full 
+
+================================================================================ 
+SCENARIO B: TIME SPLIT
+Train: 1997-2010 | Test: 2010-2022
+================================================================================ 
+
+Split date: 2010-01-01 
+
+-------------------------------------------------------------------------------- 
+Training 3 P-Trees for: Time Split (First Half, 24 chars) 
+-------------------------------------------------------------------------------- 
+
+Training data:
+  Observations: 19787 
+  Months: 143 
+  Stocks: 310 
+
+P-Tree 1 (No Benchmark)...
+The split value candidates are -0.6, -0.2, 0.2, 0.6
+fitted tree 
+19
+1 21 0.2 2 0
+2 5 0.6 3 7
+4 0 0 0 0
+5 0 0 0 0
+3 19 0.6 3 1
+6 14 0.6 3 2
+12 21 0.6 3 3
+24 0 0 0 0
+25 16 0.6 3 6
+50 0 0 0 0
+51 0 0 0 0
+13 7 0.6 3 8
+26 0 0 0 0
+27 0 0 0 0
+7 7 0.2 2 4
+14 0 0 0 0
+15 20 0.6 3 5
+30 0 0 0 0
+31 0 0 0 0
+
+  Nodes: 19 | Sharpe: 2.383 | Time: 0.9 sec
+P-Tree 2 (Boosting on P-Tree 1)...
+The split value candidates are -0.6, -0.2, 0.2, 0.6
+fitted tree 
+19
+1 8 0.2 2 0
+2 18 0.6 3 8
+4 0 0 0 0
+5 0 0 0 0
+3 19 0.6 3 1
+6 13 0.2 2 2
+12 0 0 0 0
+13 10 0.2 2 3
+26 0 0 0 0
+27 10 0.6 3 4
+54 0 0 0 0
+55 0 0 0 0
+7 9 0.6 3 5
+14 18 0.6 3 6
+28 7 0.2 2 7
+56 0 0 0 0
+57 0 0 0 0
+29 0 0 0 0
+15 0 0 0 0
+
+  Nodes: 19 | Sharpe: 1.737 
+P-Tree 3 (Boosting on P-Trees 1-2)...
+The split value candidates are -0.6, -0.2, 0.2, 0.6
+fitted tree 
+19
+1 10 0.2 2 0
+2 3 0.6 3 4
+4 0 0 0 0
+5 0 0 0 0
+3 1 0.2 2 1
+6 20 0.6 3 6
+12 0 0 0 0
+13 0 0 0 0
+7 21 0.6 3 2
+14 15 0.6 3 3
+28 20 0.6 3 5
+56 0 0 0 0
+57 0 0 0 0
+29 8 0.6 3 8
+58 0 0 0 0
+59 0 0 0 0
+15 5 0.6 3 7
+30 0 0 0 0
+31 0 0 0 0
+
+  Nodes: 19 | Sharpe: 0.718 
+
+Generating out-of-sample predictions...
+Out-of-sample predictions successful!
+Saved OOS factors to: results/ptree_24chars_scenario_b_split/ptree_factors_oos.csv 
+
+================================================================================ 
+SCENARIO C: REVERSE SPLIT
+Train: 2010-2022 | Test: 1997-2010
+================================================================================ 
+
+-------------------------------------------------------------------------------- 
+Training 3 P-Trees for: Reverse Split (Second Half, 24 chars) 
+-------------------------------------------------------------------------------- 
+
+Training data:
+  Observations: 28432 
+  Months: 156 
+  Stocks: 397 
+
+P-Tree 1 (No Benchmark)...
+The split value candidates are -0.6, -0.2, 0.2, 0.6
+break of no good candidate
+fitted tree 
+5
+1 14 0.6 3 0
+2 10 0.6 3 1
+4 0 0 0 0
+5 0 0 0 0
+3 0 0 0 0
+
+  Nodes: 5 | Sharpe: 1.034 | Time: 0.5 sec
+P-Tree 2 (Boosting on P-Tree 1)...
+The split value candidates are -0.6, -0.2, 0.2, 0.6
+break of no good candidate
+fitted tree 
+5
+1 14 0.2 2 0
+2 0 0 0 0
+3 8 0.6 3 1
+6 0 0 0 0
+7 0 0 0 0
+
+  Nodes: 5 | Sharpe: 1.172 
+P-Tree 3 (Boosting on P-Trees 1-2)...
+The split value candidates are -0.6, -0.2, 0.2, 0.6
+break of no good candidate
+fitted tree 
+5
+1 6 0.6 3 0
+2 5 0.6 3 1
+4 0 0 0 0
+5 0 0 0 0
+3 0 0 0 0
+
+  Nodes: 5 | Sharpe: 0.651 
+
+Generating out-of-sample predictions...
+Out-of-sample predictions successful!
+Saved OOS factors to: results/ptree_24chars_scenario_c_reverse/ptree_factors_oos.csv 
+
+================================================================================ 
+ANALYSIS COMPLETE - 24 MATCHED CHARACTERISTICS
+================================================================================ 
+
+    Scenario Train_Obs Test_Obs Tree1_Nodes Tree2_Nodes Tree3_Nodes
+1    A: Full     48219        0           5           5           5
+2   B: Split     19787    28432          19          19          19
+3 C: Reverse     28432    19787           5           5           5
+  Tree1_Sharpe Tree2_Sharpe Tree3_Sharpe
+1     1.129889    0.7902268    0.5795501
+2     2.382963    1.7366208    0.7176965
+3     1.033596    1.1716725    0.6509891
+
+Total runtime: 0.2 minutes
+
+Results saved to results/ptree_24chars_scenario_*/
+Summary saved to results/ptree_24chars_all_scenarios_summary.csv
+
