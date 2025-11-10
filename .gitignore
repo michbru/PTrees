@@ -14,6 +14,10 @@ analysis_dataset/**/ptree_ready_data_sample.csv
 analysis_dataset/**/finbas_market_data.csv
 analysis_dataset/**/lseg_*.csv
 
+# Exclude all prepared data files from results (too large for GitHub)
+results/**/ptree_ready_data*.csv
+results/ptree_ready_data*.csv
+
 # Keep only small result files
 !analysis_dataset/**/ptree_factors.csv
 
