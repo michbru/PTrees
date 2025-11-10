@@ -20,6 +20,9 @@ analysis_dataset/**/lseg_*.csv
 #PTree files
 PTree-2501
 
+# Serrano database files (large)
+serrano/
+
 # Exclude all exe files and installers
 *.exe
 *.msi
