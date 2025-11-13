@@ -1,5 +1,6 @@
 # Directories to ignore
 thesis-omxspi-pipeline/
+
 .claude/
 .idea/
 .venv/

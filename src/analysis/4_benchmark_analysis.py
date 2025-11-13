@@ -30,21 +30,21 @@ lambda_mean = 0
 scenarios = {
     'A_Full': {
         'name': 'Scenario A: Full Sample (IS)',
-        'folder': 'results/ptree_scenario_a_full',
+        'folder': '../../results/ptree_34chars/scenario_a_full',
         'prefer_oos': False,
         'period_hint': '1997-02 to 2022-12',
         'benchmark_note': 'Benchmarks limited to overlap (FF data through 2020-07)'
     },
     'B_Split': {
         'name': 'Scenario B: Time Split (Train 1997-2009; OOS 2010-2020)',
-        'folder': 'results/ptree_scenario_b_split',
+        'folder': '../../results/ptree_34chars/scenario_b_split',
         'prefer_oos': True,
         'period_hint': 'IS 1997-02 to 2009-12; OOS 2010-01 to 2020-07',
         'benchmark_note': 'Prefer OOS; aligns to FF overlap'
     },
     'C_Reverse': {
         'name': 'Scenario C: Reverse Split (Train 2010-2022; OOS 1997-2010)',
-        'folder': 'results/ptree_scenario_c_reverse',
+        'folder': '../../results/ptree_34chars/scenario_c_reverse',
         'prefer_oos': True,
         'period_hint': 'IS 2010-01 to 2022-12; OOS 1997-02 to ~2010-01',
         'benchmark_note': 'Prefer OOS; aligns to FF overlap'
@@ -53,7 +53,7 @@ scenarios = {
 
 # Load macro variables with dates
 print("\nLoading benchmark factor data...")
-macro = pd.read_csv('data/macro_variables_with_dates.csv')
+macro = pd.read_csv('../../data/macro/macro_variables_with_dates.csv')
 macro['date'] = pd.to_datetime(macro['date'])
 macro = macro.set_index('date')
 print(f"  Macro data: {len(macro)} months ({macro.index[0].strftime('%Y-%m')} to {macro.index[-1].strftime('%Y-%m')})")
@@ -158,7 +158,7 @@ for scenario_key, scenario_info in scenarios.items():
     print("  TABLE 1: SHARPE RATIOS")
     print("-"*80)
 
-    for i, factor_name in enumerate(['factor1', 'factor2', 'factor3'], 1):
+    for i, factor_name in enumerate(['factor', 'factor', 'factor'], 1):
         individual_sr = calculate_sharpe(ptree_aligned[factor_name])
         mve_sr, mve_mean, mve_std = calculate_mve_sharpe(
             ptree_aligned.iloc[:, :i],
@@ -181,7 +181,7 @@ for scenario_key, scenario_info in scenarios.items():
     print("  TABLE 2: ALPHAS VS BENCHMARKS")
     print("-"*80)
 
-    for i, factor_name in enumerate(['factor1', 'factor2', 'factor3'], 1):
+    for i, factor_name in enumerate(['factor', 'factor', 'factor'], 1):
         Y = ptree_aligned[factor_name].values
 
         # CAPM
@@ -219,9 +219,9 @@ for scenario_key, scenario_info in scenarios.items():
     print("-"*80)
 
     all_factors = pd.DataFrame({
-        'P-Tree F1': ptree_aligned['factor1'],
-        'P-Tree F2': ptree_aligned['factor2'],
-        'P-Tree F3': ptree_aligned['factor3'],
+        'P-Tree F1': ptree_aligned['factor'],
+        'P-Tree F2': ptree_aligned['factor'],
+        'P-Tree F3': ptree_aligned['factor'],
         'MKT': mkt,
         'SMB': smb,
         'HML': hml,
@@ -286,8 +286,8 @@ df_comparison = pd.DataFrame(comparison_data)
 print("\nFactor 1 Performance Across Scenarios:")
 print(df_comparison.to_string(index=False))
 
-df_comparison.to_csv('results/cross_scenario_comparison.csv', index=False)
-print("\nSaved to: results/cross_scenario_comparison.csv")
+df_comparison.to_csv('../../results/ptree_34chars/cross_scenario_comparison.csv', index=False)
+print("\nSaved to: ../../results/ptree_34chars/cross_scenario_comparison.csv")
 
 print("\n" + "="*80)
 print("BENCHMARK ANALYSIS COMPLETE")

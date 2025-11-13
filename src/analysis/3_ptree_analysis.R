@@ -1,392 +1,356 @@
 ############################################################################
-# COMPLETE P-TREE ANALYSIS 
-# Following Cong et al. (2024) JFE Paper
+# COMPREHENSIVE P-TREE ANALYSIS
+# Following Cong et al. (2024) Journal of Financial Economics
 #
-# Three scenarios:
-# - Scenario A (Full): Train on entire period 1997-2022 (like P-Tree-a)
-# - Scenario B (Split): Train 1997-2010, Test 2010-2022 (like P-Tree-b)
-# - Scenario C (Reverse): Train 2010-2022, Test 1997-2010 (like P-Tree-c)
+# This script performs TWO types of validation:
 #
-# NOTE: Benchmark analysis is limited to 1997-2020 due to Fama-French factor
-# data availability (FF factors only available through 2020-07).
+# PART 1: Three-Scenario Validation (Traditional Approach)
+#   - Scenario A: Full sample (1997-2022)
+#   - Scenario B: Time split (Train 1997-2010, Test 2010-2022)
+#   - Scenario C: Reverse split (Train 2010-2022, Test 1997-2010)
+#
+# PART 2: Rolling Window Validation (Anti-Overfitting)
+#   - 20 independent train-test windows
+#   - Train: 5 years, Test: 1 year, Roll: 1 year
+#   - More robust validation with multiple OOS tests
+#
 ############################################################################
 
-t_total = proc.time()
+cat("================================================================================\n")
+cat("COMPREHENSIVE P-TREE ANALYSIS WITH 34 CHARACTERISTICS\n")
+cat("Following Cong et al. (2024) Journal of Financial Economics\n")
+cat("================================================================================\n\n")
 
 library(PTree)
 
-cat(paste(rep("=", 80), collapse=""), "\n")
-cat("P-TREE ANALYSIS WITH 34 CHARACTERISTICS\n")
-cat("Following Cong et al. (2024) Journal of Financial Economics\n")
-cat(paste(rep("=", 80), collapse=""), "\n\n")
+###### CONSERVATIVE PARAMETERS (ANTI-OVERFITTING) #####
 
-###### Parameters (Conservative for Swedish Market) #####
-
-# UPDATED PARAMETERS based on overfitting analysis:
-# - Increased min_leaf_size from 3 to 5 (more conservative splits)
-# - Reduced max_depth from 10 to 8 (prevent deep overfitting)
-# - Reduced num_iter from 9 to 6 (less boosting = less overfitting)
-# - Increased lambda_cov from 1e-4 to 5e-4 (more shrinkage)
-#
-# Rationale: Swedish market has ~300 stocks vs US ~2500 stocks
-# Smaller sample requires MORE conservative parameters to prevent overfitting
-
-min_leaf_size = 5  # Increased from 3 (fewer stocks = need larger leaves)
-max_depth = 8      # Reduced from 10 (prevent deep tree overfitting)
-max_depth_boosting = 8
-num_iter = 6       # Reduced from 9 (less boosting iterations)
-num_iterB = 6
-num_cutpoints = 4
+# Tuned for Swedish market (~300 stocks vs ~2,500 in US)
+min_leaf_size = 10         # Conservative (doubled from 5)
+max_depth = 5              # Shallow trees (reduced from 8)
+num_iter = 3               # Minimal boosting (reduced from 6)
+num_cutpoints = 3          # Reduced from 4
 equal_weight = FALSE
+lambda_cov = 1e-3          # Strong regularization (doubled)
+lambda_cov_factor = 1e-4   # Strong regularization (doubled)
 
-# Regularization (INCREASED for smaller market)
-lambda_mean = 0
-lambda_cov = 5e-4          # Increased from 1e-4 (more covariance shrinkage)
-lambda_mean_factor = 0
-lambda_cov_factor = 5e-5   # Increased from 1e-5 (proportional increase)
+cat("ANTI-OVERFITTING PARAMETERS:\n")
+cat("  min_leaf_size     =", min_leaf_size, "(doubled from 5)\n")
+cat("  max_depth         =", max_depth, "(reduced from 8)\n")
+cat("  num_iter          =", num_iter, "(reduced from 6)\n")
+cat("  lambda_cov        =", lambda_cov, "(doubled regularization)\n")
+cat("  equal_weight      = FALSE (value-weighted portfolios)\n")
+cat("  Rationale: Smaller Swedish market requires more conservative parameters\n\n")
 
-cat("PARAMETERS (CONSERVATIVE FOR SWEDISH MARKET):\n")
-cat("  min_leaf_size =", min_leaf_size, "(increased from 3 to reduce overfitting)\n")
-cat("  max_depth =", max_depth, "(reduced from 10 to prevent deep trees)\n")
-cat("  num_iter =", num_iter, "(reduced from 9 to limit boosting)\n")
-cat("  num_cutpoints =", num_cutpoints, "\n")
-cat("  Regularization: lambda_cov =", lambda_cov, "(increased from 1e-4)\n")
-cat("  NOTE: Parameters tuned to reduce overfitting in smaller Swedish market\n\n")
+###### LOAD DATA #####
 
-###### Load Data #####
-
-cat("Loading data...\n")
-data_path = "../../results/ptree_34chars/ptree_ready_data_34chars.csv"
+cat("Loading P-Tree ready data...\n")
+data_path <- "../../results/ptree_34chars/ptree_ready_data_34chars.csv"
 data <- read.csv(data_path, stringsAsFactors = FALSE)
 data$date <- as.Date(data$date, format='%Y-%m-%d')
+data <- data[order(data$date), ]
 
 all_chars <- names(data)[grep("^rank_", names(data))]
-instruments = all_chars[1:min(5, length(all_chars))]
-first_split_var = seq(0, length(all_chars)-1)
-second_split_var = seq(0, length(all_chars)-1)
+instruments <- all_chars[1:min(5, length(all_chars))]
 
 cat("  Total observations:", nrow(data), "\n")
 cat("  Date range:", as.character(min(data$date)), "to", as.character(max(data$date)), "\n")
 cat("  Unique stocks:", length(unique(data$permno)), "\n")
 cat("  Characteristics:", length(all_chars), "\n\n")
 
-###### Helper Functions #####
+###### HELPER FUNCTIONS #####
 
 calculate_sharpe <- function(returns) {
-  return(mean(returns) / sd(returns) * sqrt(12))
+  if(length(returns) < 2 || all(is.na(returns))) return(NA)
+  mean_ret <- mean(returns, na.rm = TRUE)
+  sd_ret <- sd(returns, na.rm = TRUE)
+  if(sd_ret == 0) return(0)
+  return(mean_ret / sd_ret * sqrt(12))
 }
 
-prepare_design <- function(df, all_chars, instruments) {
-  X = df[, all_chars]
-  R = df[, "xret"]
-  months = as.numeric(as.factor(df$date)) - 1
-  stocks = as.numeric(as.factor(df$permno)) - 1
-  Z = cbind(1, df[, instruments])
-  portfolio_weight = df[, "lag_me"]
-  loss_weight = df[, "lag_me"]
-  num_months = length(unique(months))
-  num_stocks = length(unique(stocks))
-  list(X=X, R=R, months=months, stocks=stocks, Z=Z,
-       portfolio_weight=portfolio_weight, loss_weight=loss_weight,
-       num_months=num_months, num_stocks=num_stocks)
+train_simple_ptree <- function(train_data, desc = "") {
+  # Prepare data
+  X_train <- train_data[, all_chars]
+  R_train <- train_data[, "xret"]
+  months_train <- as.numeric(as.factor(train_data$date)) - 1
+  stocks_train <- as.numeric(as.factor(train_data$permno)) - 1
+  Z_train <- cbind(1, train_data[, instruments])
+  portfolio_weight <- train_data[, "lag_me"]
+  loss_weight <- train_data[, "lag_me"]
+  num_months_train <- length(unique(months_train))
+  num_stocks_train <- length(unique(stocks_train))
+
+  if(desc != "") cat("  Training P-Tree for", desc, "...\n")
+
+  Y_train <- train_data[, "xret"]
+  H_train <- rep(0, nrow(train_data))
+  first_split_var <- seq(0, length(all_chars) - 1)
+  second_split_var <- seq(0, length(all_chars) - 1)
+
+  t_start <- proc.time()
+  fit <- tryCatch({
+    PTree(R_train, Y_train, X_train, Z_train, H_train,
+          portfolio_weight, loss_weight,
+          stocks_train, months_train, first_split_var, second_split_var,
+          num_stocks_train, num_months_train,
+          min_leaf_size, max_depth, num_iter, num_cutpoints,
+          eta = 1, equal_weight = equal_weight,
+          no_H = TRUE, abs_normalize = TRUE, weighted_loss = FALSE,
+          0, lambda_cov, 0, lambda_cov_factor,
+          early_stop = FALSE, stop_threshold = 1, lambda_ridge = 0,
+          a1 = 0, a2 = 0, list_K = matrix(rep(0,3), nrow = 3, ncol = 1),
+          random_split = FALSE)
+  }, error = function(e) {
+    cat("    ERROR:", e$message, "\n")
+    return(NULL)
+  })
+
+  t_elapsed <- (proc.time() - t_start)[3]
+
+  if(!is.null(fit)) {
+    sharpe_is <- calculate_sharpe(fit$ft)
+    nodes <- as.numeric(strsplit(fit$tree, "\n")[[1]][1])
+    cat("    [OK] Nodes:", nodes, "| IS Sharpe:", round(sharpe_is, 3), "| Time:", round(t_elapsed, 1), "s\n")
+  }
+
+  return(fit)
 }
 
-ptree_predict_oos <- function(fit, test_data, all_chars) {
-  # Use the actual PTree predict function signature from the package:
-  # predict.PTree(model, X, R, months, weight = NULL)
+predict_ptree_oos <- function(fit, test_data, desc = "") {
+  if(is.null(fit)) return(NULL)
+
+  if(desc != "") cat("  Predicting OOS for", desc, "...\n")
 
   X_test <- test_data[, all_chars]
   R_test <- test_data[, "xret"]
   months_test <- as.numeric(as.factor(test_data$date)) - 1
   weight_test <- test_data[, "lag_me"]
 
-  # Call predict with correct signature
-  pred <- try(predict(fit, X_test, R_test, months_test, weight_test), silent=TRUE)
-
-  if (inherits(pred, "try-error")) {
+  pred <- tryCatch({
+    predict(fit, X_test, R_test, months_test, weight_test)
+  }, error = function(e) {
+    cat("    ERROR:", e$message, "\n")
     return(NULL)
+  })
+
+  if(!is.null(pred)) {
+    sharpe_oos <- calculate_sharpe(pred$ft)
+    cat("    [OK] OOS Sharpe:", round(sharpe_oos, 3), "\n")
+    return(pred$ft)
   }
-
-  return(pred$ft)
+  return(NULL)
 }
 
-train_ptree_trio <- function(train_data, scenario_name) {
-  cat(paste(rep("-", 80), collapse=""), "\n")
-  cat("Training 3 P-Trees for:", scenario_name, "\n")
-  cat(paste(rep("-", 80), collapse=""), "\n\n")
-
-  # Prepare training data
-  dl_train <- prepare_design(train_data, all_chars, instruments)
-  X_train = dl_train$X
-  R_train = dl_train$R
-  months_train = dl_train$months
-  stocks_train = dl_train$stocks
-  Z_train = dl_train$Z
-  portfolio_weight_train = dl_train$portfolio_weight
-  loss_weight_train = dl_train$loss_weight
-  num_months_train = dl_train$num_months
-  num_stocks_train = dl_train$num_stocks
-
-  cat("Training data:\n")
-  cat("  Observations:", nrow(train_data), "\n")
-  cat("  Months:", num_months_train, "\n")
-  cat("  Stocks:", num_stocks_train, "\n\n")
-
-  # P-Tree 1 (No Benchmark)
-  cat("P-Tree 1 (No Benchmark)...\n")
-  Y_train1 = train_data[, "xret"]
-  H_train1 = rep(0, nrow(train_data))
-
-  t1 = proc.time()
-  fit1 = PTree(R_train, Y_train1, X_train, Z_train, H_train1,
-               portfolio_weight_train, loss_weight_train,
-               stocks_train, months_train, first_split_var, second_split_var,
-               num_stocks_train, num_months_train,
-               min_leaf_size, max_depth, num_iter, num_cutpoints,
-               eta = 1, equal_weight = equal_weight,
-               no_H = TRUE,  # No benchmark for first tree
-               abs_normalize = TRUE, weighted_loss = FALSE,
-               lambda_mean, lambda_cov, lambda_mean_factor, lambda_cov_factor,
-               early_stop = FALSE, stop_threshold = 1, lambda_ridge = 0,
-               a1 = 0, a2 = 0, list_K = matrix(rep(0,3), nrow = 3, ncol = 1),
-               random_split = FALSE)
-  t1 = proc.time() - t1
-
-  tree1_nodes = as.numeric(strsplit(fit1$tree, "\n")[[1]][1])
-  sharpe1 = calculate_sharpe(fit1$ft)
-  cat("  Nodes:", tree1_nodes, "| Sharpe:", round(sharpe1, 3), "| Time:", round(t1[3], 1), "sec\n")
-
-  # P-Tree 2 (Boosting)
-  cat("P-Tree 2 (Boosting on P-Tree 1)...\n")
-  Y_train2 = train_data[, "xret"]
-  H_train2 = fit1$ft
-
-  fit2 = PTree(R_train, Y_train2, X_train, Z_train, H_train2,
-               portfolio_weight_train, loss_weight_train,
-               stocks_train, months_train, first_split_var, second_split_var,
-               num_stocks_train, num_months_train,
-               min_leaf_size, max_depth_boosting, num_iterB, num_cutpoints,
-               eta = 1, equal_weight = equal_weight,
-               no_H = FALSE,  # Use previous factor as benchmark
-               abs_normalize = TRUE, weighted_loss = FALSE,
-               lambda_mean, lambda_cov, lambda_mean_factor, lambda_cov_factor,
-               early_stop = FALSE, stop_threshold = 1, lambda_ridge = 0,
-               a1 = 0, a2 = 0, list_K = matrix(rep(0,3), nrow = 3, ncol = 1),
-               random_split = FALSE)
-
-  tree2_nodes = as.numeric(strsplit(fit2$tree, "\n")[[1]][1])
-  sharpe2 = calculate_sharpe(fit2$ft)
-  cat("  Nodes:", tree2_nodes, "| Sharpe:", round(sharpe2, 3), "\n")
-
-  # P-Tree 3 (Boosting)
-  cat("P-Tree 3 (Boosting on P-Trees 1-2)...\n")
-  Y_train3 = train_data[, "xret"]
-  H_train3 = cbind(fit1$ft, fit2$ft)
-
-  fit3 = PTree(R_train, Y_train3, X_train, Z_train, H_train3,
-               portfolio_weight_train, loss_weight_train,
-               stocks_train, months_train, first_split_var, second_split_var,
-               num_stocks_train, num_months_train,
-               min_leaf_size, max_depth_boosting, num_iterB, num_cutpoints,
-               eta = 1, equal_weight = equal_weight,
-               no_H = FALSE,
-               abs_normalize = TRUE, weighted_loss = FALSE,
-               lambda_mean, lambda_cov, lambda_mean_factor, lambda_cov_factor,
-               early_stop = FALSE, stop_threshold = 1, lambda_ridge = 0,
-               a1 = 0, a2 = 0, list_K = matrix(rep(0,3), nrow = 3, ncol = 1),
-               random_split = FALSE)
-
-  tree3_nodes = as.numeric(strsplit(fit3$tree, "\n")[[1]][1])
-  sharpe3 = calculate_sharpe(fit3$ft)
-  cat("  Nodes:", tree3_nodes, "| Sharpe:", round(sharpe3, 3), "\n\n")
-
-  return(list(
-    fit1 = fit1, fit2 = fit2, fit3 = fit3,
-    nodes = c(tree1_nodes, tree2_nodes, tree3_nodes),
-    sharpes = c(sharpe1, sharpe2, sharpe3),
-    runtime = t1[3]
-  ))
-}
-
-apply_ptree_trio_oos <- function(fits, test_data, all_chars) {
-  # Apply trained P-Trees to test data using the predict() function
-  # This generates TRUE out-of-sample predictions
-
-  cat("Generating out-of-sample predictions...\n")
-
-  # Tree 1: predict on test data
-  ft1 <- ptree_predict_oos(fits$fit1, test_data, all_chars)
-
-  if (is.null(ft1)) {
-    cat("ERROR: predict() failed for Tree 1\n")
-    return(NULL)
-  }
-
-  # Tree 2: predict on test data
-  ft2 <- ptree_predict_oos(fits$fit2, test_data, all_chars)
-
-  if (is.null(ft2)) {
-    cat("ERROR: predict() failed for Tree 2\n")
-    return(NULL)
-  }
-
-  # Tree 3: predict on test data
-  ft3 <- ptree_predict_oos(fits$fit3, test_data, all_chars)
-
-  if (is.null(ft3)) {
-    cat("ERROR: predict() failed for Tree 3\n")
-    return(NULL)
-  }
-
-  cat("Out-of-sample predictions successful!\n")
-
-  data.frame(
-    month = sort(unique(test_data$date)),
-    factor1 = as.numeric(ft1),
-    factor2 = as.numeric(ft2),
-    factor3 = as.numeric(ft3)
-  )
-}
-
-###### SCENARIO A: Full Sample (1997-2022) #####
-
-cat(paste(rep("=", 80), collapse=""), "\n")
-cat("SCENARIO A: FULL SAMPLE (like P-Tree-a)\n")
-cat(paste(rep("=", 80), collapse=""), "\n\n")
-
-train_data_a <- data
-results_a <- train_ptree_trio(train_data_a, "Full Sample")
-
-# Save results
-output_dir_a = "../../results/ptree_34chars/scenario_a_full"
-dir.create(output_dir_a, showWarnings = FALSE, recursive = TRUE)
-save(results_a, file = file.path(output_dir_a, "ptree_models.RData"))
-
-all_dates_a <- sort(unique(train_data_a$date))
-factors_a = data.frame(
-  month = all_dates_a,
-  factor1 = results_a$fit1$ft,
-  factor2 = results_a$fit2$ft,
-  factor3 = results_a$fit3$ft
-)
-write.csv(factors_a, file.path(output_dir_a, "ptree_factors.csv"), row.names = FALSE)
-cat("Saved to:", output_dir_a, "\n\n")
-
-###### SCENARIO B: Time Split (Train: 1997-2010, Test: 2010-2020) #####
-
-cat(paste(rep("=", 80), collapse=""), "\n")
-cat("SCENARIO B: TIME SPLIT (like P-Tree-b)\n")
-cat("Train: 1997-2010 | Test: 2010-2020\n")
-cat(paste(rep("=", 80), collapse=""), "\n\n")
-
-split_date <- as.Date('2010-01-01')
-train_data_b <- data[data$date < split_date, ]
-test_data_b <- data[data$date >= split_date, ]
-
-cat("Split date:", as.character(split_date), "\n\n")
-
-results_b <- train_ptree_trio(train_data_b, "Time Split (First Half)")
-
-# Save IS (training) factors
-output_dir_b = "../../results/ptree_34chars/scenario_b_split"
-dir.create(output_dir_b, showWarnings = FALSE, recursive = TRUE)
-save(results_b, file = file.path(output_dir_b, "ptree_models.RData"))
-
-all_dates_b <- sort(unique(train_data_b$date))
-factors_b_is = data.frame(
-  month = all_dates_b,
-  factor1 = results_b$fit1$ft,
-  factor2 = results_b$fit2$ft,
-  factor3 = results_b$fit3$ft
-)
-write.csv(factors_b_is, file.path(output_dir_b, "ptree_factors_is.csv"), row.names = FALSE)
-
-# Attempt OOS on test_data_b
-factors_b_oos <- apply_ptree_trio_oos(results_b, test_data_b, all_chars)
-if (!is.null(factors_b_oos)) {
-  write.csv(factors_b_oos, file.path(output_dir_b, "ptree_factors_oos.csv"), row.names = FALSE)
-  cat("Saved IS+OOS to:", output_dir_b, "(B)\n\n")
-} else {
-  # Backward-compatible: write legacy filename for IS too
-  write.csv(factors_b_is, file.path(output_dir_b, "ptree_factors.csv"), row.names = FALSE)
-  cat("Note: OOS prediction unavailable (no predict() in PTree). Wrote IS only.\n\n")
-}
-
-###### SCENARIO C: Reverse Split (Train: 2010-2020, Test: 1997-2010) #####
-
-cat(paste(rep("=", 80), collapse=""), "\n")
-cat("SCENARIO C: REVERSE SPLIT (like P-Tree-c)\n")
-cat("Train: 2010-2020 | Test: 1997-2010\n")
-cat(paste(rep("=", 80), collapse=""), "\n\n")
-
-train_data_c <- data[data$date >= split_date, ]
-test_data_c <- data[data$date < split_date, ]
-
-results_c <- train_ptree_trio(train_data_c, "Reverse Split (Second Half)")
-
-# Save IS (training) factors
-output_dir_c = "../../results/ptree_34chars/scenario_c_reverse"
-dir.create(output_dir_c, showWarnings = FALSE, recursive = TRUE)
-save(results_c, file = file.path(output_dir_c, "ptree_models.RData"))
-
-all_dates_c <- sort(unique(train_data_c$date))
-factors_c_is = data.frame(
-  month = all_dates_c,
-  factor1 = results_c$fit1$ft,
-  factor2 = results_c$fit2$ft,
-  factor3 = results_c$fit3$ft
-)
-write.csv(factors_c_is, file.path(output_dir_c, "ptree_factors_is.csv"), row.names = FALSE)
-
-# Attempt OOS on test_data_c
-factors_c_oos <- apply_ptree_trio_oos(results_c, test_data_c, all_chars)
-if (!is.null(factors_c_oos)) {
-  write.csv(factors_c_oos, file.path(output_dir_c, "ptree_factors_oos.csv"), row.names = FALSE)
-  cat("Saved IS+OOS to:", output_dir_c, "(C)\n\n")
-} else {
-  # Backward-compatible: write legacy filename for IS too
-  write.csv(factors_c_is, file.path(output_dir_c, "ptree_factors.csv"), row.names = FALSE)
-  cat("Note: OOS prediction unavailable (no predict() in PTree). Wrote IS only.\n\n")
-}
-
-###### Final Summary Table #####
-
-cat(paste(rep("=", 80), collapse=""), "\n")
-cat("FINAL SUMMARY - ALL SCENARIOS\n")
-cat(paste(rep("=", 80), collapse=""), "\n\n")
-
-summary_df <- data.frame(
-  Scenario = c("A: Full Sample", "B: Time Split", "C: Reverse Split"),
-  Period = c(
-    paste(min(train_data_a$date), "to", max(train_data_a$date)),
-    paste(min(train_data_b$date), "to", max(train_data_b$date)),
-    paste(min(train_data_c$date), "to", max(train_data_c$date))
-  ),
-  Months = c(
-    length(unique(train_data_a$date)),
-    length(unique(train_data_b$date)),
-    length(unique(train_data_c$date))
-  ),
-  Tree1_Nodes = c(results_a$nodes[1], results_b$nodes[1], results_c$nodes[1]),
-  Tree1_Sharpe = round(c(results_a$sharpes[1], results_b$sharpes[1], results_c$sharpes[1]), 3),
-  Tree2_Sharpe = round(c(results_a$sharpes[2], results_b$sharpes[2], results_c$sharpes[2]), 3),
-  Tree3_Sharpe = round(c(results_a$sharpes[3], results_b$sharpes[3], results_c$sharpes[3]), 3),
-  Runtime_Sec = round(c(results_a$runtime, results_b$runtime, results_c$runtime), 1)
-)
-
-print(summary_df)
-
-write.csv(summary_df, "../../results/ptree_34chars/all_scenarios_summary.csv", row.names = FALSE)
-cat("\nSummary saved to: ../../results/ptree_34chars/all_scenarios_summary.csv\n")
-
-t_total = proc.time() - t_total
-cat(sprintf("\nTotal runtime: %.2f minutes\n", t_total[3]/60))
+############################################################################
+# PART 1: THREE-SCENARIO VALIDATION (Traditional Approach)
+############################################################################
 
 cat("\n")
-cat(paste(rep("=", 80), collapse=""), "\n")
-cat("SUCCESS: Complete P-Tree Analysis Finished\n")
-cat(paste(rep("=", 80), collapse=""), "\n")
-cat("\nNext steps:\n")
-cat("1. Run benchmark comparisons (CAPM, FF3, FF4) for each scenario\n")
-cat("2. Calculate out-of-sample performance for scenarios B and C\n")
-cat("3. Generate comparison tables matching paper format\n")
+cat("================================================================================\n")
+cat("PART 1: THREE-SCENARIO VALIDATION\n")
+cat("================================================================================\n\n")
+
+split_date <- as.Date('2010-01-01')
+
+# --- Scenario A: Full Sample ---
+cat("Scenario A: Full Sample (1997-2022)\n")
+cat("--------------------------------------------------------------------------------\n")
+fit_a <- train_simple_ptree(data, "Full Sample")
+output_dir_a <- "../../results/ptree_34chars/scenario_a_full"
+dir.create(output_dir_a, showWarnings = FALSE, recursive = TRUE)
+if(!is.null(fit_a)) {
+  factors_a <- data.frame(
+    month = sort(unique(data$date)),
+    factor = fit_a$ft
+  )
+  write.csv(factors_a, file.path(output_dir_a, "ptree_factors.csv"), row.names = FALSE)
+  cat("  [SAVED]", output_dir_a, "\n")
+}
+cat("\n")
+
+# --- Scenario B: Time Split ---
+cat("Scenario B: Time Split (Train 1997-2010, Test 2010-2022)\n")
+cat("--------------------------------------------------------------------------------\n")
+train_b <- data[data$date < split_date, ]
+test_b <- data[data$date >= split_date, ]
+cat("  Train: 1997-2010 (", nrow(train_b), "obs )\n")
+cat("  Test:  2010-2022 (", nrow(test_b), "obs )\n")
+
+fit_b <- train_simple_ptree(train_b, "Time Split (IS)")
+output_dir_b <- "../../results/ptree_34chars/scenario_b_split"
+dir.create(output_dir_b, showWarnings = FALSE, recursive = TRUE)
+
+if(!is.null(fit_b)) {
+  # Save IS factors
+  factors_b_is <- data.frame(
+    month = sort(unique(train_b$date)),
+    factor = fit_b$ft
+  )
+  write.csv(factors_b_is, file.path(output_dir_b, "ptree_factors_is.csv"), row.names = FALSE)
+
+  # Predict OOS
+  oos_b <- predict_ptree_oos(fit_b, test_b, "Time Split (OOS)")
+  if(!is.null(oos_b)) {
+    factors_b_oos <- data.frame(
+      month = sort(unique(test_b$date)),
+      factor = oos_b
+    )
+    write.csv(factors_b_oos, file.path(output_dir_b, "ptree_factors_oos.csv"), row.names = FALSE)
+  }
+  cat("  [SAVED]", output_dir_b, "\n")
+}
+cat("\n")
+
+# --- Scenario C: Reverse Split ---
+cat("Scenario C: Reverse Split (Train 2010-2022, Test 1997-2010)\n")
+cat("--------------------------------------------------------------------------------\n")
+train_c <- data[data$date >= split_date, ]
+test_c <- data[data$date < split_date, ]
+cat("  Train: 2010-2022 (", nrow(train_c), "obs )\n")
+cat("  Test:  1997-2010 (", nrow(test_c), "obs )\n")
+
+fit_c <- train_simple_ptree(train_c, "Reverse Split (IS)")
+output_dir_c <- "../../results/ptree_34chars/scenario_c_reverse"
+dir.create(output_dir_c, showWarnings = FALSE, recursive = TRUE)
+
+if(!is.null(fit_c)) {
+  # Save IS factors
+  factors_c_is <- data.frame(
+    month = sort(unique(train_c$date)),
+    factor = fit_c$ft
+  )
+  write.csv(factors_c_is, file.path(output_dir_c, "ptree_factors_is.csv"), row.names = FALSE)
+
+  # Predict OOS
+  oos_c <- predict_ptree_oos(fit_c, test_c, "Reverse Split (OOS)")
+  if(!is.null(oos_c)) {
+    factors_c_oos <- data.frame(
+      month = sort(unique(test_c$date)),
+      factor = oos_c
+    )
+    write.csv(factors_c_oos, file.path(output_dir_c, "ptree_factors_oos.csv"), row.names = FALSE)
+  }
+  cat("  [SAVED]", output_dir_c, "\n")
+}
+cat("\n")
+
+############################################################################
+# PART 2: ROLLING WINDOW VALIDATION (Anti-Overfitting)
+############################################################################
+
+cat("\n")
+cat("================================================================================\n")
+cat("PART 2: ROLLING WINDOW VALIDATION (ANTI-OVERFITTING)\n")
+cat("================================================================================\n\n")
+
+# Window configuration
+all_dates <- sort(unique(data$date))
+n_months <- length(all_dates)
+train_window <- 60  # 5 years
+test_window <- 12   # 1 year
+roll_step <- 12     # 1 year
+max_start <- n_months - train_window - test_window
+n_windows <- floor(max_start / roll_step) + 1
+
+cat("CONFIGURATION:\n")
+cat("  Total months:     ", n_months, "\n")
+cat("  Training window:  ", train_window, "months (5 years)\n")
+cat("  Test window:      ", test_window, "months (1 year)\n")
+cat("  Roll step:        ", roll_step, "months (1 year)\n")
+cat("  Number of windows:", n_windows, "\n\n")
+
+results_list <- list()
+
+for(w in 1:n_windows) {
+  # Calculate indices
+  train_start_idx <- (w - 1) * roll_step + 1
+  train_end_idx <- train_start_idx + train_window - 1
+  test_start_idx <- train_end_idx + 1
+  test_end_idx <- test_start_idx + test_window - 1
+
+  if(test_end_idx > n_months) {
+    cat("Window", w, ": Insufficient data, skipping\n")
+    break
+  }
+
+  # Get data
+  train_dates <- all_dates[train_start_idx:train_end_idx]
+  test_dates <- all_dates[test_start_idx:test_end_idx]
+  train_data <- data[data$date %in% train_dates, ]
+  test_data <- data[data$date %in% test_dates, ]
+
+  cat(sprintf("Window %d/%d: Train %s to %s | Test %s to %s\n",
+              w, n_windows,
+              as.character(min(train_dates)), as.character(max(train_dates)),
+              as.character(min(test_dates)), as.character(max(test_dates))))
+
+  # Train and predict
+  fit <- train_simple_ptree(train_data, sprintf("Window %d", w))
+  if(is.null(fit)) {
+    cat("  [FAILED]\n\n")
+    next
+  }
+
+  is_sharpe <- calculate_sharpe(fit$ft)
+  oos_factors <- predict_ptree_oos(fit, test_data, sprintf("Window %d", w))
+
+  if(is.null(oos_factors)) {
+    cat("  [FAILED OOS]\n\n")
+    next
+  }
+
+  oos_sharpe <- calculate_sharpe(oos_factors)
+  degradation <- if(is_sharpe != 0) (oos_sharpe - is_sharpe) / is_sharpe * 100 else NA
+
+  # Store results
+  results_list[[w]] <- data.frame(
+    window = w,
+    train_start = as.character(min(train_dates)),
+    train_end = as.character(max(train_dates)),
+    test_start = as.character(min(test_dates)),
+    test_end = as.character(max(test_dates)),
+    is_sharpe = is_sharpe,
+    oos_sharpe = oos_sharpe,
+    degradation_pct = degradation,
+    stringsAsFactors = FALSE
+  )
+  cat("\n")
+}
+
+# Aggregate results
+results_df <- do.call(rbind, results_list)
+
+cat("================================================================================\n")
+cat("ROLLING WINDOW SUMMARY\n")
+cat("================================================================================\n\n")
+cat(sprintf("Windows tested:        %d\n", nrow(results_df)))
+cat(sprintf("Avg IS Sharpe:         %.3f\n", mean(results_df$is_sharpe, na.rm = TRUE)))
+cat(sprintf("Avg OOS Sharpe:        %.3f\n", mean(results_df$oos_sharpe, na.rm = TRUE)))
+cat(sprintf("Median OOS Sharpe:     %.3f\n", median(results_df$oos_sharpe, na.rm = TRUE)))
+cat(sprintf("Std Dev OOS Sharpe:    %.3f\n", sd(results_df$oos_sharpe, na.rm = TRUE)))
+cat(sprintf("Avg Degradation:       %.1f%%\n", mean(results_df$degradation_pct, na.rm = TRUE)))
+cat(sprintf("Positive OOS:          %.0f%% (%d/%d)\n",
+            sum(results_df$oos_sharpe > 0, na.rm = TRUE) / nrow(results_df) * 100,
+            sum(results_df$oos_sharpe > 0, na.rm = TRUE),
+            nrow(results_df)))
+
+# Save
+output_dir_rolling <- "../../results/ptree_34chars/rolling_window"
+dir.create(output_dir_rolling, showWarnings = FALSE, recursive = TRUE)
+write.csv(results_df, file.path(output_dir_rolling, "rolling_window_results.csv"), row.names = FALSE)
+cat(sprintf("\n[SAVED] %s\n", output_dir_rolling))
+
+############################################################################
+# FINAL SUMMARY
+############################################################################
+
+cat("\n")
+cat("================================================================================\n")
+cat("ANALYSIS COMPLETE\n")
+cat("================================================================================\n\n")
+cat("Results saved to: ../../results/ptree_34chars/\n")
+cat("  - scenario_a_full/\n")
+cat("  - scenario_b_split/\n")
+cat("  - scenario_c_reverse/\n")
+cat("  - rolling_window/\n")
+cat("\nNext step: Run 7_validate_results.py to verify OOS performance\n")
