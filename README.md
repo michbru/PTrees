@@ -73,8 +73,7 @@ cd ../analysis
 Rscript 3_ptree_analysis.R
 
 # Step 3: Validate results
-cd ../..
-python3 validate_results.py
+python3 7_validate_results.py
 ```
 
 **Expected runtime:** 30-60 minutes
@@ -102,7 +101,8 @@ PTrees/
 │       ├── 3_ptree_analysis.R         # Main P-Tree training (REQUIRED)
 │       ├── 4_benchmark_analysis.py    # Fama-French comparison (optional)
 │       ├── 5_transaction_cost_analysis.py  # Transaction costs (optional)
-│       └── 6_subperiod_analysis.py    # Robustness checks (optional)
+│       ├── 6_subperiod_analysis.py    # Robustness checks (optional)
+│       └── 7_validate_results.py      # Validate OOS performance
 │
 ├── results/
 │   └── ptree_34chars/                 # Analysis results (34-char implementation)
@@ -116,8 +116,6 @@ PTrees/
 │
 ├── notebooks/                          # Jupyter notebooks for exploration
 │   └── data_preprocessing.ipynb
-│
-├── validate_results.py                 # Validation script for OOS results
 │
 └── archive/
     ├── 19_char_implementation/         # Original implementation (superseded)
@@ -261,7 +259,6 @@ Despite these constraints, the implementation has important strengths:
 
 - **`docs/pdfs/trees.pdf`** - Original P-Tree paper (Cong et al., 2024)
 - **`results/ptree_34chars/validation_summary.csv`** - OOS performance validation
-- **`validate_results.py`** - Script to verify out-of-sample results
 
 ### Analysis Scripts
 
@@ -270,10 +267,11 @@ Despite these constraints, the implementation has important strengths:
 2. `src/data_preparation/2_prepare_data.py` - Prepare and lag data
 3. `src/analysis/3_ptree_analysis.R` - **Train P-Tree models** (main analysis)
 
-**Optional Analyses:**
+**Post-Analysis (Validation & Extensions):**
 4. `src/analysis/4_benchmark_analysis.py` - Fama-French factor comparisons
 5. `src/analysis/5_transaction_cost_analysis.py` - Transaction cost sensitivity
 6. `src/analysis/6_subperiod_analysis.py` - Temporal stability checks
+7. `src/analysis/7_validate_results.py` - Verify OOS performance
 
 ---
 
