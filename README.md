@@ -65,12 +65,12 @@ Run the analysis pipeline step by step:
 ```bash
 # Step 1: Prepare data (from project root)
 cd src/data_preparation
-python3 0_add_missing_characteristics.py
-python3 1_prepare_data_34chars.py
+python3 1_add_missing_characteristics.py
+python3 2_prepare_data.py
 
-# Step 2: Run P-Tree analysis
+# Step 2: Run P-Tree analysis (MAIN STEP)
 cd ../analysis
-Rscript 2_ptree_analysis_34chars.R
+Rscript 3_ptree_analysis.R
 
 # Step 3: Validate results
 cd ../..
@@ -96,16 +96,13 @@ PTrees/
 │
 ├── src/
 │   ├── data_preparation/              # Data processing scripts
-│   │   ├── 0_add_missing_characteristics.py
-│   │   └── 1_prepare_data_34chars.py
-│   ├── analysis/                      # P-Tree analysis scripts
-│   │   ├── 2_ptree_analysis_34chars.R
-│   │   ├── 3_benchmark_analysis.py
-│   │   ├── 4_transaction_cost_analysis.py
-│   │   └── 5_subperiod_analysis.py
-│   └── visualization/                 # Visualization scripts
-│       ├── 7_visualize_rolling_window.py
-│       └── 8_visualize_main_results.py
+│   │   ├── 1_add_missing_characteristics.py
+│   │   └── 2_prepare_data.py
+│   └── analysis/                      # P-Tree analysis scripts
+│       ├── 3_ptree_analysis.R         # Main P-Tree training (REQUIRED)
+│       ├── 4_benchmark_analysis.py    # Fama-French comparison (optional)
+│       ├── 5_transaction_cost_analysis.py  # Transaction costs (optional)
+│       └── 6_subperiod_analysis.py    # Robustness checks (optional)
 │
 ├── results/
 │   └── ptree_34chars/                 # Analysis results (34-char implementation)
@@ -136,24 +133,24 @@ PTrees/
 **Step 1: Create Enhanced Dataset**
 ```bash
 cd src/data_preparation
-python 0_add_missing_characteristics.py
+python3 1_add_missing_characteristics.py
 ```
 - Calculates 15 additional characteristics from existing data
 - Output: `data/processed/ptrees_enhanced_dataset.csv` (34 total characteristics)
 
 **Step 2: Prepare for P-Tree**
 ```bash
-python 1_prepare_data_34chars.py
+python3 2_prepare_data.py
 ```
 - Merges with macro variables (risk-free rate)
-- Lags characteristics by 1 month (avoid look-ahead bias)
+- Lags characteristics by 1-3 months (avoid look-ahead bias)
 - Ranks characteristics cross-sectionally within each month
 - Output: `results/ptree_34chars/ptree_ready_data_34chars.csv`
 
-**Step 3: Train P-Tree Models**
+**Step 3: Train P-Tree Models** (MAIN ANALYSIS)
 ```bash
 cd ../analysis
-Rscript 2_ptree_analysis_34chars.R
+Rscript 3_ptree_analysis.R
 ```
 - Trains 3 trees per scenario using boosting approach
 - Three scenarios: Full sample, Time split, Reverse split
@@ -268,36 +265,40 @@ Despite these constraints, the implementation has important strengths:
 
 ### Analysis Scripts
 
-All scripts are documented with detailed comments:
-- Data preparation: `src/data_preparation/`
-- Analysis: `src/analysis/`
-- Visualization: `src/visualization/`
+**Core Pipeline (Required):**
+1. `src/data_preparation/1_add_missing_characteristics.py` - Create 34 characteristics
+2. `src/data_preparation/2_prepare_data.py` - Prepare and lag data
+3. `src/analysis/3_ptree_analysis.R` - **Train P-Tree models** (main analysis)
+
+**Optional Analyses:**
+4. `src/analysis/4_benchmark_analysis.py` - Fama-French factor comparisons
+5. `src/analysis/5_transaction_cost_analysis.py` - Transaction cost sensitivity
+6. `src/analysis/6_subperiod_analysis.py` - Temporal stability checks
 
 ---
 
-## Running Additional Analyses
+## Running Optional Analyses
+
+**Note:** These are supplementary analyses for robustness checks. The core results come from step 3 (P-Tree analysis).
 
 ### Benchmark Comparisons
-
 ```bash
 cd src/analysis
-python 3_benchmark_analysis.py
+python3 4_benchmark_analysis.py
 ```
-Compare P-Tree performance against CAPM, Fama-French 3-factor, and 5-factor models.
+Compare P-Tree performance against CAPM and Fama-French factor models.
 
 ### Transaction Cost Analysis
-
 ```bash
-python 4_transaction_cost_analysis.py
+python3 5_transaction_cost_analysis.py
 ```
-Evaluate net returns after transaction costs.
+Evaluate net returns after realistic transaction costs.
 
 ### Subperiod Analysis
-
 ```bash
-python 5_subperiod_analysis.py
+python3 6_subperiod_analysis.py
 ```
-Test stability across different time periods.
+Test performance stability across different time periods.
 
 ---
 

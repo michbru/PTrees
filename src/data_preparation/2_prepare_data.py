@@ -1,35 +1,30 @@
 """
-Data Preparation for P-Tree Analysis
+Data Preparation for P-Tree Analysis (34 Characteristics)
 
-Prepares Swedish stock market data for P-Tree analysis:
-1. Loads raw data
+Prepares Swedish stock market data with ENHANCED characteristics for P-Tree analysis:
+1. Loads enhanced data (with 34 characteristics)
 2. Merges with macro variables (risk-free rate)
 3. Creates required P-Tree columns (xret, permno, lag_me)
 4. Creates cross-sectional ranked characteristics
 5. Saves prepared dataset
 
-Input: data/ptrees_final_dataset.csv, data/macro_variables_with_dates.csv
-Output: results/ptree_ready_data_full.csv
+Input: ../../data/processed/ptrees_enhanced_dataset.csv, ../../data/macro/macro_variables_with_dates.csv
+Output: ../../results/ptree_34chars/ptree_ready_data_34chars.csv
 """
 
 import pandas as pd
 import numpy as np
 from pathlib import Path
+import sys
 
 print("="*80)
-print("DATA PREPARATION FOR P-TREE ANALYSIS")
+print("DATA PREPARATION FOR P-TREE ANALYSIS (34 CHARACTERISTICS)")
 print("="*80)
 
 # Load data
-print("\nLoading enhanced data with additional characteristics...")
-# Try enhanced dataset first, fall back to original if not available
-try:
-    data = pd.read_csv('data/ptrees_enhanced_dataset.csv')
-    print("  [OK] Using enhanced dataset with 34 characteristics")
-except FileNotFoundError:
-    print("  [WARNING] Enhanced dataset not found, using original dataset")
-    print("  -> Run: python src/0_add_missing_characteristics.py first")
-    data = pd.read_csv('data/ptrees_final_dataset.csv')
+print("\nLoading enhanced data with 34 characteristics...")
+data = pd.read_csv('../../data/processed/ptrees_enhanced_dataset.csv')
+print(f"  [OK] Loaded enhanced dataset")
 print(f"  Loaded {len(data):,} observations")
 print(f"  Period: {data['date'].min()} to {data['date'].max()}")
 
@@ -38,7 +33,7 @@ data['date'] = pd.to_datetime(data['date'])
 
 # Load macro variables (for risk-free rate)
 print("\nLoading macro variables...")
-macro = pd.read_csv('data/macro_variables_with_dates.csv')
+macro = pd.read_csv('../../data/macro/macro_variables_with_dates.csv')
 macro['date'] = pd.to_datetime(macro['date'])
 print(f"  Loaded {len(macro)} months of macro data")
 
@@ -62,12 +57,10 @@ print("\nCreating lagged market cap...")
 data = data.sort_values(['permno', 'date'])
 data['lag_me'] = data.groupby('permno')['market_cap'].shift(1)
 # Fill NaN lag_me with current market_cap (for first observation per stock)
-# Also fill where market_cap itself is NaN (should not happen but defensive)
 data['lag_me'] = data['lag_me'].fillna(data['market_cap'])
 # Final safety: drop any remaining NaN in lag_me
 data = data[data['lag_me'].notna()].copy()
 print(f"  Created lag_me (lagged market cap for value-weighting)")
-print(f"  Dropped {data['lag_me'].isna().sum()} observations with missing lag_me")
 
 # Remove observations without required data
 print("\nRemoving observations with missing required data...")
@@ -76,8 +69,8 @@ data = data[data['xret'].notna() & data['lag_me'].notna()].copy()
 print(f"  Removed {before - len(data):,} observations")
 print(f"  Remaining observations: {len(data):,}")
 
-# Characteristics to rank - ENHANCED SET
-# Includes all original characteristics PLUS critical additions from Cong et al. (2024)
+# Characteristics to rank - ENHANCED SET (34 characteristics)
+# Prioritized by importance in original P-Tree paper
 characteristics = [
     # CRITICAL characteristics (used in top P-Tree splits)
     'sue',              # Standardized Unexpected Earnings (Split 1 in paper!)
@@ -91,7 +84,7 @@ characteristics = [
     'market_cap', 'book_to_market', 'me',
 
     # Original characteristics - Profitability
-    'ep_ratio', 'cfp_ratio', 'sp_ratio', 'roa', 'roe',
+    'ep_ratio', 'cfp_ratio', 'sp_ratio', 'roa',
     'gross_profitability', 'op', 'pm',
 
     # Original characteristics - Investment & Growth
@@ -114,11 +107,23 @@ characteristics = [c for c in characteristics if c in data.columns]
 print(f"\nCreating ranked characteristics...")
 print(f"  Processing {len(characteristics)} characteristics")
 
-# Lag characteristics by 1 month (following Cong et al. 2024)
-print("  Step 1: Lagging all characteristics by 1 month...")
+# Define accounting characteristics that require 3-month lag (reporting delay)
+accounting_chars = [
+    'roe', 'roa', 'gross_profitability', 'op', 'pm',
+    'asset_growth', 'sales_growth', 'ni',
+    'debt_to_equity', 'asset_quality', 'capex_to_assets',
+    'cfo_to_assets', 'asset_turnover', 'ep_ratio', 'cfp_ratio', 'sp_ratio'
+]
+
+# Lag characteristics (1 month for market data, 3 months for accounting data)
+print("  Step 1: Lagging characteristics by 1 or 3 months...")
 for char in characteristics:
     if char in data.columns:
-        data[f'lag_{char}'] = data.groupby('permno')[char].shift(1)
+        # Use 3-month lag for accounting data (to account for reporting delays)
+        lag_periods = 3 if char in accounting_chars else 1
+        data[f'lag_{char}'] = data.groupby('permno')[char].shift(lag_periods)
+        if lag_periods == 3:
+            print(f"    [OK] lag_{char} (3-month lag for accounting data)")
 
 # Cross-sectional ranking by month using LAGGED values
 print("  Step 2: Ranking lagged characteristics within each month...")
@@ -153,11 +158,11 @@ print(f"  Dropped {before_final - len(data):,} obs with NaN in core columns")
 print(f"  Final observations: {len(data):,}")
 
 # Create output directory
-output_dir = Path('results')
-output_dir.mkdir(exist_ok=True)
+output_dir = Path('../../results/ptree_34chars')
+output_dir.mkdir(parents=True, exist_ok=True)
 
 # Save prepared data
-output_file = output_dir / 'ptree_ready_data_full.csv'
+output_file = output_dir / 'ptree_ready_data_34chars.csv'
 data.to_csv(output_file, index=False)
 
 print(f"\n[SUCCESS] Data preparation complete")
@@ -172,4 +177,15 @@ nan_ranks = data[ranked_cols].isna().sum().sum()
 print(f"  NaN in core columns (xret, permno, lag_me): {nan_core}")
 print(f"  NaN in ranked characteristics: {nan_ranks}")
 print(f"  [OK] Ready for P-Tree analysis: {'YES' if nan_core == 0 and nan_ranks == 0 else 'NO - CHECK DATA'}")
+
+# Print summary statistics
+print("\n" + "="*80)
+print("SUMMARY STATISTICS")
+print("="*80)
+print(f"Date range: {data['date'].min().strftime('%Y-%m')} to {data['date'].max().strftime('%Y-%m')}")
+print(f"Number of months: {data['date'].nunique()}")
+print(f"Number of stocks: {data['permno'].nunique()}")
+print(f"Average stocks per month: {len(data) / data['date'].nunique():.0f}")
+print(f"Total observations: {len(data):,}")
+print(f"Characteristics: {len(characteristics)}")
 print()

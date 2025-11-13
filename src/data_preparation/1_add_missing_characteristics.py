@@ -27,7 +27,7 @@ print("="*80)
 
 # Load data
 print("\n[1/6] Loading data...")
-data = pd.read_csv('data/ptrees_final_dataset.csv')
+data = pd.read_csv('../../data/processed/ptrees_final_dataset.csv')
 data['date'] = pd.to_datetime(data['date'])
 print(f"  Loaded {len(data):,} observations")
 print(f"  Period: {data['date'].min()} to {data['date'].max()}")
@@ -281,7 +281,7 @@ else:
 # ============================================================================
 print("\n[6/6] Saving enhanced dataset...")
 
-output_file = 'data/ptrees_enhanced_dataset.csv'
+output_file = '../../data/processed/ptrees_enhanced_dataset.csv'
 data.to_csv(output_file, index=False)
 
 print(f"\n[OK] SUCCESS! Enhanced dataset saved to: {output_file}")

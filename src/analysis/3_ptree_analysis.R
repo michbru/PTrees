@@ -16,41 +16,47 @@ t_total = proc.time()
 library(PTree)
 
 cat(paste(rep("=", 80), collapse=""), "\n")
-cat("COMPLETE P-TREE ANALYSIS - SWEDISH STOCK MARKET\n")
+cat("P-TREE ANALYSIS WITH 34 CHARACTERISTICS\n")
 cat("Following Cong et al. (2024) Journal of Financial Economics\n")
 cat(paste(rep("=", 80), collapse=""), "\n\n")
 
-###### Parameters (Scaled for Swedish Market) #####
+###### Parameters (Conservative for Swedish Market) #####
 
-# Market size scaling: Swedish ~300 stocks vs US ~2500 stocks
-# US paper: min_leaf_size = 20
-# Swedish: 300/2500 * 20 = 2.4 → use 3 (conservative)
+# UPDATED PARAMETERS based on overfitting analysis:
+# - Increased min_leaf_size from 3 to 5 (more conservative splits)
+# - Reduced max_depth from 10 to 8 (prevent deep overfitting)
+# - Reduced num_iter from 9 to 6 (less boosting = less overfitting)
+# - Increased lambda_cov from 1e-4 to 5e-4 (more shrinkage)
+#
+# Rationale: Swedish market has ~300 stocks vs US ~2500 stocks
+# Smaller sample requires MORE conservative parameters to prevent overfitting
 
-min_leaf_size = 3  # Scaled for Swedish market: 300/2500 * 20 ≈ 3
-max_depth = 10
-max_depth_boosting = 10
-num_iter = 9
-num_iterB = 9
+min_leaf_size = 5  # Increased from 3 (fewer stocks = need larger leaves)
+max_depth = 8      # Reduced from 10 (prevent deep tree overfitting)
+max_depth_boosting = 8
+num_iter = 6       # Reduced from 9 (less boosting iterations)
+num_iterB = 6
 num_cutpoints = 4
 equal_weight = FALSE
 
-# Regularization (same as paper)
+# Regularization (INCREASED for smaller market)
 lambda_mean = 0
-lambda_cov = 1e-4
+lambda_cov = 5e-4          # Increased from 1e-4 (more covariance shrinkage)
 lambda_mean_factor = 0
-lambda_cov_factor = 1e-5
+lambda_cov_factor = 5e-5   # Increased from 1e-5 (proportional increase)
 
-cat("PARAMETERS:\n")
-cat("  min_leaf_size =", min_leaf_size, "(scaled for Swedish market size)\n")
-cat("  max_depth =", max_depth, "\n")
-cat("  num_iter =", num_iter, "\n")
+cat("PARAMETERS (CONSERVATIVE FOR SWEDISH MARKET):\n")
+cat("  min_leaf_size =", min_leaf_size, "(increased from 3 to reduce overfitting)\n")
+cat("  max_depth =", max_depth, "(reduced from 10 to prevent deep trees)\n")
+cat("  num_iter =", num_iter, "(reduced from 9 to limit boosting)\n")
 cat("  num_cutpoints =", num_cutpoints, "\n")
-cat("  Regularization: lambda_cov =", lambda_cov, "\n\n")
+cat("  Regularization: lambda_cov =", lambda_cov, "(increased from 1e-4)\n")
+cat("  NOTE: Parameters tuned to reduce overfitting in smaller Swedish market\n\n")
 
 ###### Load Data #####
 
 cat("Loading data...\n")
-data_path = "results/ptree_ready_data_full.csv"
+data_path = "../../results/ptree_34chars/ptree_ready_data_34chars.csv"
 data <- read.csv(data_path, stringsAsFactors = FALSE)
 data$date <- as.Date(data$date, format='%Y-%m-%d')
 
@@ -252,7 +258,7 @@ train_data_a <- data
 results_a <- train_ptree_trio(train_data_a, "Full Sample")
 
 # Save results
-output_dir_a = "results/ptree_scenario_a_full"
+output_dir_a = "../../results/ptree_34chars/scenario_a_full"
 dir.create(output_dir_a, showWarnings = FALSE, recursive = TRUE)
 save(results_a, file = file.path(output_dir_a, "ptree_models.RData"))
 
@@ -282,7 +288,7 @@ cat("Split date:", as.character(split_date), "\n\n")
 results_b <- train_ptree_trio(train_data_b, "Time Split (First Half)")
 
 # Save IS (training) factors
-output_dir_b = "results/ptree_scenario_b_split"
+output_dir_b = "../../results/ptree_34chars/scenario_b_split"
 dir.create(output_dir_b, showWarnings = FALSE, recursive = TRUE)
 save(results_b, file = file.path(output_dir_b, "ptree_models.RData"))
 
@@ -319,7 +325,7 @@ test_data_c <- data[data$date < split_date, ]
 results_c <- train_ptree_trio(train_data_c, "Reverse Split (Second Half)")
 
 # Save IS (training) factors
-output_dir_c = "results/ptree_scenario_c_reverse"
+output_dir_c = "../../results/ptree_34chars/scenario_c_reverse"
 dir.create(output_dir_c, showWarnings = FALSE, recursive = TRUE)
 save(results_c, file = file.path(output_dir_c, "ptree_models.RData"))
 
@@ -370,8 +376,8 @@ summary_df <- data.frame(
 
 print(summary_df)
 
-write.csv(summary_df, "results/ptree_all_scenarios_summary.csv", row.names = FALSE)
-cat("\nSummary saved to: results/ptree_all_scenarios_summary.csv\n")
+write.csv(summary_df, "../../results/ptree_34chars/all_scenarios_summary.csv", row.names = FALSE)
+cat("\nSummary saved to: ../../results/ptree_34chars/all_scenarios_summary.csv\n")
 
 t_total = proc.time() - t_total
 cat(sprintf("\nTotal runtime: %.2f minutes\n", t_total[3]/60))
