@@ -1,0 +1,22 @@
+# P-Tree Analysis: Swedish Stock Market
+# Python Dependencies
+
+# Core data analysis
+pandas>=1.5.0
+numpy>=1.23.0
+
+# Statistical analysis
+statsmodels>=0.14.0
+scipy>=1.10.0
+
+# Visualization
+matplotlib>=3.6.0
+seaborn>=0.12.0
+
+# Additional utilities
+pathlib2>=2.3.7; python_version < '3.4'
+
+# Note: R dependencies must be installed separately
+# Required R packages:
+#   - PTree (install from CRAN or archive/PTree-2501/)
+#   - base R packages (included with R installation)

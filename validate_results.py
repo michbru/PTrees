@@ -77,11 +77,11 @@ scenario_c_oos = pd.read_csv(results_dir / 'ptree_scenario_c_reverse' / 'ptree_f
 scenario_c_oos['date'] = pd.to_datetime(scenario_c_oos['month'])
 scenario_c_oos['sample'] = 'OOS'
 
-print(f"  ✓ Scenario A (Full): {len(scenario_a)} months ({scenario_a['date'].min().strftime('%Y-%m')} to {scenario_a['date'].max().strftime('%Y-%m')})")
-print(f"  ✓ Scenario B IS: {len(scenario_b_is)} months ({scenario_b_is['date'].min().strftime('%Y-%m')} to {scenario_b_is['date'].max().strftime('%Y-%m')})")
-print(f"  ✓ Scenario B OOS: {len(scenario_b_oos)} months ({scenario_b_oos['date'].min().strftime('%Y-%m')} to {scenario_b_oos['date'].max().strftime('%Y-%m')})")
-print(f"  ✓ Scenario C IS: {len(scenario_c_is)} months ({scenario_c_is['date'].min().strftime('%Y-%m')} to {scenario_c_is['date'].max().strftime('%Y-%m')})")
-print(f"  ✓ Scenario C OOS: {len(scenario_c_oos)} months ({scenario_c_oos['date'].min().strftime('%Y-%m')} to {scenario_c_oos['date'].max().strftime('%Y-%m')})")
+print(f"  [OK] Scenario A (Full): {len(scenario_a)} months ({scenario_a['date'].min().strftime('%Y-%m')} to {scenario_a['date'].max().strftime('%Y-%m')})")
+print(f"  [OK] Scenario B IS: {len(scenario_b_is)} months ({scenario_b_is['date'].min().strftime('%Y-%m')} to {scenario_b_is['date'].max().strftime('%Y-%m')})")
+print(f"  [OK] Scenario B OOS: {len(scenario_b_oos)} months ({scenario_b_oos['date'].min().strftime('%Y-%m')} to {scenario_b_oos['date'].max().strftime('%Y-%m')})")
+print(f"  [OK] Scenario C IS: {len(scenario_c_is)} months ({scenario_c_is['date'].min().strftime('%Y-%m')} to {scenario_c_is['date'].max().strftime('%Y-%m')})")
+print(f"  [OK] Scenario C OOS: {len(scenario_c_oos)} months ({scenario_c_oos['date'].min().strftime('%Y-%m')} to {scenario_c_oos['date'].max().strftime('%Y-%m')})")
 
 # =============================================================================
 # VALIDATE: CHECK FOR OVERLAP
@@ -94,18 +94,18 @@ b_is_end = scenario_b_is['date'].max()
 b_oos_start = scenario_b_oos['date'].min()
 
 if b_is_end < b_oos_start:
-    print(f"  ✓ Scenario B: No overlap (IS ends {b_is_end.strftime('%Y-%m')}, OOS starts {b_oos_start.strftime('%Y-%m')})")
+    print(f"  [OK] Scenario B: No overlap (IS ends {b_is_end.strftime('%Y-%m')}, OOS starts {b_oos_start.strftime('%Y-%m')})")
 else:
-    print(f"  ✗ WARNING: Scenario B has overlap! IS ends {b_is_end.strftime('%Y-%m')}, OOS starts {b_oos_start.strftime('%Y-%m')}")
+    print(f"  [WARNING] Scenario B has overlap! IS ends {b_is_end.strftime('%Y-%m')}, OOS starts {b_oos_start.strftime('%Y-%m')}")
 
 # Check C: IS should end before OOS begins
 c_is_end = scenario_c_is['date'].max()
 c_oos_start = scenario_c_oos['date'].min()
 
 if c_is_end > c_oos_start:
-    print(f"  ✓ Scenario C: No overlap (reverse split - as expected)")
+    print(f"  [OK] Scenario C: No overlap (reverse split - as expected)")
 else:
-    print(f"  ✗ WARNING: Scenario C has unexpected date ordering!")
+    print(f"  [WARNING] Scenario C has unexpected date ordering!")
 
 # =============================================================================
 # CALCULATE SHARPE RATIOS
@@ -126,7 +126,7 @@ for i in [1, 2, 3]:
     print(f"  Tree {i}: Sharpe = {sharpe:.3f} (t = {t_stat:.2f}) | Mean = {mean_ret:.2f}% | Vol = {vol:.2f}%")
 
 print("\n" + "-" * 80)
-print("SCENARIO B: TIME SPLIT (1997-2010 → 2010-2022)")
+print("SCENARIO B: TIME SPLIT (1997-2010 to 2010-2022)")
 print("-" * 80)
 
 print("\n  In-Sample (1997-2010):")
@@ -153,10 +153,10 @@ for i in [1, 2, 3]:
     degradation = (sharpe_oos - sharpe_is) / sharpe_is * 100 if sharpe_is != 0 else 0
     
     print(f"    Tree {i}: Sharpe = {sharpe_oos:.3f} (t = {t_stat:.2f}) | Mean = {mean_ret:.2f}% | Vol = {vol:.2f}%")
-    print(f"             IS→OOS change: {degradation:+.1f}%")
+    print(f"             IS->OOS change: {degradation:+.1f}%")
 
 print("\n" + "-" * 80)
-print("SCENARIO C: REVERSE SPLIT (2010-2022 → 1997-2010)")
+print("SCENARIO C: REVERSE SPLIT (2010-2022 to 1997-2010)")
 print("-" * 80)
 
 print("\n  In-Sample (2010-2022):")
@@ -181,7 +181,7 @@ for i in [1, 2, 3]:
     degradation = (sharpe_oos - sharpe_is) / sharpe_is * 100 if sharpe_is != 0 else 0
     
     print(f"    Tree {i}: Sharpe = {sharpe_oos:.3f} (t = {t_stat:.2f}) | Mean = {mean_ret:.2f}% | Vol = {vol:.2f}%")
-    print(f"             IS→OOS change: {degradation:+.1f}%")
+    print(f"             IS->OOS change: {degradation:+.1f}%")
 
 # =============================================================================
 # SUMMARY TABLE
@@ -239,7 +239,7 @@ print(summary_pivot)
 
 # Save summary
 summary_df.to_csv(results_dir / 'validation_summary.csv', index=False)
-print(f"\n✓ Saved to: {results_dir / 'validation_summary.csv'}")
+print(f"\n[OK] Saved to: {results_dir / 'validation_summary.csv'}")
 
 # =============================================================================
 # OVERFITTING DIAGNOSTIC
