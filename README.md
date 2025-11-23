@@ -84,8 +84,7 @@ Run the analysis pipeline step by step:
 ```bash
 # Step 1: Prepare data (from project root)
 cd src/data_preparation
-python3 1_add_missing_characteristics.py
-python3 2_prepare_data.py
+python3 prepare_ptree_dataset.py
 
 # Step 2: Run P-Tree analysis (MAIN STEP)
 cd ../analysis
@@ -114,8 +113,7 @@ PTrees/
 │
 ├── src/
 │   ├── data_preparation/              # Data processing scripts
-│   │   ├── 1_add_missing_characteristics.py
-│   │   └── 2_prepare_data.py
+│   │   └── prepare_ptree_dataset.py   # Single unified pipeline
 │   └── analysis/                      # P-Tree analysis scripts
 │       ├── 3_ptree_analysis.R         # Main P-Tree training (REQUIRED)
 │       ├── 4_benchmark_analysis.py    # Fama-French comparison (optional)
@@ -147,22 +145,20 @@ PTrees/
 
 ### Data Processing Pipeline
 
-**Step 1: Create Enhanced Dataset**
+**Single Unified Script:**
 ```bash
 cd src/data_preparation
-python3 1_add_missing_characteristics.py
+python3 prepare_ptree_dataset.py
 ```
-- Calculates 15 additional characteristics from existing data
-- Output: `data/processed/ptrees_enhanced_dataset.csv` (34 total characteristics)
 
-**Step 2: Prepare for P-Tree**
-```bash
-python3 2_prepare_data.py
-```
-- Merges with macro variables (risk-free rate)
-- Lags characteristics by 1-3 months (avoid look-ahead bias)
-- Ranks characteristics cross-sectionally within each month
+This script performs ALL data preparation in one traceable pipeline:
+- Loads and merges 4 raw data sources
+- Calculates all 34 stock characteristics (fully documented)
+- Applies proper lags (1-month market, 3-month accounting)
+- Creates cross-sectional ranks within each month
 - Output: `results/ptree_34chars/ptree_ready_data_34chars.csv`
+
+See `DATA_PREPARATION_GUIDE.md` for complete documentation of all formulas and assumptions.
 
 **Step 3: Train P-Tree Models** (MAIN ANALYSIS)
 ```bash
