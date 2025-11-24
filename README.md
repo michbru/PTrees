@@ -119,7 +119,8 @@ PTrees/
 │       ├── 2_benchmark_analysis.py    # Fama-French comparison (optional)
 │       ├── 3_transaction_cost_analysis.py  # Transaction costs (optional)
 │       ├── 4_validate_results.py      # Validate OOS performance (REQUIRED)
-│       └── 5_visualize_ptree.py       # Generate visualizations (optional)
+│       ├── 5_visualize_ptree.py       # Performance visualizations (optional)
+│       └── 6_visualize_tree_structure.py  # Tree split visualizations (optional)
 │
 ├── results/
 │   └── ptree_34chars/                 # Analysis results (34-char implementation)
@@ -292,7 +293,8 @@ Despite these constraints, the implementation has important strengths:
 **Optional (Supplementary):**
 4. `src/analysis/2_benchmark_analysis.py` - Fama-French factor comparisons
 5. `src/analysis/3_transaction_cost_analysis.py` - Transaction cost sensitivity
-6. `src/analysis/5_visualize_ptree.py` - Generate visualizations
+6. `src/analysis/5_visualize_ptree.py` - Generate performance visualizations
+7. `src/analysis/6_visualize_tree_structure.py` - Visualize tree splits
 
 ---
 
@@ -310,7 +312,21 @@ This creates:
 - Rolling window performance charts
 - Scenario comparison plots
 - Factor alpha visualizations
-- Summary statistics table
+- Summary statistics tables
+
+### Tree Structure Visualization
+
+Visualize the actual P-Tree structure as hierarchical tree diagrams:
+
+```bash
+python3 6_visualize_tree_structure.py
+```
+
+This creates flowchart-style tree diagrams showing:
+- Split nodes (blue boxes) with characteristic name and threshold
+- Leaf nodes (green boxes) representing final portfolios
+- Left/right branches showing decision paths
+- Complete tree structure for each scenario
 
 Output: `results/ptree_34chars/visualizations/`
 

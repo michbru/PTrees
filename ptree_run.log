@@ -1,0 +1,451 @@
+================================================================================
+COMPREHENSIVE P-TREE ANALYSIS WITH 34 CHARACTERISTICS
+Following Cong et al. (2024) Journal of Financial Economics
+================================================================================
+
+ANTI-OVERFITTING PARAMETERS:
+  min_leaf_size     = 10 (doubled from 5)
+  max_depth         = 5 (reduced from 8)
+  num_iter          = 3 (reduced from 6)
+  lambda_cov        = 0.001 (doubled regularization)
+  equal_weight      = FALSE (value-weighted portfolios)
+  Rationale: Smaller Swedish market requires more conservative parameters
+
+Loading P-Tree ready data...
+  Total observations: 100562 
+  Date range: 1997-03-27 to 2022-12-30 
+  Unique stocks: 876 
+  Characteristics: 33 
+
+
+================================================================================
+PART 1: THREE-SCENARIO VALIDATION
+================================================================================
+
+Scenario A: Full Sample (1997-2022)
+--------------------------------------------------------------------------------
+  Training P-Tree for Full Sample ...
+The split value candidates are -0.5, 0, 0.5
+break of no good candidate
+fitted tree 
+3
+1 12 0.5 2 0
+2 0 0 0 0
+3 0 0 0 0
+
+    [OK] Nodes: 3 | IS Sharpe: 0.872 | Time: 1.7 s
+  [SAVED] ../../results/ptree_34chars/scenario_a_full 
+
+Scenario B: Time Split (Train 1997-2010, Test 2010-2022)
+--------------------------------------------------------------------------------
+  Train: 1997-2010 ( 47049 obs )
+  Test:  2010-2022 ( 53513 obs )
+  Training P-Tree for Time Split (IS) ...
+The split value candidates are -0.5, 0, 0.5
+fitted tree 
+7
+1 12 0.5 2 0
+2 3 0.5 2 1
+4 0 0 0 0
+5 24 0.5 2 2
+10 0 0 0 0
+11 0 0 0 0
+3 0 0 0 0
+
+    [OK] Nodes: 7 | IS Sharpe: 1.421 | Time: 1.5 s
+  Predicting OOS for Time Split (OOS) ...
+    [OK] OOS Sharpe: 0.654 
+  [SAVED] ../../results/ptree_34chars/scenario_b_split 
+
+Scenario C: Reverse Split (Train 2010-2022, Test 1997-2010)
+--------------------------------------------------------------------------------
+  Train: 2010-2022 ( 53513 obs )
+  Test:  1997-2010 ( 47049 obs )
+  Training P-Tree for Reverse Split (IS) ...
+The split value candidates are -0.5, 0, 0.5
+break of no good candidate
+fitted tree 
+3
+1 7 0.5 2 0
+2 0 0 0 0
+3 0 0 0 0
+
+    [OK] Nodes: 3 | IS Sharpe: 1.317 | Time: 1.4 s
+  Predicting OOS for Reverse Split (OOS) ...
+    [OK] OOS Sharpe: 0.914 
+  [SAVED] ../../results/ptree_34chars/scenario_c_reverse 
+
+
+================================================================================
+PART 2: ROLLING WINDOW VALIDATION (ANTI-OVERFITTING)
+================================================================================
+
+CONFIGURATION:
+  Total months:      310 
+  Training window:   60 months (5 years)
+  Test window:       12 months (1 year)
+  Roll step:         12 months (1 year)
+  Number of windows: 20 
+
+Window 1/20: Train 1997-03-27 to 2002-02-28 | Test 2002-03-28 to 2003-02-28
+  Training P-Tree for Window 1 ...
+The split value candidates are -0.5, 0, 0.5
+fitted tree 
+7
+1 12 0.5 2 0
+2 1 0.5 2 1
+4 0 0 0 0
+5 0 0 0 0
+3 11 0.5 2 2
+6 0 0 0 0
+7 0 0 0 0
+
+    [OK] Nodes: 7 | IS Sharpe: 1.815 | Time: 0.2 s
+  Predicting OOS for Window 1 ...
+    [OK] OOS Sharpe: 0.603 
+
+Window 2/20: Train 1998-03-31 to 2003-02-28 | Test 2003-03-31 to 2004-02-27
+  Training P-Tree for Window 2 ...
+The split value candidates are -0.5, 0, 0.5
+fitted tree 
+7
+1 26 0.5 2 0
+2 24 0.5 2 1
+4 0 0 0 0
+5 0 0 0 0
+3 12 0.5 2 2
+6 0 0 0 0
+7 0 0 0 0
+
+    [OK] Nodes: 7 | IS Sharpe: 2.679 | Time: 0.3 s
+  Predicting OOS for Window 2 ...
+    [OK] OOS Sharpe: 1.384 
+
+Window 3/20: Train 1999-03-31 to 2004-02-27 | Test 2004-03-31 to 2005-02-28
+  Training P-Tree for Window 3 ...
+The split value candidates are -0.5, 0, 0.5
+fitted tree 
+7
+1 26 0.5 2 0
+2 7 0.5 2 1
+4 0 0 0 0
+5 0 0 0 0
+3 12 0.5 2 2
+6 0 0 0 0
+7 0 0 0 0
+
+    [OK] Nodes: 7 | IS Sharpe: 3.479 | Time: 0.7 s
+  Predicting OOS for Window 3 ...
+    [OK] OOS Sharpe: 7.966 
+
+Window 4/20: Train 2000-03-31 to 2005-02-28 | Test 2005-03-31 to 2006-02-28
+  Training P-Tree for Window 4 ...
+The split value candidates are -0.5, 0, 0.5
+fitted tree 
+7
+1 12 0.5 2 0
+2 23 0.5 2 1
+4 7 0.5 2 2
+8 0 0 0 0
+9 0 0 0 0
+5 0 0 0 0
+3 0 0 0 0
+
+    [OK] Nodes: 7 | IS Sharpe: 3.998 | Time: 0.3 s
+  Predicting OOS for Window 4 ...
+    [OK] OOS Sharpe: 4.18 
+
+Window 5/20: Train 2001-03-30 to 2006-02-28 | Test 2006-03-31 to 2007-02-28
+  Training P-Tree for Window 5 ...
+The split value candidates are -0.5, 0, 0.5
+fitted tree 
+7
+1 7 0.5 2 0
+2 12 0.5 2 1
+4 20 0.5 2 2
+8 0 0 0 0
+9 0 0 0 0
+5 0 0 0 0
+3 0 0 0 0
+
+    [OK] Nodes: 7 | IS Sharpe: 4.083 | Time: 0.3 s
+  Predicting OOS for Window 5 ...
+    [OK] OOS Sharpe: 2.877 
+
+Window 6/20: Train 2002-03-28 to 2007-02-28 | Test 2007-03-30 to 2008-02-29
+  Training P-Tree for Window 6 ...
+The split value candidates are -0.5, 0, 0.5
+fitted tree 
+7
+1 7 0.5 2 0
+2 12 0.5 2 1
+4 20 0.5 2 2
+8 0 0 0 0
+9 0 0 0 0
+5 0 0 0 0
+3 0 0 0 0
+
+    [OK] Nodes: 7 | IS Sharpe: 4.102 | Time: 0.3 s
+  Predicting OOS for Window 6 ...
+    [OK] OOS Sharpe: -0.312 
+
+Window 7/20: Train 2003-03-31 to 2008-02-29 | Test 2008-03-31 to 2009-02-27
+  Training P-Tree for Window 7 ...
+The split value candidates are -0.5, 0, 0.5
+fitted tree 
+7
+1 7 0.5 2 0
+2 12 0.5 2 1
+4 20 0.5 2 2
+8 0 0 0 0
+9 0 0 0 0
+5 0 0 0 0
+3 0 0 0 0
+
+    [OK] Nodes: 7 | IS Sharpe: 2.781 | Time: 0.3 s
+  Predicting OOS for Window 7 ...
+    [OK] OOS Sharpe: -2.67 
+
+Window 8/20: Train 2004-03-31 to 2009-02-27 | Test 2009-03-31 to 2010-02-26
+  Training P-Tree for Window 8 ...
+The split value candidates are -0.5, 0, 0.5
+fitted tree 
+7
+1 20 0.5 2 0
+2 0 0 0 0
+3 4 0.5 2 1
+6 28 0.5 2 2
+12 0 0 0 0
+13 0 0 0 0
+7 0 0 0 0
+
+    [OK] Nodes: 7 | IS Sharpe: 2.576 | Time: 0.3 s
+  Predicting OOS for Window 8 ...
+    [OK] OOS Sharpe: 2.155 
+
+Window 9/20: Train 2005-03-31 to 2010-02-26 | Test 2010-03-31 to 2011-02-28
+  Training P-Tree for Window 9 ...
+The split value candidates are -0.5, 0, 0.5
+fitted tree 
+7
+1 2 0.5 2 0
+2 4 0.5 2 1
+4 19 0.5 2 2
+8 0 0 0 0
+9 0 0 0 0
+5 0 0 0 0
+3 0 0 0 0
+
+    [OK] Nodes: 7 | IS Sharpe: 2.133 | Time: 0.2 s
+  Predicting OOS for Window 9 ...
+    [OK] OOS Sharpe: 2.453 
+
+Window 10/20: Train 2006-03-31 to 2011-02-28 | Test 2011-03-31 to 2012-02-29
+  Training P-Tree for Window 10 ...
+The split value candidates are -0.5, 0, 0.5
+fitted tree 
+7
+1 4 0.5 2 0
+2 29 0.5 2 2
+4 0 0 0 0
+5 0 0 0 0
+3 27 0.5 2 1
+6 0 0 0 0
+7 0 0 0 0
+
+    [OK] Nodes: 7 | IS Sharpe: 2.493 | Time: 0.2 s
+  Predicting OOS for Window 10 ...
+    [OK] OOS Sharpe: 1.613 
+
+Window 11/20: Train 2007-03-30 to 2012-02-29 | Test 2012-03-30 to 2013-02-28
+  Training P-Tree for Window 11 ...
+The split value candidates are -0.5, 0, 0.5
+fitted tree 
+7
+1 4 0.5 2 0
+2 0 0 0 0
+3 7 0.5 2 1
+6 0 0 0 0
+7 1 0.5 2 2
+14 0 0 0 0
+15 0 0 0 0
+
+    [OK] Nodes: 7 | IS Sharpe: 2.436 | Time: 0.3 s
+  Predicting OOS for Window 11 ...
+    [OK] OOS Sharpe: 2.183 
+
+Window 12/20: Train 2008-03-31 to 2013-02-28 | Test 2013-03-28 to 2014-02-28
+  Training P-Tree for Window 12 ...
+The split value candidates are -0.5, 0, 0.5
+fitted tree 
+7
+1 4 0.5 2 0
+2 26 0.5 2 2
+4 0 0 0 0
+5 0 0 0 0
+3 7 0.5 2 1
+6 0 0 0 0
+7 0 0 0 0
+
+    [OK] Nodes: 7 | IS Sharpe: 2.26 | Time: 0.3 s
+  Predicting OOS for Window 12 ...
+    [OK] OOS Sharpe: 0.922 
+
+Window 13/20: Train 2009-03-31 to 2014-02-28 | Test 2014-03-31 to 2015-02-27
+  Training P-Tree for Window 13 ...
+The split value candidates are -0.5, 0, 0.5
+fitted tree 
+7
+1 2 0.5 2 0
+2 9 0.5 2 1
+4 25 0.5 2 2
+8 0 0 0 0
+9 0 0 0 0
+5 0 0 0 0
+3 0 0 0 0
+
+    [OK] Nodes: 7 | IS Sharpe: 2.609 | Time: 0.3 s
+  Predicting OOS for Window 13 ...
+    [OK] OOS Sharpe: 2.565 
+
+Window 14/20: Train 2010-03-31 to 2015-02-27 | Test 2015-03-31 to 2016-02-29
+  Training P-Tree for Window 14 ...
+The split value candidates are -0.5, 0, 0.5
+fitted tree 
+7
+1 8 0.5 2 0
+2 26 0.5 2 1
+4 0 0 0 0
+5 13 0.5 2 2
+10 0 0 0 0
+11 0 0 0 0
+3 0 0 0 0
+
+    [OK] Nodes: 7 | IS Sharpe: 3.277 | Time: 0.3 s
+  Predicting OOS for Window 14 ...
+    [OK] OOS Sharpe: 1.039 
+
+Window 15/20: Train 2011-03-31 to 2016-02-29 | Test 2016-03-31 to 2017-02-28
+  Training P-Tree for Window 15 ...
+The split value candidates are -0.5, 0, 0.5
+fitted tree 
+7
+1 2 0.5 2 0
+2 25 0.5 2 1
+4 0 0 0 0
+5 0 0 0 0
+3 26 0.5 2 2
+6 0 0 0 0
+7 0 0 0 0
+
+    [OK] Nodes: 7 | IS Sharpe: 2.046 | Time: 1.1 s
+  Predicting OOS for Window 15 ...
+    [OK] OOS Sharpe: 2.753 
+
+Window 16/20: Train 2012-03-30 to 2017-02-28 | Test 2017-03-31 to 2018-02-28
+  Training P-Tree for Window 16 ...
+The split value candidates are -0.5, 0, 0.5
+fitted tree 
+7
+1 2 0.5 2 0
+2 25 0.5 2 2
+4 0 0 0 0
+5 0 0 0 0
+3 26 0.5 2 1
+6 0 0 0 0
+7 0 0 0 0
+
+    [OK] Nodes: 7 | IS Sharpe: 2.682 | Time: 0.4 s
+  Predicting OOS for Window 16 ...
+    [OK] OOS Sharpe: 1.573 
+
+Window 17/20: Train 2013-03-28 to 2018-02-28 | Test 2018-03-29 to 2019-02-28
+  Training P-Tree for Window 17 ...
+The split value candidates are -0.5, 0, 0.5
+fitted tree 
+7
+1 2 0.5 2 0
+2 25 0.5 2 2
+4 0 0 0 0
+5 0 0 0 0
+3 7 0.5 2 1
+6 0 0 0 0
+7 0 0 0 0
+
+    [OK] Nodes: 7 | IS Sharpe: 2.789 | Time: 0.3 s
+  Predicting OOS for Window 17 ...
+    [OK] OOS Sharpe: 1.784 
+
+Window 18/20: Train 2014-03-31 to 2019-02-28 | Test 2019-03-29 to 2020-02-28
+  Training P-Tree for Window 18 ...
+The split value candidates are -0.5, 0, 0.5
+fitted tree 
+7
+1 2 0.5 2 0
+2 25 0.5 2 2
+4 0 0 0 0
+5 0 0 0 0
+3 7 0.5 2 1
+6 0 0 0 0
+7 0 0 0 0
+
+    [OK] Nodes: 7 | IS Sharpe: 2.466 | Time: 0.5 s
+  Predicting OOS for Window 18 ...
+    [OK] OOS Sharpe: 3.069 
+
+Window 19/20: Train 2015-03-31 to 2020-02-28 | Test 2020-03-31 to 2021-02-26
+  Training P-Tree for Window 19 ...
+The split value candidates are -0.5, 0, 0.5
+fitted tree 
+7
+1 2 0.5 2 0
+2 7 0.5 2 2
+4 0 0 0 0
+5 0 0 0 0
+3 14 0.5 2 1
+6 0 0 0 0
+7 0 0 0 0
+
+    [OK] Nodes: 7 | IS Sharpe: 2.768 | Time: 0.5 s
+  Predicting OOS for Window 19 ...
+    [OK] OOS Sharpe: 1.767 
+
+Window 20/20: Train 2016-03-31 to 2021-02-26 | Test 2021-03-31 to 2022-02-28
+  Training P-Tree for Window 20 ...
+The split value candidates are -0.5, 0, 0.5
+break of no good candidate
+fitted tree 
+3
+1 7 0.5 2 0
+2 0 0 0 0
+3 0 0 0 0
+
+    [OK] Nodes: 3 | IS Sharpe: 1.612 | Time: 1.7 s
+  Predicting OOS for Window 20 ...
+    [OK] OOS Sharpe: 1.269 
+
+================================================================================
+ROLLING WINDOW SUMMARY
+================================================================================
+
+Windows tested:        20
+Avg IS Sharpe:         2.754
+Avg OOS Sharpe:        1.959
+Median OOS Sharpe:     1.775
+Std Dev OOS Sharpe:    1.999
+Avg Degradation:       -28.3%
+Positive OOS:          90% (18/20)
+
+[SAVED] ../../results/ptree_34chars/rolling_window
+
+================================================================================
+ANALYSIS COMPLETE
+================================================================================
+
+Results saved to: ../../results/ptree_34chars/
+  - scenario_a_full/
+  - scenario_b_split/
+  - scenario_c_reverse/
+  - rolling_window/
+
+Next step: Run 7_validate_results.py to verify OOS performance

@@ -164,6 +164,10 @@ if(!is.null(fit_a)) {
     factor = fit_a$ft
   )
   write.csv(factors_a, file.path(output_dir_a, "ptree_factors.csv"), row.names = FALSE)
+
+  # Save tree structure
+  writeLines(fit_a$tree, file.path(output_dir_a, "ptree_structure.txt"))
+
   cat("  [SAVED]", output_dir_a, "\n")
 }
 cat("\n")
@@ -187,6 +191,9 @@ if(!is.null(fit_b)) {
     factor = fit_b$ft
   )
   write.csv(factors_b_is, file.path(output_dir_b, "ptree_factors_is.csv"), row.names = FALSE)
+
+  # Save tree structure
+  writeLines(fit_b$tree, file.path(output_dir_b, "ptree_structure.txt"))
 
   # Predict OOS
   oos_b <- predict_ptree_oos(fit_b, test_b, "Time Split (OOS)")
@@ -220,6 +227,9 @@ if(!is.null(fit_c)) {
     factor = fit_c$ft
   )
   write.csv(factors_c_is, file.path(output_dir_c, "ptree_factors_is.csv"), row.names = FALSE)
+
+  # Save tree structure
+  writeLines(fit_c$tree, file.path(output_dir_c, "ptree_structure.txt"))
 
   # Predict OOS
   oos_c <- predict_ptree_oos(fit_c, test_c, "Reverse Split (OOS)")
