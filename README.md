@@ -88,10 +88,10 @@ python3 prepare_ptree_dataset.py
 
 # Step 2: Run P-Tree analysis (MAIN STEP)
 cd ../analysis
-Rscript 3_ptree_analysis.R
+Rscript 1_ptree_analysis.R
 
 # Step 3: Validate results
-python3 7_validate_results.py
+python3 4_validate_results.py
 ```
 
 **Expected runtime:** 30-60 minutes
@@ -115,11 +115,11 @@ PTrees/
 │   ├── data_preparation/              # Data processing scripts
 │   │   └── prepare_ptree_dataset.py   # Single unified pipeline
 │   └── analysis/                      # P-Tree analysis scripts
-│       ├── 3_ptree_analysis.R         # Main P-Tree training (REQUIRED)
-│       ├── 4_benchmark_analysis.py    # Fama-French comparison (optional)
-│       ├── 5_transaction_cost_analysis.py  # Transaction costs (optional)
-│       ├── 6_subperiod_analysis.py    # Robustness checks (optional)
-│       └── 7_validate_results.py      # Validate OOS performance
+│       ├── 1_ptree_analysis.R         # Main P-Tree training (REQUIRED)
+│       ├── 2_benchmark_analysis.py    # Fama-French comparison (optional)
+│       ├── 3_transaction_cost_analysis.py  # Transaction costs (optional)
+│       ├── 4_validate_results.py      # Validate OOS performance (REQUIRED)
+│       └── 5_visualize_ptree.py       # Generate visualizations (optional)
 │
 ├── results/
 │   └── ptree_34chars/                 # Analysis results (34-char implementation)
@@ -285,40 +285,53 @@ Despite these constraints, the implementation has important strengths:
 ### Analysis Scripts
 
 **Core Pipeline (Required):**
-1. `src/data_preparation/1_add_missing_characteristics.py` - Create 34 characteristics
-2. `src/data_preparation/2_prepare_data.py` - Prepare and lag data
-3. `src/analysis/3_ptree_analysis.R` - **Train P-Tree models** (main analysis)
+1. `src/data_preparation/prepare_ptree_dataset.py` - Unified data preparation
+2. `src/analysis/1_ptree_analysis.R` - **Train P-Tree models** (main analysis)
+3. `src/analysis/4_validate_results.py` - Verify OOS performance
 
-**Post-Analysis (Validation & Extensions):**
-4. `src/analysis/4_benchmark_analysis.py` - Fama-French factor comparisons
-5. `src/analysis/5_transaction_cost_analysis.py` - Transaction cost sensitivity
-6. `src/analysis/6_subperiod_analysis.py` - Temporal stability checks
-7. `src/analysis/7_validate_results.py` - Verify OOS performance
+**Optional (Supplementary):**
+4. `src/analysis/2_benchmark_analysis.py` - Fama-French factor comparisons
+5. `src/analysis/3_transaction_cost_analysis.py` - Transaction cost sensitivity
+6. `src/analysis/5_visualize_ptree.py` - Generate visualizations
 
 ---
 
-## Running Optional Analyses
+## Visualization
 
-**Note:** These are supplementary analyses for robustness checks. The core results come from step 3 (P-Tree analysis).
+Generate comprehensive visualizations of P-Tree results:
+
+```bash
+cd src/analysis
+python3 5_visualize_ptree.py
+```
+
+This creates:
+- Cumulative return time series
+- Rolling window performance charts
+- Scenario comparison plots
+- Factor alpha visualizations
+- Summary statistics table
+
+Output: `results/ptree_34chars/visualizations/`
+
+---
+
+## Optional Analyses
+
+**Note:** These are supplementary analyses for robustness checks. The core results come from step 3 (P-Tree analysis) and step 7 (validation).
 
 ### Benchmark Comparisons
 ```bash
 cd src/analysis
-python3 4_benchmark_analysis.py
+python3 2_benchmark_analysis.py
 ```
 Compare P-Tree performance against CAPM and Fama-French factor models.
 
 ### Transaction Cost Analysis
 ```bash
-python3 5_transaction_cost_analysis.py
+python3 3_transaction_cost_analysis.py
 ```
-Evaluate net returns after realistic transaction costs.
-
-### Subperiod Analysis
-```bash
-python3 6_subperiod_analysis.py
-```
-Test performance stability across different time periods.
+Evaluate net returns after realistic transaction costs (optional robustness check).
 
 ---
 
