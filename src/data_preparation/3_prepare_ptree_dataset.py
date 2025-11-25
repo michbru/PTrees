@@ -194,6 +194,15 @@ data['std_dolvol'] = data.groupby('permno')['dolvol'].transform(
     lambda x: x.rolling(window=12, min_periods=6).std()
 )
 
+# -----------------------------------------------------------------------------
+# GROUP G: SERRANO-DERIVED CHARACTERISTICS (Enhancement)
+# -----------------------------------------------------------------------------
+
+# G1. DEBT_TO_EQUITY - Leverage
+# If not already present, calculate from Serrano ratios
+if 'debt_to_equity' not in data.columns and 'debt_ratio' in data.columns and 'equity_ratio' in data.columns:
+    data['debt_to_equity'] = data['debt_ratio'] / data['equity_ratio']
+
 # Clean up temporary calculation columns
 data = data.drop(['earnings_lag1y', 'earnings_surprise', 'earnings_surprise_std',
                   'market_cap_lag1', 'industry'], axis=1, errors='ignore')
@@ -230,6 +239,10 @@ characteristics = [
     'market_cap', 'me', 'book_to_market', 'ep_ratio', 'cfp_ratio', 'sp_ratio',
     # Profitability (Group D)
     'roa', 'gross_profitability', 'op', 'pm',
+    # Serrano Additional Accounting (High Quality)
+    'operating_margin', 'net_margin', 'cash_liquidity', 'equity_ratio', 
+    'debt_ratio', 'capital_turnover', 'inventory_turnover', 
+    'receivables_turnover', 'revenue_per_employee', 'profit_pct',
     # Investment (Group E)
     'asset_growth', 'sales_growth', 'capex_to_assets', 'ni',
     # Frictions (Group F)
