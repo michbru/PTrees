@@ -40,3 +40,7 @@ serrano/
 *.msi
 *.dmg
 desktop.ini
+
+# Exclude Excel files (often large)
+*.xlsx
+*.xls
