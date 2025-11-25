@@ -1,0 +1,744 @@
+isin,stock_name,lseg_name,orgnr
+SE0000100026,Active Biotech AB ser. A,Active Biotech AB publ,5562239227
+SE0000100182,AGA AB ser. A,Linde Sverige AB,5560091331
+SE0000100208,AGA AB ser. B,Linde Sverige AB,5560091331
+SE0000100505,Lundin Oil AB ser. B,Talisman Energy Sweden AB,5562979483
+SE0000100844,Argonaut AB ser. A,Kappahl Molndal 2 AB,5562266477
+SE0000100919,"ABB, ser. A",Hitachi Energy Sweden AB,5560297029
+SE0000100927,ABB ser. B,Hitachi Energy Sweden AB,5560297029
+SE0000101008,"Astra, AB, ser. A, fria",Astrazeneca AB,5560117482
+SE0000101016,"Astra, AB, ser. B, fria",Astrazeneca AB,5560117482
+SE0000101362,Bergman & Beving AB ser. B,Bergman & Beving AB,5560348590
+SE0000101552,"BTL AB, ser. A, fr",Schenker North & East AB,5560164310
+SE0000101578,"Bilspedition AB, ser. B,fr",Schenker North & East AB,5560164310
+SE0000101669,ElektronikGruppen BK AB ser. B,ElektronikGruppen BK AB,5560722547
+SE0000101891,Borås Wäfveri AB ser. B,Boras Wafveri AB,5561089052
+SE0000102006,BRIO AB ser. B,BRIO Leksaker AB,5562019686
+SE0000102295,Catena AB ser. A,Bilia AB,5561125690
+SE0000102642,"Cloetta, AB ser. B",Fazer Services AB,5560142357
+SE0000102790,Kalmar Industries AB,Kalmar Finland Oy,09868201
+SE0000102824,Concordia Maritime AB ser. B,Concordia Maritime AB,5560685819
+SE0000103046,"Custos, AB ser. B (Old)",AB Custos,5560361668
+SE0000103152,"Marieberg, Tidnings AB, ser A,fr",Tidnings Marieberg AB,5560028796
+SE0000103780,Eldon AB ser. B,Eldon AB,5563681104
+SE0000104051,Esselte AB ser. A,Esselte AB,5560114554
+SE0000104077,Esselte AB ser. B,Esselte AB,5560114554
+SE0000104150,Scancem AB ser. A,HeidelbergCement Sweden AB,5560006057
+SE0000104176,Scancem AB ser. B,HeidelbergCement Sweden AB,5560006057
+SE0000104259,"FABEGE AB, ser. B, fr",Fabege AB,5560491523
+SE0000104416,"Kinnevik, Industriförvaltnings A",Kinnevik Industriforvaltnings AB,5560019035
+SE0000104580,"Sweco AB, ser. A",Humlegarden Fastigheter AB,5566821202
+SE0000104606,FFNS B,Humlegarden Fastigheter AB,5566821202
+SE0000104788,Fjällräven AB ser. B,Fenix Outdoor AB,5561106310
+SE0000105082,"Storheden AB, ser. B,fr",Fabege Storstockholm AB,5561309039
+SE0000105116,Frontec AB ser. B,Acando AB,5562725092
+SE0000105199,Garphyttan Industrier AB,Haldex AB,5560101155
+SE0000105264,"Geveko, AB ser. B",Geveko AB,5560246844
+SE0000105371,"Gotland, Rederiab. ser. A",Rederi Gotland AB,5560008020
+SE0000105397,"Gotland, Rederiab. ser. B",Rederi Gotland AB,5560008020
+SE0000106205,Peab AB ser. B,Peab AB,5560614330
+SE0000106270,"HM AB, ser. B",H & M Hennes & Mauritz AB,5560427220
+SE0000106304,"Latour, Investmentab. ser. A",Investment AB Latour,5560263237
+SE0000106759,IBS AB ser. B,Iptor Supply Chain Systems AB,5561987289
+SE0000107203,"Industrivärden, AB ser. C",Industrivarden AB,5560434200
+SE0000107724,KABE AB ser. B,KABE Group AB,5560972233
+SE0000108169,Svedala Industri AB,Metso Outotec Sweden AB,5562165653
+SE0000108201,"SKF, AB ser. A",SKF AB,5560073495
+SE0000108227,"SKF, AB ser. B",SKF AB,5560073495
+SE0000108300,"TurnIT AB, ser. B",DistIT AB,5561164384
+SE0000108581,Lindab AB ser. B,Lindab AB,5560682022
+SE0000108649,"Ericsson, Telefonab. L M ser. A",Telefonaktiebolaget LM Ericsson,5560160680
+SE0000108656,"Ericsson, Telefonab. ser. B",Telefonaktiebolaget LM Ericsson,5560160680
+SE0000108847,"Lundbergföretagen AB, L E ser. B",L E Lundbergforetagen AB (publ),5560568817
+SE0000109985,"Nordström & Thulin AB, ser B,fr",Kappahl Molndal 2 AB,5562266477
+SE0000110322,HOIST International AB ser. B,Hoist Finance AB (publ),5560128489
+SE0000110710,Perstorp AB ser. A,Perstorp AB,5560246513
+SE0000110736,Perstorp AB ser. B,Perstorp AB,5560246513
+SE0000110819,"Spectra-Physics AB, ser. A, fria",Spectra-Physics AB,5560158882
+SE0000110959,Platzer Fastigheter AB ser. B,Platzer Fastigheter AB,5561025692
+SE0000111155,Extended Capital Group ECG AB se,Stockwik Forvaltning AB,5562947845
+SE0000111940,Ratos AB ser. B,Ratos AB,5560083585
+SE0000112252,Rottneros AB,Rottneros AB,5560135872
+SE0000112625,Sandvik AB ser. B,Sandvik AB,5560003468
+SE0000112724,SCA ser. B,Svenska Cellulosa Aktiebolaget SCA,5560126293
+SE0000113094,Skandia Försäkringsab,Forsakringsaktiebolaget Skandia (publ),5020173083
+SE0000113250,"Skanska AB, ser. B",Skanska AB,5560004615
+SE0000113516,Spendrups Bryggeriab. ser. B,Spendrups Bryggeriaktiebolag,5560796871
+SE0000113730,"Stora Kopparb. Bergsl.AB, A,fr",Stora Kopparbergs Bergslags AB,5560022096
+SE0000113797,Strålfors AB ser. B,PostNord Stralfors Group AB,5560620618
+SE0000114431,Sydkraft AB ser. A,EON Sverige AB,5560068420
+SE0000114456,Sydkraft AB ser. C,EON Sverige AB,5560068420
+SE0000114662,Tivox AB ser. B,Tivox AB,5561769596
+SE0000114837,Trelleborg AB ser. B,Trelleborg AB,5560063421
+SE0000115107,VBG AB ser. B,VBG Group AB (publ),5560690751
+SE0000115404,WM-data AB ser. B,CGI IT konsulter AB,5561245233
+SE0000115420,"Volvo, AB ser. A",Volvo AB,5560125790
+SE0000115446,"Volvo, AB ser. B",Volvo AB,5560125790
+SE0000115503,ZETECO AB ser. B,Zeteco AB,5560691338
+SE0000116634,ICB Shipping AB ser. A,Icb Shipping AB,5562718337
+SE0000116642,ICB Shipping AB ser. B,Icb Shipping AB,5562718337
+SE0000116717,"Trelleborg AB, ser. C, fr",Trelleborg AB,5560063421
+SE0000116949,Stena Line AB ser. B,Rosenborgs Securities AB,5562078005
+SE0000117822,Argonaut AB ser. B,Kappahl Molndal 2 AB,5562266477
+SE0000117970,NCC AB ser. B,NCC AB,5560345174
+SE0000118838,Seco Tools AB ser. B,Seco Tools AB,5560711060
+SE0000118945,"Stora Kopparb. Bergsl.AB, B,fr",Stora Kopparbergs Bergslags AB,5560022096
+SE0000118952,NCC AB ser. A,NCC AB,5560345174
+SE0000119299,Elanders AB ser. B,Elanders AB,5560081621
+SE0000120164,"Frontline AB, fria (Old)",Frontline Plc,HE442213
+SE0000120222,"Kinnevik, Industriförvaltnings A",Kinnevik Industriforvaltnings AB,5560019035
+SE0000120669,SSAB AB ser. B,SSAB AB,5560163429
+SE0000120776,"Westergyllen, AB ser. B",Elos Medtech AB,5560219650
+SE0000120784,SEB ser. C,Skandinaviska Enskilda Banken AB,5020329081
+SE0000120818,"Trygg-Hansa ser. B,fr",Trygg-Hansa FAB (publ),5164017799
+SE0000122657,Midway Holding AB ser. A,HAKI Safety AB,5563232536
+SE0000122673,Midway Holding AB ser. B,HAKI Safety AB,5563232536
+SE0000123085,Ortivus AB ser. B,Ortivus AB,5562591205
+SE0000123267,"ERRCE AB, ser. B",Bulten Fasteners AB,5560108861
+SE0000123671,"Rejlerkoncernen AB, ser. B",Rejlers AB (publ),5563498426
+SE0000135303,"Celtica, Fastighetsab.",Fastighetsaktiebolaget Celtica,5563509727
+SE0000135485,Taurus Petroleum AB ser. B,RaySearch Laboratories AB (publ),5563226157
+SE0000135501,"Solitair Kapital AB, fria",Solitair Kapital AB,5563859643
+SE0000143430,"Forcenergy AB, ser B,fr",Forcenergy AB,5562178177
+SE0000147480,Alcatel Alsthom Comp. Gen,Alcatel Lucent SA,542 019 096
+SE0000147555,"Saint-Gobain, Compagnie de SDB",Compagnie de Saint Gobain SA,542 039 532
+SE0000148884,SEB ser. A,Skandinaviska Enskilda Banken AB,5020329081
+SE0000162786,Nefab AB ser. B,Nefab AB,5562268143
+SE0000163594,Securitas AB ser. B,Securitas AB,5563027241
+SE0000163628,Elekta AB ser. B,Elekta AB (publ),5561704015
+SE0000164485,Incentive AB ser. B,Gambro AB,5560418005
+SE0000166506,SinterCast AB ser. A,SinterCast AB,5562336494
+SE0000166514,SinterCast AB ser. B,SinterCast AB,5562336494
+SE0000168304,Luxonen S.A. SDB,Luxonen SA,B30541
+SE0000169070,Bayer AG,Bayer AG,HRB 48248
+SE0000169567,"Kanthal AB ser B,fria",Kanthal AB,5564425576
+SE0000169658,Internat. Petroleum Corp. IPC,International Petroleum Corp,1103721
+SE0000170375,Hufvudstaden AB ser. A,Hufvudstaden AB,5560128240
+SE0000170383,Hufvudstaden AB ser. C,Hufvudstaden AB,5560128240
+SE0000171100,SSAB AB ser. A,SSAB AB,5560163429
+SE0000171886,SCA ser. A,Svenska Cellulosa Aktiebolaget SCA,5560126293
+SE0000188500,Scribona AB ser. A,Catella AB,5560791419
+SE0000188518,Scribona AB ser. B,Catella AB,5560791419
+SE0000188930,Ortivus AB ser. A,Ortivus AB,5562591205
+SE0000189128,Närkes Elektriska AB ser. B,Narkes Elektriska AB,5560299835
+SE0000189417,"Sv. Handelsbanken, index fr",Svenska Handelsbanken AB,5020077862
+SE0000189433,"Sv. Handelsbanken, pref, ser B63",Svenska Handelsbanken AB,5020077862
+SE0000189946,Industrial and Financial Syst. A,Industrial and Financial Systems IFS AB,5561220996
+SE0000189953,Industrial and Financial Syst. A,Industrial and Financial Systems IFS AB,5561220996
+SE0000190126,"Industrivärden, AB ser. A",Industrivarden AB,5560434200
+SE0000191090,Ratos AB ser. A,Ratos AB,5560083585
+SE0000191561,"Enea Data AB ser. A,fr",Enea AB,5562097146
+SE0000192874,"JP Bank, ser. A, fria",Meroc Asset Management AB,5932001745
+SE0000192882,"JP Bank, ser. B, fria",Meroc Asset Management AB,5932001745
+SE0000195570,Gunnebo AB,Gunnebo AB,5564382629
+SE0000195810,Bure Equity AB,Bure Equity AB,5564548781
+SE0000202624,Getinge Industrier AB ser. B,Getinge AB,5564085032
+SE0000204828,Piren AB,Rodamco Sverige AB,5562018654
+SE0000214058,HL Display AB ser. B,HL Display AB,5562869957
+SE0000215493,"Doro AB, ser. A",Doro AB,5561619429
+SE0000220824,Munksjö AB (Old),Ahlstrom Sweden AB,5566699731
+SE0000221723,Meda AB ser. A,Meda AB,5564272812
+SE0000224578,Graphium AB,IDEMIA Sweden Company AB,5564083854
+SE0000226367,Nobel Biocare AB,Nobel Biocare AB,5560020231
+SE0000226607,"Diös AB, Anders",Fastighets Gesimsen Gron AB,5560117698
+SE0000227258,Akzo Nobel N.V. SDB,Akzo Nobel NV,09007809
+SE0000232175,Höganäs AB ser. B,Hoganas AB,5560050121
+SE0000232282,Matteus AB,Matteus Fondkommission AB,5564043007
+SE0000233934,Pricer AB ser. B,Pricer AB,5564277993
+SE0000236382,Consilium AB ser. B,Concejo AB (publ),5564803327
+SE0000240558,"Spira AB, ser Fria",Kronfagel Holding AB,5565296372
+SE0000242125,Althin Medical AB ser. B,Baxter Medical AB,5561710657
+SE0000242455,Sparbanken ser. A,Swedbank AB,5020177753
+SE0000251902,"Empire AB, The ser. B",Ledstiernan AB,5561222158
+SE0000254567,Klippan AB,Klippan AB,5563601821
+SE0000254880,Broström Van Ommeren Shipping AB,B Tankers AB,5560051467
+SE0000262446,Resco AB ser. B,Acando Europe AB,5562208511
+SE0000262982,Cardo AB,Cardo AB,5560268517
+SE0000265217,"PA Resources, serie B",PA Resources AB,5564882180
+SE0000266991,Gränges AB,Granges AB,5560016122
+SE0000267494,"Caran AB, serie B",Caran AB,5562561562
+SE0000275802,IRO AB,Vandewiele Sweden AB,5565129417
+SE0000275943,Artema Medical AB ser. B,Mindray Medical Sweden AB,5563869949
+SE0000282071,Trio AB,Teligent Mobile Office AB,5564390341
+SE0000291171,BT Industries AB,Toyota Material Handling Europe AB,5564919537
+SE0000291486,Observer AB,Cision AB,5560279514
+SE0000293656,BioPhausia AB ser. A,BioPhausia AB,5564850153
+SE0000304750,CityMail Group AB ser. A,Bring Mail Nordic AB,5565288197
+SE0000308272,Scania AB ser. A,Scania AB,5561848564
+SE0000308280,Scania AB ser. B,Scania AB,5561848564
+SE0000311615,Linné Group AB,Mandator AB,5562160357
+SE0000312043,"Havsfrun, AB ser. B",Havsfrun Investment AB,5563115939
+SE0000314155,Näckebro,Stena Fastigheter Vast AB,5560936279
+SE0000316150,Benima Ferator Engineering AB,Ferator Engineering AB,5560834011
+SE0000323305,Softronic AB ser. B,Softronic AB,5562490192
+SE0000325870,Diffchamb AB,Diffchamb Sverige AB,5564304029
+SE0000327090,Medi Team Dentalutveckling i Gbg,Biolin Scientific AB,5562494293
+SE0000329146,SAS Sverige AB,SAS Sverige AB,5560425414
+SE0000329203,Sifab Fastighets AB,SIFAB Fastighets AB,5560145251
+SE0000331266,Duroc AB ser. B,Duroc AB,5564464286
+SE0000338220,Diligentia AB,Skandia Fastigheter AB,5564671641
+SE0000345902,Modul 1 Data AB,Softronic 1 AB,5564190006
+SE0000349243,Intentia International AB ser. B,Infor Holdings (Sweden) AB,5563878148
+SE0000350696,"Norrporten, Fastighetsab",Castellum Norr 2 AB,5564586138
+SE0000351157,Scandic Hotels AB (Old),Scandic Hotels AB,5562991009
+SE0000352809,ScanMining - Scandinavian Mining,Scanmining AB,5564451655
+SE0000353351,Biacore International AB,Biacore International AB,5565345211
+SE0000353898,MultiQ International AB,MQ International AB,5564586948
+SE0000355729,"Daydream Software AB, serie B",Entraction Holding AB,5563672913
+SE0000356008,Prevas AB ser. B,Prevas AB,5562521384
+SE0000361909,Biora AB,Biora AB,5562898998
+SE0000362675,"NovaCast AB, ser. B",NovaCast Technologies AB,5562110790
+SE0000364283,Alfaskop AB,Alfaskop AB,5565188926
+SE0000366098,Net Insight AB ser. B,Net Insight AB,5565334397
+SE0000366254,Sigma AB ser. B,Harman Connected Services AB,5562503515
+SE0000367823,"Vostok Nafta, Inv Ltd SDB",Vostok Gas Ltd,22531
+SE0000371296,Teletrade AB ser. B,Nordnet AB (Pre-Merger),5562491687
+SE0000374704,Pronyx AB,Pronyx AB,5564526225
+SE0000374993,MTV Produktion AB ser. B,Banijay Sweden AB,5563334662
+SE0000375545,"Academedia, serie B (old)",ACM 2001 AB,5560572850
+SE0000378127,Ticket Travel Group AB,Braathens Travel Group AB,5564454170
+SE0000379075,SäkI AB,SakI AB,5560128547
+SE0000379190,Castellum AB,Castellum AB,5564755550
+SE0000379497,Semcon AB,Semcon AB,5565399549
+SE0000381790,SIFO Group AB ser. B,Cision AB,5560279514
+SE0000381840,Feelgood,Feelgood Svenska AB,5565112058
+SE0000383259,Handelsbanken Hypotek AB pr,Handelsbanken Hypotek AB,5560007618
+SE0000383473,Riddarhyttan AB,Riddarhyttan Resources AB,5565347639
+SE0000383499,Arkivator AB,LGP Allgon Holding AB,5563462620
+SE0000383531,North Atlantic Natural Resources,North Atlantic Natural Resources AB,5565385076
+SE0000386104,"Optosof AB, serie B",Decerno City AB,5565311890
+SE0000386138,Expanda AB ser. B,Lammhults Design Group AB,5565412094
+SE0000387318,Rörvik Timber AB ser. B,Rorvik Industri och Handel AB,5565412086
+SE0000387607,Protect Data AB,Check Point Holding AB,5563158541
+SE0000388969,Gorthon Lines AB ser. B,Gorthon Lines AB,5561126953
+SE0000391716,"Traction Holding AB, serie B",Traction AB,5560298654
+SE0000393860,ProfilGruppen AB ser. B,Profilgruppen AB,5562778943
+SE0000394165,PartnerTech AB,Scanfil Sweden AB,5562513308
+SE0000394181,Pandox AB (Old),Pandox AB,5560307885
+SE0000394470,Mandator AB,Mandator AB,5562160357
+SE0000396061,Bong Ljungdahl AB,Bong AB,5560341579
+SE0000396715,Independent Media Gr. Sweden AB,Vision Park Interactive Media AB,5564641388
+SE0000402497,Dentronic AB ser. B,Decim AB,5561288332
+SE0000407991,Svedbergs i Dalstorp AB ser. B,Svedbergs Group AB,5560524984
+SE0000409724,Hufvudstaden International AB,Hufvudstaden AB,5560128240
+SE0000410698,"Corona Petroleum, serie B",Dial Nxt Group AB,5565433553
+SE0000413221,Artimplant AB ser. B,Artimplant AB,5564048394
+SE0000416125,Svenska Orient Linien AB ser. B,Svenska Orient Linien AB,5566050950
+SE0000416604,Munters AB (old),Munters AB,5560410606
+SE0000418402,Nilörngruppen AB ser. B Old,Nilorngruppen AB,5563223782
+SE0000418923,CTT Systems AB,CTT Systems AB,5564307741
+SE0000421273,Know IT AB,Knowit AB (publ),5563910354
+SE0000426462,Q-Med,Q Med AB,5562586882
+SE0000427361,Nordea Bank AB,Nordea Bank Abp,28583949
+SE0000429706,ARETE AB,CAG Arete AB,5562876770
+SE0000430894,PWT Pure Water Technology AB ser,PWT Pure Water Technology AB,5563815496
+SE0000433914,Nexus Technology,Technology Nexus AB,5564109758
+SE0000434102,Tele1 Europe,TDC Nordic AB,5565127031
+SE0000434292,"Aerocrine AB, ser. B",Circassia AB,5565491056
+SE0000434342,Teligent AB,Teligent AB,5563987154
+SE0000444713,Forcenergy Inc. SDB,Forcenergy AB,5562178177
+SE0000445934,Affärsstrategerna i Sverige AB s,Affarsstrategerna AB,5563214096
+SE0000449068,A Brand New World,A Brand New World in Sweden AB,5565007480
+SE0000451346,Karolin Machine Tool AB,WJG Holdings AB,5562416775
+SE0000452682,Asticus,Asticus AB,5564615960
+SE0000454746,PyroSequencing,Biotage AB,5565393138
+SE0000454886,Sodra Petroleum AB,Sodra Petroleum AB,5565504882
+SE0000456386,Mandamus Fastigheter AB,Heimstaden A Lagenheter AB,5565496360
+SE0000459067,Kipling Holding AB,Kipling Holding AB,5565376414
+SE0000459299,"Probi AB, ser. B",Probi AB,5564177540
+SE0000459323,All Cards Service Center - ACSC,All Cards Service Center ACSC AB,5562726546
+SE0000469579,Lifco (Old),Lifco AB (publ),5564653185
+SE0000469769,"Balder, Fastighets AB (Old)",Fastighets AB Balder,5565256905
+SE0000470700,Proffice B,Randstad Sweden Group AB,5560896572
+SE0000470817,Tryckinvest i Norden AB,Tryckinvest I Norden AB,5563950210
+SE0000476954,"LightLab AB, ser. B",Nordic Service Partners Holding AB,5565341970
+SE0000476962,Icon Medialab International AB,Lb Icon AB,5562840917
+SE0000478059,"Société Europ de Com,  SDBA",Societe Europeenne de Communication SA,B114447
+SE0000478067,"Société Europ de Com, SDBB",Societe Europeenne de Communication SA,B114447
+SE0000479107,ReadSoft AB ser. B,Kofax Sweden Services AB,5563981066
+SE0000479495,"Gullspång Kraft AB, ser. B, fr",Fortum Power and Heat AB,5562215623
+SE0000483943,Thalamus Networks,Hifab Group AB,5563941987
+SE0000500258,Aspiro,Aspiro AB,5565199998
+SE0000500290,Drott AB ser. A,Fabege Fastigheter Stockholm AB,5560502113
+SE0000500308,Drott AB ser. B,Fabege Fastigheter Stockholm AB,5560502113
+SE0000507659,Malmbergs Elektriska AB ser. B,Malmbergs Elektriska AB (publ),5565562781
+SE0000507774,Novada,Novada AB (publ),5565146965
+SE0000514325,ZAPP B,Zapp AB,5565581203
+SE0000514374,Enea Data AB,Enea AB,5562097146
+SE0000514440,Cash Guard B,Cash Guard AB,5564228327
+SE0000514515,Estinvest,Estinvest,5562407345
+SE0000514572,SBI Holding B,Petrosibir AB,5564681491
+SE0000519928,Centrecourt (Old),Centrecourt AB,5565468864
+SE0000523441,Castcom,Castcom AB (publ),5565528378
+SE0000524191,Ballingslöv International AB,Ballingslov International AB,5565562807
+SE0000524811,Åhus Glass AB ser. B,Ingman Glass AB,5561218487
+SE0000525057,Capona AB,Strawberry Properties AB,5565476073
+SE0000526626,Micro Systemation B,Micro Systemation AB (publ),5562443050
+SE0000535593,"Skandigen, Industriförvaltningsa",Skanditek Industriforvaltning AB,5562354141
+SE0000538258,Entra Data AB ser. A,Entra Data AB,5592310147
+SE0000538845,Naturkompaniet AB,Naturkompaniet AB,5564337037
+SE0000542896,Skultuna Messingsbruk AB,Skultuna Messingsbruk AB,5560293085
+SE0000544678,Persea B,Persea AB,5561522409
+SE0000545477,Glasis Holding AB ser. B,Eitech Electro AB,5564690732
+SE0000545626,Jeeves Information Systems AB,Forterro Sweden AB,5563434215
+SE0000549412,Kungsleden AB,Kungsleden AB,5565451217
+SE0000558173,Netwise B,Netwise AB,5564044286
+SE0000561623,"Electrolux, AB ser. B",Electrolux AB,5560094178
+SE0000565210,Wilh. Sonesson AB ser. A,Midsona AB,5562415322
+SE0000565228,Wilh. Sonesson AB ser. B,Midsona AB,5562415322
+SE0000567539,Poolia AB ser. B,PION Group AB,5564479912
+SE0000567752,NOVOTEK AB ser. B,Novotek AB,5560609447
+SE0000571275,Skribo Font,Skribo Font AB (publ),5564161163
+SE0000577025,Swedmach Ind. B,Swedmach Logistics AB,5566147939
+SE0000577199,Swedmach Industries AB BT ser. B,Swedish Match Industries AB,5560050253
+SE0000579591,Autofill,Autofill AB,5564611639
+SE0000582603,Viking Telecom,Availo AB,5563303055
+SE0000584948,Clas Ohlson B,Clas Ohlson AB,5560358672
+SE0000585960,Connecta (old) B,Connecta AB,5565403457
+SE0000588147,Nordbanken Holding AB,Nordea Bank AB,5164060120
+SE0000590416,Perbio Science,Perbio Science AB,5565670626
+SE0000601544,Friluftsbolaget,Friluftsbolaget Ekelund & Sagner AB,5565430229
+SE0000614695,Tripep,Din Bostad Sverige AB,5565411898
+SE0000615858,JC,Jotunfjell Partners AB,5564688991
+SE0000616716,Duni AB,Duni AB,5565367488
+SE0000619181,LinkMed AB,CareDx International AB,5565436127
+SE0000622656,Hagströmer&Qviberg,HQ AB,5565735650
+SE0000628984,ISEC Intelligent Securtity AB,Reguard AB,5564020922
+SE0000634040,Pharmacia Corp. SDB,Pharmacia LLC,0341113
+SE0000634321,Orc,Broadridge Trading and Connectivity Solutions AB,5563134583
+SE0000641151,Delphi Private Placement Group,Svithoid Tankers AB,5565740064
+SE0000646606,Sign On i Stockholm AB,Dagon AB,5564310067
+SE0000648115,,Axfood AB,5565420824
+SE0000652216,Hakon Invest AB,ICA Gruppen AB,5560482837
+SE0000653230,Studsvik,Studsvik AB,5565010997
+SE0000653495,Comexchange,Nordic Holding Sverige AB (publ),5565230801
+SE0000657140,Netonnet,NetOnNet AB,5565204137
+SE0000667891,Sandvik AB,Sandvik AB,5560003468
+SE0000667925,Telia AB,Telia Company AB,5561034249
+SE0000671711,Beijer Electronics,Ependion AB,5560251851
+SE0000671810,Mogul,Decerno City AB,5565311890
+SE0000672040,Coldator B,Coldator FreshCool International AB,5563929545
+SE0000672354,Axis,Axis AB,5562411065
+SE0000673907,Scand. Online,Scandinavia Online AB,5565519989
+SE0000673998,Mind,Mind AB,5565828059
+SE0000674509,AU-System,Knowit Connectivity AB,5562540673
+SE0000678328,IAR Systems AB (Old),I.A.R. Systems AB,5562307107
+SE0000683484,CellaVision AB,CellaVision AB,5565000998
+SE0000683757,Human Care,Human Care HC AB (publ),5564946332
+SE0000689986,Johnson Pump,Johnson Pump International AB,5561630095
+SE0000695876,Alfa Laval AB,Alfa Laval AB,5565878054
+SE0000696841,Metro SDBA,Metro International SA,B73790
+SE0000696858,Metro SDBB,Metro International SA,B73790
+SE0000698268,Hemtex AB,Hemtex AB,5561327056
+SE0000702169,Cybercom,Knowit Group Sverige AB,5565446522
+SE0000702177,Custos (Old),AB Custos,5560361668
+SE0000706913,Neonet,BTN Forvaltning AB,5565301263
+SE0000708620,AudioDev B,Audiodev AB,5561962035
+SE0000718199,Capio,Capio AB (publ),5567064448
+SE0000718751,Glasis Holding AB,Eitech Electro AB,5564690732
+SE0000721433,Dimension,Proact IT Sweden AB,5563282754
+SE0000722365,Oasmia Pharmaceutical AB,Vivesto AB,5563326676
+SE0000725624,Gandalf AB,JLT Mobile Computers AB (publ),5562394071
+SE0000736415,Orexo AB,Orexo AB,5565000600
+SE0000739286,Vostok Oil,Alliance Oil Company Ltd,25413
+SE0000769044,CellPoint Inc. SDB,Cellpoint Inc,C41521997
+SE0000798829,Carnegie,Victoriahem Fastigheter AB,5564989449
+SE0000799827,HQ Fonder AB,Carnegie Fonder AB,5562666049
+SE0000805426,BTS Group B,BTS Group AB,5565667119
+SE0000806994,JM AB,JM AB,5560452103
+SE0000809881,Pergo AB,Declam AB,5565632600
+SE0000818023,Transcom WorldWide S.A. S ser. A,Transcom Worldwide AB,5568801277
+SE0000818031,Transcom WorldWide S.A. SDB ser.,Transcom Worldwide AB,5568801277
+SE0000825820,Lundin Petroleum AB,Orron Energy AB,5566108055
+SE0000835217,Sigma AB ser. B,Sigma Nexer AB,5563475440
+SE0000856999,Kraftkommission i Sverige ser. B,Stavrullen Finans AB (publ),5561255851
+SE0000857369,Seamless Distribution AB,Invuo Technologies AB,5566102660
+SE0000862997,Billerud AB,Billerud AB (publ),5560255001
+SE0000872095,Biovitrum AB,Swedish Orphan Biovitrum AB (publ),5560389321
+SE0000936478,Intrum Justitia AB,Intrum AB,5566077581
+SE0000937674,Active Capital AB ser. A,ACAP Invest AB,5560877838
+SE0000937682,Active Capital AB ser. B,ACAP Invest AB,5560877838
+SE0000949331,Nobia AB,Nobia AB,5565282752
+SE0000950982,SinterCast AB,SinterCast AB,5562336494
+SE0000957979,Adcore AB ser. A,Corem Kelly AB,5564825833
+SE0000961724,Connecta AB (Very old),Connecta AB,5565403457
+SE0001048984,BioPhausia AB,BioPhausia AB,5564850153
+SE0001097031,Senea AB ser. A,Kamstrup AB,5564364890
+SE0001105487,Brinova Fastigheter AB (Old),Brinova Fastigheter AB,5565949566
+SE0001105511,ZetaDisplay AB,ZetaDisplay AB,5566034434
+SE0001131269,Tilgin AB,Seliro AB,5565375812
+SE0001134529,South Atlantic Ventures SDB,Lundin Mining Corp,4437365
+SE0001134537,Tanganyika Oil,Tanganyika Oil Co Ltd,3183688
+SE0001137985,Active Biotech AB,Active Biotech AB publ,5562239227
+SE0001161530,Nanook Investment AB,Acando Solutions AB,5566105705
+SE0001161654,NOTE AB,Note AB (publ),5564088770
+SE0001174889,Oriflame Cosmetics S.A. SDB,Oriflame Cosmetics SA,B8835
+SE0001174970,Millicom Intern. Cellular SDB,Millicom International Cellular SA,B40630
+SE0001200015,Nextlink,Invisio AB,5566510987
+SE0001207606,Ainax,Ainax AB,5565794459
+SE0001210329,BubbelTian AB,Envirosation AB,5566621800
+SE0001280355,Probi AB,Probi AB,5564177540
+SE0001283607,"Uniflex AB, ser. B",Uniflex AB,5564620887
+SE0001306119,addVise Inredning Skyddsvent. AB,ADDvise Group AB (publ),5563632115
+SE0001336983,Bostads AB Drott,Bostads Drott AB,5562383959
+SE0001338039,Formpipe Software,FormPipe Software AB,5566686605
+SE0001447723,Gunnebo Industrier AB,Gunnebo Industrier AB,5563249183
+SE0001449380,Mangold AB,Mangold AB,5566285408
+SE0001471103,Transmode Holding AB,Transmode AB,5565889101
+SE0001493693,Tricorona Mineral AB,Bryggpipan AB,5563320240
+SE0001512088,Finnveden AB ser. B,Bulten Holding AB,5562240894
+SE0001515552,Indutrade AB,Indutrade AB,5560179367
+SE0001552357,TradeDoubler AB,TradeDoubler AB,5565757423
+SE0001572520,Electra Gruppen AB,Elon AB (publ),5560654054
+SE0001625534,AllTele Allmänna Svenska Telefon,Bredband2 Allmanna IT AB,5566262407
+SE0001629288,AB Sagax pref,Sagax AB,5565200028
+SE0001634262,Diös Fastigheter AB,Dios Fastigheter AB,5565011771
+SE0001662222,"Husqvarna AB, ser. A",Husqvarna AB,5560005331
+SE0001662230,"Husqvarna AB, ser. B",Husqvarna AB,5560005331
+SE0001664210,Gant Company AB,Gant Company AB,5566004486
+SE0001664707,Catena AB,Catena AB,5562941715
+SE0001696683,OPUS Prodox AB,Opus Group AB (publ),5563906063
+SE0001733841,"Swedol AB, ser. B",Swedol AB,5561276188
+SE0001739053,Carl Lamm AB,Franco Frankerings Intressenter AB,5566947593
+SE0001785197,"Securitas Systems AB, ser. B",Niscayah Group AB,5564366267
+SE0001785270,Melker Schörling AB,Melker Schorling AB,5565605309
+SE0001824004,G5 Entertainment AB,G5 Entertainment AB (publ),5566808878
+SE0001826215,TMT One AB ser. A,SCA Estonian Forests AB,5567264659
+SE0001852419,Lindab International AB,Lindab International AB,5566065446
+SE0001857533,Rezidor Hotel Group AB,Radisson Hospitality AB,5566740964
+SE0001965369,NAXS Nordic Access Buyout Fund,NAXS AB (publ),5567122972
+SE0002016352,"C-RAD AB, ser. B",C Rad AB,5566639174
+SE0002060863,BlackPearl Resources,BlackPearl Resources Inc (Pre-Reincorporation),4546113
+SE0002091496,"Peab Industri AB, ser. B",Peab Industri AB,5565949558
+SE0002095604,Arise Windpower AB,Arise AB,5562746726
+SE0002110064,Mekonomen,Meko AB,5563921971
+SE0002148817,Hansa Medical AB,Hansa Biopharma AB,5567345359
+SE0002160010,TV4 AB ser. A,TV4 AB,5562427152
+SE0002180539,Avega Group AB,Avega Group AB,5566011887
+SE0002190926,Karolinska Development AB ser. B,Karolinska Development AB,5567075048
+SE0002216713,Victoria Park AB,,5566950738
+SE0002402701,eWork Scandinavia AB,Ework Group AB,5565878708
+SE0002469312,Carl Lamm Holding AB,Ricoh Sverige Holding AB,5567345987
+SE0002478776,Senzime AB,Senzime AB (publ),5565655734
+SE0002571539,DGC One AB,DGC One AB,5566241732
+SE0002575340,NeuroVive Pharmaceutical AB,Abliva AB,5565956538
+SE0002579912,Global Health Partner AB,GHP Specialty Care AB,5567571103
+SE0002591420,Tobii AB,Tobii AB,5566139654
+SE0002626861,Cloetta AB ser. B,Cloetta AB,5563088144
+SE0002687749,"Swedbank AB, preferensaktie",Swedbank AB,5020177753
+SE0003210590,SwitchCore AB ser. A,Arbona AB (publ),5565418869
+SE0003303627,Byggmax Group AB,Byggmax Group AB,5566563531
+SE0003366871,SAS AB,SAS AB,5566068499
+SE0003491562,Episurf Medical AB ser. B,Episurf Medical AB,5567670541
+SE0003756758,"Sdiptech AB, ser. B",Sdiptech AB (publ),5566724893
+SE0003815604,PledPharma AB,Egetis Therapeutics AB (publ),5567066724
+SE0003849223,FinvedenBulten AB,Bulten AB,5566682141
+SE0003909282,"Dedicare AB, ser B",Dedicare AB (publ),5565161501
+SE0003917798,Sivers IMA Holding AB,Sivers Semiconductors AB,5563839348
+SE0003949973,"Balder FastighetsAB, pref",Fastighets AB Balder,5565256905
+SE0003950864,Concentric AB,Concentric AB,5568284995
+SE0004390037,"Klövern AB, preferensaktie",Corem Kelly AB,5564825833
+SE0004635878,Sagax A,Sagax AB,5565200028
+SE0004777241,Sportamore AB,TSR Noisiver 7 AB,5567888614
+SE0004840718,Xvivo Perfusion AB,Xvivo Perfusion AB,5565610424
+SE0004977692,"Platzer Fastigheter Holding AB,",Platzer Fastigheter Holding AB (publ),5567466437
+SE0005034550,Amasten Holding,Neobo Fastigheter AB (publ),5565802526
+SE0005096369,"Oscar Properties Holding AB, pre",Oscar Properties Holding AB,5568704521
+SE0005126729,PA Resources AB,PA Resources AB,5564882180
+SE0005126885,Tribona AB,Tribona AB,5568704646
+SE0005127818,Sagax B,Sagax AB,5565200028
+SE0005190220,Tele2 AB ser. A,Tele2 AB,5564108917
+SE0005190238,Tele 2 AB ser. B,Tele2 AB,5564108917
+SE0005222841,"Ratos AB, preferansaktier",Ratos AB,5560083585
+SE0005250487,"Victoria Park AB, preferensakti",Victoriahem AB,5566950738
+SE0005454873,Nanologica AB,Nanologica AB (publ),5566645023
+SE0005468717,Ferronordic Machines AB,Ferronordic AB,5567487953
+SE0005594728,D. Carnegie & Co AB,Victoriahem Fastigheter AB,5564989449
+SE0005676160,Arcam AB,Arcam AB,5565395356
+SE0005704053,"SAS AB, preferensaktie",SAS AB,5566068499
+SE0005757267,Recipharm AB,Recipharm AB,5564988425
+SE0005794617,Saniona AB,Saniona AB,5569625345
+SE0005851706,I.A.R Systems Group AB ser.B,IAR Systems Group AB,5564007200
+SE0005878543,Hanza Holding AB,Hanza AB,5567488399
+SE0005878741,Bactiguard Holding AB,Bactiguard Holding AB,5568221187
+SE0005932795,"Victoria Park AB, ser. B",Victoriahem AB,5566950738
+SE0005991411,Besqab AB (Old),Besqab Bostadsutveckling AB,5566938881
+SE0005992831,Starbreeze AB,Starbreeze AB,5565518932
+SE0005999760,Scandi Standard AB,Scandi Standard AB (publ),5569210627
+SE0005999778,Com Hem Holding AB,Com Hem Holding AB,5568586613
+SE0005999836,"ÅF, AB. ser. B",Afry AB,5561206474
+SE0006091997,Immunovia AB,Immunovia AB (publ),5567304299
+SE0006143129,"Christian Berner Tech Trade AB,",Berner Industrier AB,5560263666
+SE0006168316,Transcom WorldWide AB,Transcom Worldwide AB,5568801277
+SE0006220018,Inwido AB,Inwido AB (publ),5566333828
+SE0006288015,Gränges AB,Granges AB,5560016122
+SE0006342333,NP3 Fastigheter AB,NP3 Fastigheter AB,5567491963
+SE0006371126,Cantargia AB,Cantargia AB,5567916019
+SE0006421871,Image Systems AB,Image Systems AB,5563194041
+SE0006422390,Thule Group AB,Thule Group AB,5567706311
+SE0006425815,PowerCell Sweden AB,Powercell Sweden AB (publ),5567598353
+SE0006509949,Eltel AB,Eltel AB,5567286652
+SE0006543344,"Stendörren Fastigh. AB, ser. B",Stendorren Fastigheter AB,5568254741
+SE0006593901,"Klövern AB, ser. A",Corem Kelly AB,5564825833
+SE0006593919,"Klövern AB, ser B",Corem Kelly AB,5564825833
+SE0006593927,"Klövern AB, preferensaktie",Corem Kelly AB,5564825833
+SE0006625471,Dustin Group AB,Dustin Group AB,5567033062
+SE0006758348,"Sdiptech AB, preference share",Sdiptech AB (publ),5566724893
+SE0006758587,Transtema Group AB,Transtema Group AB,5569880411
+SE0006852075,"K2A Knaust&Andersson Fast. AB ,",K2A Knaust & Andersson Fastigheter AB (publ),5569437600
+SE0006887063,Hoist Finance AB,Hoist Finance AB (publ),5560128489
+SE0006965216,Nordax Group AB,NOBA Group AB (publ),5569932485
+SE0006993770,Axfood,Axfood AB,5565420824
+SE0007048020,Collector AB,Collector AB,5565600797
+SE0007074281,"HEXPOL AB, ser. B",Hexpol AB,5561089631
+SE0007074505,Magnolia Bostad AB,Magnolia Bostad AB,5567977078
+SE0007075056,"Eolus Vind AB, ser. B",Eolus AB (publ),5563893956
+SE0007100342,"Nilörngruppen AB, ser. B",Nilorngruppen AB,5563223782
+SE0007100359,"Pandox AB, ser. B",Pandox AB,5560307885
+SE0007100581,Assa Abloy AB ser. B,Assa Abloy AB,5560593575
+SE0007100599,SHB AB ser. A,Svenska Handelsbanken AB,5020077862
+SE0007100607,SHB ser. B,Svenska Handelsbanken AB,5020077862
+SE0007126115,Hemfosa Fastigheter AB,Hemfosa Fastigheter AB,5569174377
+SE0007126123,"Hemfosa Fastigheter AB, Pref",Hemfosa Fastigheter AB,5569174377
+SE0007157763,Bilia AB ser. A,Bilia AB,5561125690
+SE0007158829,Coor Service Mgmt Holding AB,Coor Service Management Holding AB,5567420806
+SE0007158910,Alimak Group AB,Alimak Group AB (publ),5567141857
+SE0007158928,"Starbreeze AB, ser. A",Starbreeze AB,5565518932
+SE0007184189,Genova Property Group AB,Genova Property Group AB,5568648116
+SE0007185418,Nobina AB,Nobina AB,5565764569
+SE0007185681,Capio AB,Capio AB (publ),5567064448
+SE0007192018,Vostok Emerging Finance Ltd,VEF Ltd,50298
+SE0007277876,Wise Group AB,Wise Group AB,5566863576
+SE0007278841,"Serneke Group AB, ser. B",Tornskogens fastighetsforvaltning i Solna AB,5566694153
+SE0007464888,Karo Bio AB,Karo Healthcare AB,5563093359
+SE0007491105,Nordic Mines AB,Nordic Mines AB (publ),5566791215
+SE0007491303,Bravida Holding AB,Bravida Holding AB,5568915390
+SE0007526132,"Genova Property Group AB, prefer",Genova Property Group AB,5568648116
+SE0007577895,Vicore Pharma Holding AB,Vicore Pharma Holding AB,5566803804
+SE0007578026,"Fastator, AB, ser. B",Fastator AB (publ),5566786645
+SE0007640156,Scandic Hotels Group AB,Scandic Hotels Group AB,5567031702
+SE0007665823,Resurs Holding AB,Resurs Holding AB (publ),5568982291
+SE0007666110,Attendo AB,Attendo AB (publ),5590267885
+SE0007691613,Dometic Group AB,Dometic Group AB (publ),5568294390
+SE0007692850,Camurus AB,Camurus AB,5566679105
+SE0007730650,Nuevolution AB,Nuevolution AB,5590264304
+SE0007871363,Vitec Software Group AB ser. B,Vitec Software Group AB (publ),5562584804
+SE0007871645,Unibet Group Plc,Kindred Group PLC,C 39017
+SE0007897079,AcadeMedia AB,AcadeMedia AB,5568460231
+SE0008015259,"Infant Bacterial Therapeut. AB,s",Infant Bacterial Therapeutics AB,5568738586
+SE0008040653,Humana AB,Humana AB,5567608475
+SE0008091573,"Bonava AB, ser. A",Bonava AB (publ),5569280380
+SE0008091581,"Bonava AB, ser. B",Bonava AB (publ),5569280380
+SE0008091904,LeoVegas AB,LeoVegas AB (publ),5568304033
+SE0008135610,HiQ International AB,HiQ International AB,5565293205
+SE0008212518,Enea Data AB,Enea AB,5562097146
+SE0008241491,SynAct Pharma AB,SynAct Pharma AB,5590584826
+SE0008293674,Wilson Therapeutics AB,Wilson Therapeutics AB,5568930357
+SE0008321202,IRRAS AB,Irras AB,5568727134
+SE0008321608,"Öresund, Investmentab",Investment Oresund AB,5560639147
+SE0008321921,BE Group AB,BE Group AB (publ),5565784724
+SE0008347652,"Brinova Fastigheter AB, ser.B",Brinova Fastigheter AB (publ),5568403918
+SE0008347660,B3IT Management AB,B3 Consulting Group AB (publ),5566063300
+SE0008348767,Trention AB,Trention AB,5562748623
+SE0008374383,"Maha Energy AB, ser A",Maha Capital AB,5590189543
+SE0008585525,Int. Engelska Skolan Hldg AB,Internationella Engelska Skolan I Sverige Holdings II AB,5569007254
+SE0009143662,Volati AB,Volati AB,5565554317
+SE0009143670,"Volati AB, preferensaktie",Volati AB,5565554317
+SE0009155005,Ahlsell AB,Ahlsell AB (publ),5568828916
+SE0009160872,MedCap AB,MedCap AB (publ),5566171459
+SE0009161052,"Sagax AB, ser. D",Sagax AB,5565200028
+SE0009216278,MIPS AB,Mips AB,5566090162
+SE0009268360,Edgeware AB,Edgeware AB (publ),5566917554
+SE0009269467,Actic Group AB,Actic Group AB,5568953409
+SE0009414576,Oncopeptides AB,Oncopeptides AB,5565966438
+SE0009554454,"Effnetplattformen AB, ser B",Samhallsbyggnadsbolaget I Norden AB,5569817660
+SE0009581051,Isofol Medical AB,Isofol Medical AB (publ),5567598064
+SE0009663511,SSM Holding AB,SSM Holding AB,5565333902
+SE0009663826,Ambea AB,Ambea AB (publ),5564684354
+SE0009697220,Enea Data AB,Enea AB,5562097146
+SE0009778848,"Medicover AB, ser. B",Medicover AB,5590739487
+SE0009779796,Seafire AB,Seafire AB (publ),5565407615
+SE0009806607,"Munters Group AB, ser. B",Munters Group AB,5568192321
+SE0009858152,BONESUPPORT HOLDING AB,Bonesupport Holding AB,5568022171
+SE0009888738,Boozt AB,Boozt AB,5567935183
+SE0009921588,Bilia AB ser. A,Bilia AB,5561125690
+SE0009922156,"Essity AB, ser. A",Essity AB (publ),5563255511
+SE0009922164,"Essity AB, ser. B",Essity AB (publ),5563255511
+SE0009922305,"Momentum Group AB, ser. B",Alligo AB,5590721352
+SE0009947708,NGS Group AB,NGS Group AB,5565351128
+SE0009973563,XSpray Pharma AB,XSpray Pharma AB (publ),5566493671
+SE0009997018,HMS Networks AB,HMS Networks AB,5566618954
+SE0010023432,"Mertiva AB, ser. A",Mertiva AB,5565301420
+SE0010048884,"Fagerhult, AB",Fagerhult Group AB,5561106203
+SE0010100958,"Latour, Investmentab. ser. B",Investment AB Latour,5560263237
+SE0010133256,"Cherry AB, ser. B",European Entertainment Intressenter Sweden AB,5562109909
+SE0010298109,Handicare Group AB,Handicare Group AB,5569827115
+SE0010323311,"BioArctic AB, ser. B",BioArctic AB,5566012679
+SE0010323998,Balco Group AB,Balco Group AB,5568212319
+SE0010413567,"Arion Banki hf, SDB",Arion banki hf,5810080150
+SE0010415281,Anoto Group,Anoto Group AB,5565323929
+SE0010441139,Railcare Group AB,Railcare Group AB,5567307813
+SE0010441584,Calliditas Therapeutics AB,Calliditas Therapeutics AB,5566599766
+SE0010468116,"Arjo AB, ser. B",Arjo AB (publ),5590928064
+SE0010520155,ICTA AB,Rolling Optics Holding AB,5560565151
+SE0010520254,K2A Knaust & Andersson Fastigh.,K2A Knaust & Andersson Fastigheter AB (publ),5569437600
+SE0010520981,KappAhl AB,KappAhl AB,5566612312
+SE0010573113,Ascelia Pharma AB,Ascelia Pharma AB,5565718797
+SE0010599704,"Atvexa AB, ser. B",Atvexa AB,5567814024
+SE0010600106,Infrea AB,Infrea AB,5565565289
+SE0010714279,Corem Property Group AB ser.A,Corem Property Group AB,5564639440
+SE0010714287,"Corem Property Group AB, ser. B",Corem Property Group AB,5564639440
+SE0010714311,Corem Property Group AB Pref. sh,Corem Property Group AB,5564639440
+SE0010769182,Empir  AB ser. B,mySafety Group AB,5563135309
+SE0010820514,"NP3 Fastigheter AB, preference",NP3 Fastigheter AB,5567491963
+SE0010820613,"Viking Supply Ships AB, ser. B",Viking Supply Ships AB,5561610113
+SE0010832204,Cibus Nordic Real Estate AB,Cibus Nordic Real Estate AB (publ),5591350599
+SE0010832287,"KlaraBo Sverige AB, ser. B",KlaraBo Sverige AB,5590292727
+SE0010948588,Bygghemma Group First AB,BHG Group AB,5590770763
+SE0010948711,Ovzon AB,Ovzon AB (publ),5590792650
+SE0010949750,MrGreen & Co AB,Mr Green & Co AB,5568831449
+SE0010985028,Green Landscaping Holding AB,Green Landscaping Group AB (publ),5567713465
+SE0011090000,Holmen AB ser. A,Holmen AB,5560013301
+SE0011090018,Holmen AB ser. B,Holmen AB,5560013301
+SE0011090547,Beijer Alma AB ser. B,Beijer Alma AB,5562297480
+SE0011115963,"Veoneer, Inc",Arriver Holdco Inc,6613527
+SE0011166974,Fabege AB,Fabege AB,5560491523
+SE0011204510,Nederman Holding AB,Nederman Holding AB,5565764205
+SE0011205202,Vitrolife,Vitrolife AB,5563543452
+SE0011231158,Boule Diagnostics AB,Boule Diagnostics AB,5565350252
+SE0011256312,Eniro,Eniro Group AB,5565880936
+SE0011309236,"FastPartner AB, preferensaktie",FastPartner AB,5562307867
+SE0011337666,Projektengagemang Sweden AB,Projektengagemang Sweden AB,5563302602
+SE0011337708,AAK AB,AAK AB (publ),5566692850
+SE0011426428,Nyfosa AB,Nyfosa AB,5591310833
+SE0011844091,"Samhällsbyggnbol. ,ser D",Samhallsbyggnadsbolaget I Norden AB,5569817660
+SE0011870195,Lime Technologies AB,Lime Technologies AB (publ),5569532616
+SE0012040459,Strax AB,Strax AB,5565397709
+SE0012116390,"Nordic Entertainm Grp AB, ser B",Viaplay Group AB (publ),5591246847
+SE0012141687,SkiStar AB ser. B,SkiStar AB,5560936949
+SE0012257970,Stockwik Förvaltning AB,Stockwik Forvaltning AB,5562947845
+SE0012323715,Karnov Group AB,Karnov Group AB (publ),5590169016
+SE0012324226,"Nordic Entertainm Grp AB, ser A",Viaplay Group AB (publ),5591246847
+SE0012454072,Avanza AB,Avanza Bank Holding AB,5562748458
+SE0012454619,HiQ International AB,HiQ International AB,5565293205
+SE0012481364,John Mattson Fastighetsföretagen,John Mattson Fastighetsforetagen publ AB,5568022858
+SE0012673267,Evolution Gaming Group AB,Evolution AB (publ),5569945792
+SE0012675361,"IRLAB Therapeutics AB, ser A",IRLAB Therapeutics AB,5569314692
+SE0012729366,Troax Group AB,Troax Group AB (publ),5569164030
+SE0012853455,EQT AB,EQT AB,5568494180
+SE0013512506,"Fast Partner AB, ser. A",FastPartner AB,5562307867
+SE0013512514,"Fastpartner AB, Ser D",FastPartner AB,5562307867
+SE0013647385,"Cellink AB, ser. B",BICO Group AB,5590505052
+SE0013719077,Qliro AB,Qliro AB,5569622441
+SE0013720018,"Electrolux Prof. AB, ser A",Electrolux Professional AB (publ),5560030354
+SE0013747870,"Electrolux Prof. AB, ser B",Electrolux Professional AB (publ),5560030354
+SE0013748001,MQ Holding AB,MQ Holding AB,5566972211
+SE0014186656,"NetEnt AB, ser. B",Evolution Services Sweden AB,5565326443
+SE0014401378,AddLife AB,AddLife AB,5569958126
+SE0014428835,VNV Global AB,VNV Global AB (publ),5566777917
+SE0014453874,"Wästbygg Gruppen AB, ser. B",Wastbygg Gruppen AB (publ),5568785538
+SE0014504817,Loomis AB ser. B,Loomis AB,5566208095
+SE0014731089,Nordic Waterproofing Holding AB,Nordic Waterproofing Holding AB,5568393168
+SE0014781795,"Addtech AB, ser. B",Addtech AB,5563029726
+SE0014808838,Nordic Paper Holding AB,Nordic Paper Holding AB,5569141913
+SE0014855292,Readly International AB,Readly International AB (publ),5569129553
+SE0014960365,SWECO AB ser. A,Sweco AB (publ),5565429841
+SE0014960373,SWECO AB ser. B,Sweco AB (publ),5565429841
+SE0014990966,"Lagercrantz Group AB, ser. B",Lagercrantz Group AB,5562824556
+SE0015192067,Nordnet AB,Nordnet AB (publ),5590736681
+SE0015195771,Fasadgruppen Group AB,Fasadgruppen Group AB (publ),5591584122
+SE0015221684,"Annehem Fastigheter AB, ser. B",Annehem Fastigheter AB (publ),5592209083
+SE0015244520,BioInvent International AB,BioInvent International AB,5565377263
+SE0015245535,Nelly Group AB,Nelly Group AB (publ),5560356940
+SE0015346135,Stillfront Group AB,Stillfront Group AB (publ),5567213078
+SE0015407382,Fastator AB,Fastator AB (publ),5566786645
+SE0015483276,Cint Group AB,Cint Group AB (publ),5590403217
+SE0015657788,ACQ Bure AB,Yubico AB,5592786668
+SE0015658109,"Epiroc AB, Ser A",Epiroc AB,5560412149
+SE0015658117,"Epiroc AB, Ser. B",Epiroc AB,5560412149
+SE0015658364,Pierce Group AB,Pierce Group AB (publ),5569674392
+SE0015660014,"Acrinova AB, ser. A",Acrinova AB (publ),5569840910
+SE0015660030,"Acrinova AB, ser. B",Acrinova AB (publ),5569840910
+SE0015661236,"Creades AB, ser. A",Creades publ AB,5568660723
+SE0015671995,Hemnet Group AB,Hemnet Group AB (publ),5590884440
+SE0015672282,Betsson B,Betsson AB,5560904251
+SE0015810817,Arla Plast AB,Arla Plast AB,5561312611
+SE0015811559,Boliden AB,Boliden AB,5560514142
+SE0015811955,Investor AB ser. A,Investor AB,5560138298
+SE0015811963,Investor AB ser. B,Investor AB,5560138298
+SE0015812128,"Nordisk Bergteknik AB, ser. B",Nordisk Bergteknik AB (publ),5590592506
+SE0015812219,Swedish Match AB,Swedish Match AB,5560150756
+SE0015812417,Garo AB,Garo AB,5560517772
+SE0015949201,"Lifco AB, ser. B",Lifco AB (publ),5564653185
+SE0015949433,Linc AB,Linc AB,5562320811
+SE0015949540,Aligro Planet Acquisition Comp A,Aligro Planet Acquisition Company AB,5593017261
+SE0015949748,"Beijer Ref AB, ser.B",Beijer Ref AB (publ),5560408113
+SE0015961222,ProAct IT Group AB,Proact IT Group AB,5564943446
+SE0015961404,Sleep Cycle AB,Sleep Cycle AB (publ),5566147368
+SE0015961594,"Corem Property Group AB, ser D",Corem Property Group AB,5564639440
+SE0015961909,Hexagon AB ser. B,Hexagon AB,5561904771
+SE0015962097,ITAB Shop Concept AB,ITAB Shop Concept AB,5562921089
+SE0015962147,Profoto Holding AB,Profoto Holding AB (publ),5568109879
+SE0015962477,Nolato AB ser. B,Nolato AB,5560804592
+SE0015962485,RVRC Holding AB,RVRC Holding AB,5591294623
+SE0015988019,NIBE Industrier AB ser. B,Nibe Industrier AB,5563748309
+SE0015988373,Sedana Medical AB,Sedana Medical AB (publ),5566702519
+SE0016074249,Mildef Group AB,MilDef Group AB,5568935414
+SE0016075246,"tbd30 AB, Spac",Wall To Wall Group AB,5593098790
+SE0016075337,OX2 AB,OX2 AB (publ),5566757497
+SE0016075691,"Creaspac AB, Spac",Creaspac AB,5592717564
+SE0016101679,"K-Fast Holding AB, Ser. B",K-Fast Holding AB,5568270390
+SE0016101844,Sinch AB,Sinch AB (publ),5568828908
+SE0016128151,VEF AB,Vef AB (publ),5592880362
+SE0016276109,Rizzo Group AB,Rizzo Group AB,5565401493
+SE0016278071,"Eniro Group AB, pref B",Eniro Group AB,5565880936
+SE0016278303,Oscar Properties Holding AB,Oscar Properties Holding AB,5568704521
+SE0016278311,"Oscar Properties AB, pref",Oscar Properties Holding AB,5568704521
+SE0016278329,"Oscar Properties Holding AB, pre",Oscar Properties Holding AB,5568704521
+SE0016589170,"Electrolux, AB ser. A",Electrolux AB,5560094178
+SE0016589188,"Electrolux, AB ser. B",Electrolux AB,5560094178
+SE0016609499,Systemair AB,Systemair AB,5561604108
+SE0016609671,Cary Group Holding AB,Cary Group Holding AB,5590409388
+SE0016785786,"Emilshus AB, ser. B",Fastighetsbolaget Emilshus AB,5591648752
+SE0016785794,"Emilshus AB, preference",Fastighetsbolaget Emilshus AB,5591648752
+SE0016787071,"Truecaller AB, ser. B",Truecaller AB,5592782774
+SE0016797732,Storskogen Group AB,Storskogen Group AB (publ),5592238694
+SE0016798417,Netel Holding AB,Netel Holding AB (publ),5593276263
+SE0016798581,Byggfakta Group Nordic HoldCo AB,Hubexo Nordic HoldCo AB,5592627516
+SE0016798763,CTEK AB,CTEK AB (publ),5592174659
+SE0016829709,Synsam AB,Synsam AB (publ),5569463358
+SE0017082548,Solid FörsäkringsAB,Solid FAB,5164018482
+SE0017083272,"Nivika Fastigheter AB, ser B",Nivika Fastigheter AB (publ),5567353809
+SE0017083983,Coala-life Group AB,Coala-Life Group AB (publ),5564954682
+SE0017084759,Norva24 Group AB,Norva24 Group AB (publ),5592262553
+SE0017105620,Tobii Dynavox AB,Dynavox Group AB,5569147563
+SE0017131329,Odd Molly International AB,Logistea AB,5566276241
+SE0017131337,"Logistea AB, ser. B",Logistea AB,5566276241
+SE0017134125,Vestum AB,Vestum AB (publ),5565782496
+SE0017160773,NCAB Group AB,NCAB Group AB (publ),5567330161
+SE0017161243,Fortnox AB,Fortnox AB,5564696291
+SE0017161441,Svolder AB ser. A,Svolder AB,5564692019
+SE0017161458,Svolder AB ser. B,Svolder AB,5564692019
+SE0017483506,Instalco AB,Instalco AB,5590158944
+SE0017486889,"Atlas Copco AB, ser. A",Atlas Copco AB,5560142720
+SE0017486897,Atlas Copco AB ser. B,Atlas Copco AB,5560142720
+SE0017562523,"Momentum Group AB, ser. B",Momentum Group AB,5592660699
+SE0017565476,"Swedish Logistic Property AB, se",Swedish Logistic Property AB,5591792873
+SE0017615644,Alleima AB,Alleima AB,5592241433
+SE0017766843,OEM International AB ser. B,OEM International AB,5561846691
+SE0017769847,engcon AB,Engcon AB,5566471727
+SE0017769995,BioGaia AB ser. B,Biogaia AB,5563808723
+SE0017780133,"Wallenstam AB,  ser. B",Wallenstam AB,5560721523
+SE0017831795,Collector Bank AB,Norion Bank AB,5565970513
+SE0017832488,"Balder Fastighets AB, ser. B.",Fastighets AB Balder,5565256905
+SE0017885767,Addnode Group AB ser. B,Addnode Group AB (publ),5562913185
+SE0017911480,Heba Fastighets AB ser. B,HEBA Fastighets AB,5560573981
+SE0018012486,Modern Times Group MTG AB ser. A,Modern Times Group MTG AB,5563099158
+SE0018012494,Modern Times Group MTG AB ser. B,Modern Times Group MTG AB,5563099158
+SE0018012635,Wihlborgs Fastigheter,Wihlborgs Fastigheter AB,5563670230
+SE0018012932,"Bergs Timber AB, ser. B",Bergs Timber AB,5560522798
+SE0018013658,"Trianon, FastighetsAB, ser.B",Fastighets AB Trianon,5561830281
+SE0018013849,Precise Biometrics,Precise Biometrics AB,5565456596
+SE0018014151,XANO Industri AB ser. B,XANO Industri AB,5560762055
+SE0018040883,"FM Mattsson Mora Group AB, ser.",FM Mattsson AB (publ),5560510207
+SE0018690059,Endomines AB,Endomines AB (publ),5566942974

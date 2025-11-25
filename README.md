@@ -79,22 +79,36 @@ pip install -r requirements.txt  # or use .venv
 
 ### Run Complete Analysis
 
-Run the analysis pipeline step by step:
+The analysis consists of two main phases:
 
+**Phase 1: Data Preparation (Steps 0-3)**
 ```bash
-# Step 1: Prepare data (from project root)
 cd src/data_preparation
-python3 prepare_ptree_dataset.py
 
-# Step 2: Run P-Tree analysis (MAIN STEP)
-cd ../analysis
-Rscript 1_ptree_analysis.R
+# Option A: Run complete pipeline
+python RUN_PIPELINE.py
 
-# Step 3: Validate results
-python3 4_validate_results.py
+# Option B: Run individual steps
+python 0_process_serrano_accounting.py
+python 1_create_isin_orgnr_mapping.py
+python 2_merge_stock_and_accounting.py
+python 3_prepare_ptree_dataset.py
 ```
 
-**Expected runtime:** 30-60 minutes
+**Phase 2: P-Tree Analysis**
+```bash
+cd ../analysis
+
+# Step 4: Run P-Tree analysis (MAIN STEP)
+Rscript 1_ptree_analysis.R
+
+# Step 5: Validate results
+python 4_validate_results.py
+```
+
+**Expected runtime:** 
+- Data preparation: 15-20 minutes
+- P-Tree analysis: 30-60 minutes
 
 ---
 
@@ -112,9 +126,14 @@ PTrees/
 │   └── macro/                         # Macro variables (risk-free rate, market returns)
 │
 ├── src/
-│   ├── data_preparation/              # Data processing scripts
-│   │   └── prepare_ptree_dataset.py   # Single unified pipeline
-│   └── analysis/                      # P-Tree analysis scripts
+│   ├── data_preparation/              # Data processing pipeline (Steps 0-3)
+│   │   ├── RUN_PIPELINE.py            # Execute complete pipeline
+│   │   ├── 0_process_serrano_accounting.py
+│   │   ├── 1_create_isin_orgnr_mapping.py
+│   │   ├── 2_merge_stock_and_accounting.py
+│   │   ├── 3_prepare_ptree_dataset.py
+│   │   └── README.md                  # Pipeline documentation
+│   └── analysis/                      # P-Tree analysis scripts (Steps 4+)
 │       ├── 1_ptree_analysis.R         # Main P-Tree training (REQUIRED)
 │       ├── 2_benchmark_analysis.py    # Fama-French comparison (optional)
 │       ├── 3_transaction_cost_analysis.py  # Transaction costs (optional)
@@ -146,22 +165,27 @@ PTrees/
 
 ### Data Processing Pipeline
 
-**Single Unified Script:**
+**Numbered Pipeline (4 steps):**
 ```bash
 cd src/data_preparation
-python3 prepare_ptree_dataset.py
+python RUN_PIPELINE.py  # Runs Steps 0-3 automatically
 ```
 
-This script performs ALL data preparation in one traceable pipeline:
-- Loads and merges 4 raw data sources
-- Calculates all 34 stock characteristics (fully documented)
-- Applies proper lags (1-month market, 3-month accounting)
-- Creates cross-sectional ranks within each month
-- Output: `results/ptree_34chars/ptree_ready_data_34chars.csv`
+**Pipeline stages:**
+- **Step 0**: Process Serrano accounting data (Stata → CSV)
+- **Step 1**: Create ISIN→ORGNR mapping (LSEG API)
+- **Step 2**: Merge stock & accounting data
+- **Step 3**: Calculate 33 characteristics, apply lags, create ranks
 
-See `DATA_PREPARATION_GUIDE.md` for complete documentation of all formulas and assumptions.
+**Key Features:**
+- **Modular Design**: Each step is independent and well-documented
+- **Publication Lag**: Serrano accounting gets 6-month delay + 1-month standard lag
+- **Comprehensive Comments**: Every calculation explained with business rationale
+- **No Look-Ahead Bias**: All data properly lagged before use
 
-**Step 3: Train P-Tree Models** (MAIN ANALYSIS)
+See `src/data_preparation/README.md` for detailed pipeline documentation.
+
+**Step 4: Train P-Tree Models** (MAIN ANALYSIS)
 ```bash
 cd ../analysis
 Rscript 3_ptree_analysis.R
