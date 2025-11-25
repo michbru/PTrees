@@ -44,3 +44,8 @@ desktop.ini
 # Exclude Excel files (often large)
 *.xlsx
 *.xls
+
+# Exclude large intermediate and raw data files
+data/raw/lseg/ptrees_final_dataset.csv
+data/intermediate/stock_with_accounting.csv
+data/intermediate/serrano_nyckeltal_full.csv
