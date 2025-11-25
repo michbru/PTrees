@@ -1,11 +1,11 @@
 Metric,Value
 Scenarios Tested (Traditional),"3 (A, B, C)"
 Rolling Windows (Anti-Overfitting),20
-Average OOS Sharpe (Rolling),1.494
-Median OOS Sharpe (Rolling),1.249
-Std Dev OOS Sharpe (Rolling),2.172
-Positive Windows,17/20
-Success Rate,85%
+Average OOS Sharpe (Rolling),1.151
+Median OOS Sharpe (Rolling),0.967
+Std Dev OOS Sharpe (Rolling),1.616
+Positive Windows,15/20
+Success Rate,75%
 Scenario B OOS Sharpe,0.797
 Scenario C OOS Sharpe,0.917
 Characteristics Used,34

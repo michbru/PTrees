@@ -58,60 +58,66 @@ import os
 
 def clean_orgnr(val):
     """
-    Robustly clean ORGNR to standard string format.
-    Handles: ints (556223), floats (556223.0), strings ("556223-9227")
+    Convert Swedish organization numbers (ORGNR) to standardized string format.
+
+    WHY NEEDED: Stata files store ORGNR as float64 (5562239227.0), but our
+                ISIN mapping uses strings ("5562239227"). Without this, the
+                merge will fail with a dtype mismatch error.
+
+    Examples:
+        5562239227.0    →  "5562239227"  (Stata float)
+        "556223-9227"   →  "5562239227"  (formatted string)
+        5562239227      →  "5562239227"  (integer)
     """
     try:
         s = str(val).strip()
-        # Remove hyphens and spaces
         s = s.replace('-', '').replace(' ', '')
-        # If it looks like a float (ends in .0), strip it
         if s.endswith('.0'):
-            s = s[:-2]
+            s = s[:-2]  # Slice off trailing '.0' from float conversion
         return s
     except:
-        return str(val)
+        return str(val)  # Fallback to prevent pipeline crash
 
 def process_serrano_accounting():
     """Process all Serrano nyckeltal files into a single dataset."""
-    
+
     all_data = []
-    
-    # Dynamic file finding instead of hardcoded range
-    # Resolve path relative to this script file to ensure it works from any CWD
+
+    # Path(__file__).parent gets directory containing this script
+    # .resolve() converts relative path to absolute path (for cross-platform compatibility)
     script_dir = Path(__file__).parent
     base_path = (script_dir / '../../data/raw/serrano/Stata_2025').resolve()
-    
+
+    # glob.glob() finds files matching pattern (* wildcard matches any characters)
+    # sorted() ensures consistent file order (important for reproducibility)
     files = sorted(glob.glob(str(base_path / 'nyckeltal*.dta')))
-    
+
     if not files:
         print(f"Error: No nyckeltal files found in {base_path}")
         return pd.DataFrame()
 
     print(f"Processing {len(files)} Serrano files...")
 
-    # Process all found nyckeltal files
+    # enumerate(files, 1) provides both index (starting at 1) and item from list
     for idx, stata_file in enumerate(files, 1):
         try:
-            file_name = os.path.basename(stata_file)
-            
-            # Load Stata file (contains pre-calculated ratios for Swedish companies)
-            df = pd.read_stata(stata_file)
-            print(f"  [{idx}/{len(files)}] {file_name}: {len(df):,} records", end="")
-            
+            file_name = os.path.basename(stata_file)  # Extract filename from full path
+
+            df = pd.read_stata(stata_file)  # Read Stata .dta format
+            print(f"  [{idx}/{len(files)}] {file_name}: {len(df):,} records", end="")  # end="" continues on same line
+
             # Extract year from fiscal year-end date
-            # BSLSLUT = Balance Sheet Date (fiscal year-end)
+            # BSLSLUT = Swedish "Balance Sheet End Date" (fiscal year-end)
             df['BSLSLUT'] = pd.to_datetime(df['BSLSLUT'])
-            df['year'] = df['BSLSLUT'].dt.year
+            df['year'] = df['BSLSLUT'].dt.year  # .dt accessor for datetime operations
             
-            # Rename Serrano variables to English equivalents
-            # Swedish -> English mapping for clarity
+            # Rename Swedish column names to English
             df = df.rename(columns={
                 'AVKEGKAP': 'roe',                    # Return on Equity
-                'AVKTOTKAP': 'roa',                   # Return on Total Assets
+                'AVKTOTKAP': 'roa',                   # Return on Assets
                 'RORMARG': 'operating_margin',        # Operating Margin
                 'NETTOMARG': 'net_margin',            # Net Margin
-                'KASSLIKV': 'cash_liquidity',         # Cash Liquidity Ratio
+                'KASSLIKV': 'cash_liquidity',         # Cash Liquidity
                 'SOLIDITET': 'equity_ratio',          # Equity Ratio (Solidity)
                 'SKULDGRAD': 'debt_ratio',            # Debt Ratio
                 'KAPOMS': 'capital_turnover',         # Capital Turnover
@@ -120,88 +126,88 @@ def process_serrano_accounting():
                 'OMSPANST': 'revenue_per_employee',   # Revenue per Employee
                 'VINSTPCT': 'profit_pct'              # Profit Percentage
             })
-            
-            # Convert ORGNR to standardized string format using robust cleaner
-            # Removes hyphens, handles floats: "556223-9227" → "5562239227"
+
+            # Standardize ORGNR format (critical for merging with stock data)
+            # .apply() vectorizes function application across all rows
             df['orgnr'] = df['ORGNR'].apply(clean_orgnr)
             
-            # CRITICAL: Calculate when this accounting data becomes available for trading
-            # Swedish Annual Accounts Act (Årsredovisningslagen, SFS 1995:1554)
-            # Chapter 7, §1: Annual reports must be filed within 4 months of fiscal year-end
-            # Source: https://www.riksdagen.se/sv/dokument-lagar/dokument/svensk-forfattningssamling/arsredovisningslag-19951554_sfs-1995-1554
-            #
-            # Example: Fiscal year ends Dec 31, 2011 → Report published April 2012 (4 months later)
-            # This accounts for: preparation time + audit + regulatory filing
-            
-            df['fiscal_month'] = df['BSLSLUT'].dt.month  # Extract fiscal year-end month
-            df['available_month'] = df['fiscal_month'] + 4  # Add mandatory 4-month publication lag
+            # CRITICAL: Calculate when accounting data becomes publicly available
+            # Prevents look-ahead bias: Can't trade on Dec 31, 2011 data on Jan 1, 2012
+            # Swedish law: Reports published within 4 months of fiscal year-end
+            # Source: Årsredovisningslagen (SFS 1995:1554), Chapter 7, §1
+            # Example: FY ends Dec 31, 2011 → Available April 2012
+
+            df['fiscal_month'] = df['BSLSLUT'].dt.month
+            df['available_month'] = df['fiscal_month'] + 4  # Add 4-month publication lag
             df['available_year'] = df['year']
-            
-            # Handle year rollover: If fiscal month is Sep-Dec, publication is next year
-            # Example: Oct 31 fiscal end → Oct + 4 = month 14 → February next year
+
+            # Handle year rollover (e.g., Oct 31 + 4 months = Feb next year)
+            # .loc[] boolean indexing: select rows where condition is True
             year_rollover = df['available_month'] > 12
             df.loc[year_rollover, 'available_year'] += 1
             df.loc[year_rollover, 'available_month'] -= 12
-            
-            # Store as accounting_year/month for clear join logic in Step 2
-            # These represent: "This accounting is available starting from (accounting_year, accounting_month)"
+
+            # Store as accounting_year/month for join logic in next script
             df['accounting_year'] = df['available_year']
             df['accounting_month'] = df['available_month']
             
-            # Select relevant columns for output
+            # Select relevant columns only
             cols = ['orgnr', 'year', 'BSLSLUT', 'accounting_year', 'accounting_month',
                     'roe', 'roa', 'operating_margin',
                     'net_margin', 'cash_liquidity', 'equity_ratio', 'debt_ratio',
                     'capital_turnover', 'inventory_turnover', 'receivables_turnover',
                     'revenue_per_employee', 'profit_pct']
-            
-            # Ensure all columns exist (handle missing cols in some files gracefully)
+
+            # List comprehension: filter for columns that exist (some files may be missing cols)
             available_cols = [c for c in cols if c in df.columns]
-            df_subset = df[available_cols].copy()
-            
+            df_subset = df[available_cols].copy()  # .copy() prevents SettingWithCopyWarning
+
             all_data.append(df_subset)
             print(f" → {len(df_subset):,} final")
-            
+
         except Exception as e:
             print(f"\nWarning: Could not process {os.path.basename(stata_file)}: {e}")
-            continue
+            continue  # Skip to next file if this one fails
     
     # Combine all files into single dataset
     if not all_data:
         print("\nError: No data processed.")
         return pd.DataFrame()
-    
+
     print(f"\nConsolidating...")
+    # pd.concat() stacks DataFrames vertically
+    # ignore_index=True resets row numbers (0, 1, 2, ...) instead of preserving original indices
     combined = pd.concat(all_data, ignore_index=True)
-    
-    # Sort by company and year, then by fiscal year-end date
-    # Use mergesort for stability to respect file order if dates are identical
+
+    # Sort by company, year, then fiscal year-end date
+    # kind='mergesort' = stable sort (preserves order of equal elements)
     combined = combined.sort_values(['orgnr', 'year', 'BSLSLUT'], kind='mergesort')
-    
+
     # Remove duplicate company-years (keep most recent fiscal year-end)
-    # Example: If company has both Jun 2012 and Dec 2012 fiscal year-ends,
-    # we keep Dec 2012 as it's more standard and complete
+    # Example: Company changed fiscal year from Jun 30 → Dec 31 in 2012 → keep Dec 31
     before_dedup = len(combined)
+    # drop_duplicates: subset defines what makes a duplicate, keep='last' chooses which to keep
     combined = combined.drop_duplicates(subset=['orgnr', 'year'], keep='last')
     duplicates_removed = before_dedup - len(combined)
     
     # Save consolidated dataset
     output_file = (script_dir / '../../data/intermediate/serrano_nyckeltal_full.csv').resolve()
-    combined.to_csv(output_file, index=False)
-    
-    # Summary statistics
+    combined.to_csv(output_file, index=False)  # index=False: don't write row numbers as column
+
+    # Print summary statistics
     print(f"\n{'='*80}")
     print("SERRANO ACCOUNTING DATA PROCESSED")
     print(f"{'='*80}")
-    print(f"  Records:             {len(combined):,}")
-    print(f"  Unique companies:    {combined['orgnr'].nunique():,}")
+    print(f"  Records:             {len(combined):,}")  # :, adds thousands separator
+    print(f"  Unique companies:    {combined['orgnr'].nunique():,}")  # .nunique() counts distinct values
     print(f"  Period:              {combined['year'].min()}-{combined['year'].max()}")
     print(f"  Duplicates removed:  {duplicates_removed:,}")
     print(f"  Publication lag:     4 months (Swedish Annual Accounts Act)")
-    print(f"  Output:              {output_file.name}")
+    print(f"  Output:              {output_file.name}")  # .name extracts filename from Path object
     print(f"{'='*80}\n")
-    
+
     return combined
 
+# __name__ == '__main__': only runs when script executed directly (not imported)
 if __name__ == '__main__':
     process_serrano_accounting()

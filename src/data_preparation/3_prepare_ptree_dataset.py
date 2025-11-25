@@ -89,6 +89,45 @@ data = base.merge(macro[['date', 'rf', 'rm_rf']], on='date', how='left')
 print(f"  Loaded: {len(data):,} observations, {data['permno'].nunique()} stocks")
 
 # ==============================================================================
+# STEP 1.5: APPLY PUBLICATION LAG TO LSEG ACCOUNTING DATA
+# ==============================================================================
+print("\n[1.5] Applying 4-month publication lag to LSEG accounting data...")
+# LSEG data often aligns to fiscal year-end (e.g., Jan 2012 has 2011 annual data)
+# We must shift it to simulate publication delay (approx 4 months)
+
+# 1. Shift Raw Inputs (used for calculations)
+lseg_raw_cols = ['total_revenue', 'net_income', 'book_value', 'cogs', 
+                 'total_assets', 'capex', 'cfo']
+for col in lseg_raw_cols:
+    if col in data.columns:
+        data[col] = data.groupby('permno')[col].shift(4)
+
+# 2. Shift Pre-calculated Ratios (Pure Accounting)
+lseg_ratios = ['gross_profitability', 'asset_growth', 'sales_growth', 
+               'capex_to_assets', 'asset_turnover', 'asset_quality', 
+               'cfo_to_assets', 'roa', 'debt_to_equity', 'price_to_assets']
+for col in lseg_ratios:
+    if col in data.columns:
+        data[col] = data.groupby('permno')[col].shift(4)
+
+# 3. Recalculate Price-based Ratios (Shifted Accounting / Current Market Cap)
+# This ensures we use the latest price but only available accounting info
+
+if 'book_value' in data.columns and 'market_cap' in data.columns:
+    data['book_to_market'] = data['book_value'] / data['market_cap']
+
+if 'net_income' in data.columns and 'market_cap' in data.columns:
+    data['ep_ratio'] = data['net_income'] / data['market_cap']
+
+if 'cfo' in data.columns and 'market_cap' in data.columns:
+    data['cfp_ratio'] = data['cfo'] / data['market_cap']
+
+if 'total_revenue' in data.columns and 'market_cap' in data.columns:
+    data['sp_ratio'] = data['total_revenue'] / data['market_cap']
+
+print(f"  ✓ Applied 4-month lag to LSEG accounting variables")
+
+# ==============================================================================
 # STEP 2: CREATE P-TREE REQUIRED FIELDS
 # ==============================================================================
 
@@ -238,7 +277,7 @@ characteristics = [
     # Value & Size (Group C)
     'market_cap', 'me', 'book_to_market', 'ep_ratio', 'cfp_ratio', 'sp_ratio',
     # Profitability (Group D)
-    'roa', 'gross_profitability', 'op', 'pm',
+    'roa_serrano', 'gross_profitability', 'op', 'pm',  # Use Serrano ROA for consistency
     # Serrano Additional Accounting (High Quality)
     'operating_margin', 'net_margin', 'cash_liquidity', 'equity_ratio', 
     'debt_ratio', 'capital_turnover', 'inventory_turnover', 
@@ -345,7 +384,7 @@ print(f"  Characteristics: {len(characteristics)}")
 print(f"  Avg stocks per month: {len(ptree_data) / ptree_data['date'].nunique():.0f}")
 
 # Summary table of all characteristics
-accounting_chars = ['roe', 'roa']  # Serrano accounting in our dataset
+accounting_chars = ['roe', 'roa_serrano']  # Serrano accounting in our dataset
 
 summary_data = []
 for char in characteristics:
