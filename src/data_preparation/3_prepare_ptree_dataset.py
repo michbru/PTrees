@@ -15,7 +15,7 @@ INPUT FILES:
 
 OUTPUT FILES:
 ------------
-    - results/ptree_34chars/ptree_ready_data_34chars.csv    (P-Tree ready dataset)
+    - results/ptree_33chars/ptree_ready_data_33chars.csv    (P-Tree ready dataset)
 
 PROCESS OVERVIEW:
 ----------------
@@ -49,6 +49,69 @@ KEY CONCEPTS:
         - All characteristics: 1-month lag (standard portfolio formation)
           * Can't use month M data to predict month M returns
         - Total accounting lag: ~5 months from fiscal year-end (4m pub + 1m standard)
+
+ASSUMPTIONS & LIMITATIONS:
+-------------------------
+    1. LAG STRUCTURE (CRITICAL FOR PREVENTING LOOK-AHEAD BIAS):
+
+       A. Serrano Accounting (from Steps 1-2):
+          - Publication lag: 4 months (applied in Step 1)
+          - Portfolio formation lag: 1 month (applied here via shift(1))
+          - Total lag: ~5 months from fiscal year-end
+          - Example: Fiscal 2011 (Dec 31) → First tradeable May 2012
+
+       B. LSEG Accounting (applied here in Step 1.5):
+          - LSEG timing: Annual reports appear in January (~1 month native lag)
+          - Additional shift(4): Adds 4 more months for consistency
+          - Portfolio formation lag: 1 month (applied via shift(1))
+          - Total lag: ~6 months (1m native + 4m adjustment + 1m formation)
+          - Rationale: Being MORE conservative than Serrano is acceptable
+
+       C. Market Characteristics (prices, returns, volume):
+          - No publication lag needed (observable in real-time)
+          - Only portfolio formation lag: 1 month (shift(1))
+          - Example: March market cap → used in April portfolio
+
+       D. Price-Based Accounting Ratios (B/M, E/P, etc.):
+          - Numerator (accounting): Shifted by shift(4) + shift(1)
+          - Denominator (market cap): Current period
+          - Recalculated after shifts to maintain ratio correctness
+          - This ensures we use latest price with available accounting only
+
+    2. CROSS-SECTIONAL RANKING:
+       - Ranks computed within each month (cross-sectional)
+       - Scaled to [-1, 1] via: rank(pct=True) * 2 - 1
+       - Missing values filled with 0.0 (neutral rank, middle of scale)
+       - Rationale: P-Tree handles scale better with normalized inputs
+
+    3. MISSING DATA STRATEGY:
+       - Characteristics: Fill with 0.0 rank (neutral, not informative)
+       - Alternative (dropping) would lose too many observations
+       - P-Tree can learn to ignore low-coverage characteristics
+       - Coverage stats printed at end to monitor data quality
+
+    4. INDUSTRY ADJUSTMENT:
+       - Originally attempted industry-adjusted B/M and market cap
+       - REMOVED: data['marketname'] is exchange (SSE, NGM), not industry
+       - Proper industry classification (GICS, ICB) not available in dataset
+       - Using raw characteristics instead (book_to_market, market_cap)
+
+    5. CHARACTERISTICS CALCULATION:
+       - Momentum: Compound returns using (1+r).prod()-1 (handles negatives)
+       - SUE: Standardized by rolling std, capped at ±10 (outlier control)
+       - Profit margin: Capped at ±100% (outlier control)
+       - Net issuance: Uses market cap changes (investor perspective), not book equity
+
+    6. FORWARD-FILL FROM STEP 2:
+       - Serrano data forward-filled within stocks (from Step 2)
+       - Represents real information availability (stale but valid)
+       - Shift(1) here operates on forward-filled data (correct)
+
+VERIFICATION STATUS (2025-01-26):
+    ✓ shift(1) verified to correctly create lag_me and lag_roe
+    ✓ LSEG shift(4) adds ~1 month extra lag vs Serrano (acceptable/conservative)
+    ✓ Ranking verified to scale [-1, 1] with 0.0 for missing
+    ✓ Total lag structure: Serrano ~5 months, LSEG ~6 months, Market 1 month
 
 Author: Michael
 Date: 2025-01-23 (Updated: 2025-11-25)
@@ -125,7 +188,7 @@ if 'cfo' in data.columns and 'market_cap' in data.columns:
 if 'total_revenue' in data.columns and 'market_cap' in data.columns:
     data['sp_ratio'] = data['total_revenue'] / data['market_cap']
 
-print(f"  ✓ Applied 4-month lag to LSEG accounting variables")
+print(f"  [OK] Applied 4-month lag to LSEG accounting variables")
 
 # ==============================================================================
 # STEP 2: CREATE P-TREE REQUIRED FIELDS
@@ -160,14 +223,13 @@ data.loc[data['sue'].abs() > 10, 'sue'] = np.nan  # Cap extreme outliers
 # A2. DOLVOL - Dollar Trading Volume
 data['dolvol'] = data['price'] * data['volume']
 
-# A3. BM_IA - Industry-Adjusted Book-to-Market
-data['industry'] = data['marketname']
-industry_medians_bm = data.groupby(['date', 'industry'])['book_to_market'].transform('median')
-data['bm_ia'] = np.log(data['book_to_market'].clip(lower=0.01) / industry_medians_bm)
+# A3. BM_IA - REMOVED (marketname is exchange, not industry)
+# NOTE: Original implementation used data['marketname'] as industry classifier,
+# but marketname represents stock exchange (SSE, NGM, SSEFN, etc.), not industry sector.
+# Industry adjustment would require proper industry classification (GICS, ICB, etc.)
+# For now, we use raw book_to_market instead.
 
-# A4. ME_IA - Industry-Adjusted Market Equity
-industry_medians_mc = data.groupby(['date', 'industry'])['market_cap'].transform('median')
-data['me_ia'] = np.log(data['market_cap'] / industry_medians_mc)
+# A4. ME_IA - REMOVED (same reason as BM_IA)
 
 # A5. ROE - Already in data from Serrano (use existing, don't recalculate)
 
@@ -200,8 +262,19 @@ data['me'] = np.log(data['market_cap'])
 # -----------------------------------------------------------------------------
 
 # D3. OP - Operating Profitability
-data['op'] = (data['total_revenue'] - data['cogs']) / data['book_value']
-data.loc[data['op'].abs() > 10, 'op'] = np.nan
+# Calculate only where we have valid data (avoid 96.5% zeros issue)
+has_valid_op = (
+    data['total_revenue'].notna() &
+    data['cogs'].notna() &
+    data['book_value'].notna() &
+    (data['book_value'] > 0)
+)
+data['op'] = np.nan  # Start with all NaN
+data.loc[has_valid_op, 'op'] = (
+    (data.loc[has_valid_op, 'total_revenue'] - data.loc[has_valid_op, 'cogs']) /
+    data.loc[has_valid_op, 'book_value']
+)
+data.loc[data['op'].abs() > 10, 'op'] = np.nan  # Cap outliers
 
 # D4. PM - Profit Margin
 data['pm'] = data['net_income'] / data['total_revenue']
@@ -244,9 +317,9 @@ if 'debt_to_equity' not in data.columns and 'debt_ratio' in data.columns and 'eq
 
 # Clean up temporary calculation columns
 data = data.drop(['earnings_lag1y', 'earnings_surprise', 'earnings_surprise_std',
-                  'market_cap_lag1', 'industry'], axis=1, errors='ignore')
+                  'market_cap_lag1'], axis=1, errors='ignore')
 
-print(f"  ✓ Characteristics calculated")
+print(f"  [OK] Characteristics calculated")
 
 # ==============================================================================
 # STEP 3: APPLY 1-MONTH LAG TO ALL CHARACTERISTICS
@@ -271,7 +344,7 @@ print("\n[3] Applying 1-month portfolio formation lag...")
 # Define all characteristics (both calculated and from base data)
 characteristics = [
     # Critical (Group A)
-    'sue', 'dolvol', 'bm_ia', 'me_ia', 'roe', 'zerotrade',
+    'sue', 'dolvol', 'roe', 'zerotrade',  # Removed: bm_ia, me_ia (exchange, not industry)
     # Momentum (Group B)
     'return_1m', 'mom6m', 'momentum_12m', 'mom36m',
     # Value & Size (Group C)
@@ -364,9 +437,9 @@ keep_cols = ['permno', 'date', 'year', 'month', 'xret', 'lag_me'] + ranked_cols
 ptree_data = data[keep_cols].copy()
 
 # Save P-Tree ready dataset
-output_dir = project_root / 'results/ptree_34chars'
+output_dir = project_root / 'results/ptree_33chars'
 output_dir.mkdir(parents=True, exist_ok=True)
-output_file = output_dir / 'ptree_ready_data_34chars.csv'
+output_file = output_dir / 'ptree_ready_data_33chars.csv'
 ptree_data.to_csv(output_file, index=False)
 
 # ==============================================================================

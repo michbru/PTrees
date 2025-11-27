@@ -40,10 +40,40 @@ WHY WE DO THIS:
     - ORGNR is the Swedish standard company identifier needed for data integration
     - Consolidated file simplifies downstream merging with stock data
 
-ASSUMPTIONS:
-    - Fiscal year-end is typically December 31 for Swedish companies
-    - When duplicates exist, the last record (by BSLSLUT date) is most accurate
-    - All 10 files use consistent variable naming conventions
+ASSUMPTIONS & LIMITATIONS:
+    1. Publication Timing:
+       - 4-month lag is the LEGAL MINIMUM (Årsredovisningslagen)
+       - Some companies may publish later, but we can't detect this from data
+       - Being conservative (using minimum) avoids look-ahead bias
+
+    2. Fiscal Year-End:
+       - Most Swedish companies use Dec 31 fiscal year-end
+       - Non-Dec 31 fiscal years are handled correctly via BSLSLUT date
+       - Example: June 30 fiscal year → 4 months → October availability
+
+    3. Data Quality:
+       - When duplicate company-years exist, keep='last' assumes latest is most accurate
+       - This handles fiscal year changes (e.g., company switched from Jun→Dec)
+       - Missing ratios are preserved as NaN (handled downstream)
+       
+    4. BSTYP Field (Individual vs Consolidated Accounts):
+       - BSTYP = "B" (Bokslut): Individual company accounts
+       - BSTYP = "K" (Koncern): Consolidated group accounts
+       - When a company has both B and K records for same year, K comes last alphabetically
+       - Combined with sort + drop_duplicates(keep='last'), this keeps consolidated accounts
+       - Consolidated accounts are preferred for stock analysis (full group picture)
+       - NOTE: This is accidental but beneficial behavior (not explicitly programmed)
+
+    4. ORGNR Standardization:
+       - Stata stores as float64, converted to string for merging
+       - Removes hyphens and spaces for consistency
+       - Critical for matching with ISIN mapping table
+
+VERIFICATION STATUS (2025-01-26):
+    ✓ Lag calculation verified with concrete examples
+    ✓ BSTYP handling verified (keeps K/consolidated correctly)
+    ✓ ORGNR type conversion verified
+    ✓ Output file format confirmed compatible with Step 2
 
 Author: Michael
 Date: 2025-01-23

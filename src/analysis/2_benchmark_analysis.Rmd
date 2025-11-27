@@ -1,0 +1,260 @@
+---
+title: "2. Benchmark Analysis"
+author: "P-Tree vs Fama-French Factors"
+output: html_document
+---
+
+# Benchmark Analysis
+
+Compare P-Tree factors against standard benchmarks (CAPM, FF3, FF4).
+
+## Step 1: Load Packages
+
+```{r setup, message=FALSE}
+library(data.table)
+
+# Install if needed
+if (!require(sandwich)) install.packages("sandwich")
+if (!require(lmtest)) install.packages("lmtest")
+library(sandwich)
+library(lmtest)
+
+output_dir <- "c:/Users/micha/Desktop/Projekte/PTrees/results/ptree_33chars"
+```
+
+## Step 2: Load Data
+
+```{r load-data}
+# Load P-Tree factors (from Step 1)
+ptree <- fread(file.path(output_dir, "ptree_factors.csv"))
+ptree$date <- as.Date(ptree$month)  # month column is already a date
+# Create year-month for merging
+ptree$ym <- format(ptree$date, "%Y-%m")
+cat("P-Tree factors:", nrow(ptree), "months\n")
+
+# Load macro/benchmark factors (Swedish Fama-French)
+macro <- fread("c:/Users/micha/Desktop/Projekte/PTrees/data/raw/FamaFrench2020/FF4F_monthly.csv")
+cat("Macro data:", nrow(macro), "months\n")
+
+# Merge on year-month
+merged <- merge(ptree, macro, by = "ym")
+cat("Overlapping:", nrow(merged), "months\n")
+cat("Period:", min(merged$ym), "to", max(merged$ym), "\n")
+```
+
+## Step 3: Extract Factors
+
+```{r extract-factors}
+# P-Tree factors
+f1 <- merged$factor_1
+f2 <- merged$factor_2
+f3 <- merged$factor_3
+f4 <- merged$factor_4
+f5 <- merged$factor_5
+
+# Benchmark factors
+mkt <- merged$rm_rf
+smb <- merged$smb_vw
+hml <- merged$hml_vw
+mom <- merged$mom_vw
+
+cat("Factors extracted\n")
+```
+
+## Step 4: Sharpe Ratios
+
+```{r sharpe}
+sharpe <- function(x) mean(x, na.rm = TRUE) / sd(x, na.rm = TRUE) * sqrt(12)
+
+cat(strrep("=", 60), "\n")
+cat("SHARPE RATIOS (Annualized)\n")
+cat(strrep("=", 60), "\n\n")
+
+cat("P-Tree Factors:\n")
+cat("  F1:", round(sharpe(f1), 3), "\n")
+cat("  F2:", round(sharpe(f2), 3), "\n")
+cat("  F3:", round(sharpe(f3), 3), "\n")
+cat("  F4:", round(sharpe(f4), 3), "\n")
+cat("  F5:", round(sharpe(f5), 3), "\n")
+
+cat("\nBenchmark Factors:\n")
+cat("  MKT:", round(sharpe(mkt), 3), "\n")
+cat("  SMB:", round(sharpe(smb), 3), "\n")
+cat("  HML:", round(sharpe(hml), 3), "\n")
+cat("  MOM:", round(sharpe(mom), 3), "\n")
+
+# MVE combination
+factors_mat <- cbind(f1, f2, f3, f4, f5)
+cov_mat <- cov(factors_mat) + 1e-5 * diag(5)
+w <- solve(cov_mat, colMeans(factors_mat))
+w <- w / sum(abs(w))
+mve_ret <- factors_mat %*% w
+
+cat("\nMVE Portfolio (all 5 P-Tree):\n")
+cat("  Sharpe:", round(sharpe(mve_ret), 3), "\n")
+```
+
+## Step 5: Alpha Regressions
+
+```{r alpha-regressions}
+run_alpha_reg <- function(y, X, name) {
+  model <- lm(y ~ X)
+  hac_se <- coeftest(model, vcov = vcovHAC(model, lag = 3))
+  
+  alpha <- coef(model)[1] * 12 * 100
+  t_stat <- hac_se[1, 3]
+  r2 <- summary(model)$r.squared
+  
+  cat(sprintf("  %s: alpha = %6.2f%% (t = %5.2f), R2 = %.3f\n", name, alpha, t_stat, r2))
+  return(c(alpha = alpha, t = t_stat, r2 = r2))
+}
+
+cat("\n", strrep("=", 60), "\n")
+cat("ALPHA VS BENCHMARKS (Annualized %, HAC t-stats)\n")
+cat(strrep("=", 60), "\n")
+
+for (i in 1:5) {
+  f <- get(paste0("f", i))
+  cat("\nFactor", i, ":\n")
+  run_alpha_reg(f, mkt, "CAPM")
+  run_alpha_reg(f, cbind(mkt, smb, hml), "FF3 ")
+  run_alpha_reg(f, cbind(mkt, smb, hml, mom), "FF4 ")
+}
+```
+
+## Step 6: Correlations
+
+```{r correlations}
+cat("\n", strrep("=", 60), "\n")
+cat("FACTOR CORRELATIONS\n")
+cat(strrep("=", 60), "\n\n")
+
+all_factors <- data.frame(
+  F1 = f1, F2 = f2, F3 = f3, F4 = f4, F5 = f5,
+  MKT = mkt, SMB = smb, HML = hml, MOM = mom
+)
+
+corr <- round(cor(all_factors, use = "complete.obs"), 3)
+print(corr)
+```
+
+## Step 7: Summary Table
+
+```{r summary-table}
+cat("\n", strrep("=", 60), "\n")
+cat("SUMMARY TABLE\n")
+cat(strrep("=", 60), "\n\n")
+
+results <- data.frame(
+  Factor = paste0("F", 1:5),
+  Sharpe = NA, Alpha_CAPM = NA, t_CAPM = NA, Alpha_FF4 = NA, t_FF4 = NA
+)
+
+for (i in 1:5) {
+  f <- get(paste0("f", i))
+  results$Sharpe[i] <- round(sharpe(f), 3)
+  
+  m1 <- lm(f ~ mkt)
+  h1 <- coeftest(m1, vcov = vcovHAC(m1, lag = 3))
+  results$Alpha_CAPM[i] <- round(coef(m1)[1] * 12 * 100, 2)
+  results$t_CAPM[i] <- round(h1[1, 3], 2)
+  
+  m4 <- lm(f ~ mkt + smb + hml + mom)
+  h4 <- coeftest(m4, vcov = vcovHAC(m4, lag = 3))
+  results$Alpha_FF4[i] <- round(coef(m4)[1] * 12 * 100, 2)
+  results$t_FF4[i] <- round(h4[1, 3], 2)
+}
+
+print(results)
+
+write.csv(results, file.path(output_dir, "benchmark_results.csv"), row.names = FALSE)
+cat("\nSaved: benchmark_results.csv\n")
+```
+
+## Step 8: Plot 5 - P-Tree vs Market
+
+```{r plot5-vs-market}
+# Create date sequence for plotting
+plot_dates <- as.Date(paste0(merged$ym, "-01"))
+
+png(file.path(output_dir, "plot5_ptree_vs_market.png"), width = 800, height = 600)
+
+plot(plot_dates, cumsum(f1), type = "l", col = "blue", lwd = 2,
+     main = "P-Tree Factor 1 vs Market",
+     xlab = "Date", ylab = "Cumulative Return")
+lines(plot_dates, cumsum(mkt), col = "black", lty = 2, lwd = 2)
+legend("topleft", c("P-Tree F1", "Market"), col = c("blue", "black"), lty = c(1, 2), lwd = 2)
+grid()
+
+dev.off()
+cat("Saved: plot5_ptree_vs_market.png\n")
+```
+
+## Step 9: Plot 6 - MVE vs Market
+
+```{r plot6-mve-vs-market}
+png(file.path(output_dir, "plot6_mve_vs_market.png"), width = 800, height = 600)
+
+plot(plot_dates, cumsum(mve_ret), type = "l", col = "purple", lwd = 2,
+     main = "P-Tree MVE vs Market",
+     xlab = "Date", ylab = "Cumulative Return")
+lines(plot_dates, cumsum(mkt), col = "black", lty = 2, lwd = 2)
+legend("topleft", c("P-Tree MVE", "Market"), col = c("purple", "black"), lty = c(1, 2), lwd = 2)
+grid()
+
+dev.off()
+cat("Saved: plot6_mve_vs_market.png\n")
+```
+
+## Step 10: Plot 7 - Full Correlation Heatmap
+
+```{r plot7-full-correlations}
+png(file.path(output_dir, "plot7_full_correlations.png"), width = 700, height = 700)
+
+n <- ncol(all_factors)
+image(1:n, 1:n, as.matrix(corr), 
+      col = colorRampPalette(c("blue", "white", "red"))(20),
+      main = "P-Tree vs Benchmark Correlations", 
+      xlab = "", ylab = "", axes = FALSE,
+      zlim = c(-1, 1))
+axis(1, 1:n, colnames(corr), las = 2, cex.axis = 0.8)
+axis(2, 1:n, colnames(corr), las = 2, cex.axis = 0.8)
+for (i in 1:n) {
+  for (j in 1:n) {
+    text(i, j, corr[i,j], cex = 0.8)
+  }
+}
+
+dev.off()
+cat("Saved: plot7_full_correlations.png\n")
+```
+
+## Step 11: Plot 8 - Sharpe Comparison
+
+```{r plot8-sharpe-comparison}
+png(file.path(output_dir, "plot8_sharpe_comparison.png"), width = 800, height = 600)
+
+sharpes <- c(
+  sapply(1:5, function(i) sharpe(get(paste0("f", i)))),
+  sharpe(mkt), sharpe(smb), sharpe(hml), sharpe(mom)
+)
+names(sharpes) <- c(paste0("F", 1:5), "MKT", "SMB", "HML", "MOM")
+
+barplot(sharpes, main = "Sharpe Ratios: P-Tree vs Benchmarks", 
+        col = c(rep("steelblue", 5), rep("gray", 4)),
+        las = 2, ylab = "Annualized Sharpe Ratio")
+abline(h = 0)
+
+dev.off()
+cat("Saved: plot8_sharpe_comparison.png\n")
+```
+
+## Summary
+
+**Key Findings:**
+
+1. **Sharpe Ratios**: P-Tree factors vs benchmarks
+2. **Alpha**: Excess returns after controlling for known factors  
+3. **Correlations**: How factors relate to each other
+
+All results and plots saved to `results/ptree_33chars/`

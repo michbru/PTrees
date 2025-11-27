@@ -73,10 +73,40 @@ COVERAGE EXPECTATIONS:
     - Typical coverage: 15-25% of stock-month observations
       (concentrated in larger, publicly traded Swedish companies)
 
-ASSUMPTIONS:
-    - Serrano fiscal year-end is December 31 (Swedish standard)
-    - When multiple share classes exist (A/B shares), same accounting applies
-    - Left join preserves all stock observations (accounting is optional)
+ASSUMPTIONS & LIMITATIONS:
+    1. Merge Structure:
+       - Match on publication date (accounting_year/month), not fiscal period
+       - Assumes Step 1 correctly calculated 4-month publication lag
+       - Left join preserves ALL stock observations (accounting is optional feature)
+
+    2. Share Classes:
+       - Multiple share classes (A/B shares) share same ORGNR
+       - All classes get same accounting data (correct - same underlying company)
+       - Example: Volvo A and Volvo B both get same ROE
+
+    3. Forward-Fill Logic:
+       - Once accounting published, remains valid until next update
+       - Example: Apr 2012 fiscal 2011 ROE → used through Mar 2013
+       - This matches real-world information availability
+
+    4. Coverage:
+       - Not all stocks have accounting data (~80-90% coverage expected)
+       - Missing data reasons:
+         a) Foreign companies (non-Swedish ISIN, no ORGNR)
+         b) Small/private companies (ORGNR exists, not in Serrano)
+         c) Timing mismatches (Serrano 1997-2024, stocks may differ)
+       - Missing accounting treated as optional features (filled with neutral ranks later)
+
+    5. Data Timing:
+       - Serrano accounting: 4-month publication lag from Step 1
+       - Stock data: Real-time prices, returns (no lag needed)
+       - Merge preserves Serrano timing (no additional lag applied here)
+
+VERIFICATION STATUS (2025-01-26):
+    ✓ Merge logic verified with company examples (Lundin Oil, Active Biotech, AGA)
+    ✓ Confirmed merge on [orgnr, year, month] = [orgnr, accounting_year, accounting_month]
+    ✓ Forward-fill verified to work correctly within stocks
+    ✓ Fiscal 1997 data correctly matched to April 1998 stock observations
 
 Author: Michael
 Date: 2025-01-23
@@ -123,10 +153,19 @@ def merge_stock_and_accounting():
     stock_with_orgnr['orgnr'] = stock_with_orgnr['orgnr'].astype(str)
     serrano['orgnr'] = serrano['orgnr'].astype(str)
     
-    # MERGE LOGIC:
-    # Stock observation at (year=Y, month=M) gets accounting with (accounting_year=Y, accounting_month=M)
-    # The accounting_year/month already includes 4-month publication lag from Step 1
-    # Example: Stock at 2012-04 matches accounting_year=2012, month=4 (which is fiscal 2011 data)
+    # MERGE LOGIC - HOW FISCAL DATA MAPS TO STOCK OBSERVATIONS:
+    # -----------------------------------------------------------------
+    # Stock observations have (year, month) from their trading date.
+    # Serrano has (accounting_year, accounting_month) = when data becomes public.
+    #
+    # Example walkthrough:
+    #   1. Fiscal year 2011 ends Dec 31, 2011
+    #   2. Step 1 calculates: accounting_year=2012, accounting_month=4 (Apr)
+    #   3. This merge matches stock observations at 2012-04 with that accounting data
+    #   4. Result: April 2012 stock data gets fiscal 2011 accounting (correct!)
+    #
+    # Key insight: We're matching on the PUBLICATION date, not the fiscal period.
+    # This ensures we only use accounting data that was actually available at trade time.
     print("\nMerging stock + accounting...")
     final = stock_with_orgnr.merge(
         serrano,
