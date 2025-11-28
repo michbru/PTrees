@@ -27,7 +27,7 @@ Logic:
 Input:
   - data/intermediate/finbas/finbas_daily_clean.csv
   - data/intermediate/serrano/serrano_accounting.csv
-  - data/intermediate/isin_orgnr_mapping_final.csv
+  - data/mappings/isin_orgnr_final.csv
 
 Output:
   - data/intermediate/merged_data_daily.csv
@@ -40,7 +40,7 @@ from pathlib import Path
 # Config
 FINBAS_PATH = Path('data/intermediate/finbas/finbas_daily_clean.csv')
 SERRANO_PATH = Path('data/intermediate/serrano/serrano_accounting.csv')
-MAPPING_PATH = Path('data/intermediate/isin_orgnr_mapping_final.csv')
+MAPPING_PATH = Path('data/mappings/isin_orgnr_final.csv')
 OUTPUT_PATH = Path('data/intermediate/merged_data_daily.csv')
 
 def clean_orgnr(orgnr_series):

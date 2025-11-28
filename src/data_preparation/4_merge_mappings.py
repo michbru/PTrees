@@ -3,19 +3,19 @@ Merge Automated and Manual ISIN-ORGNR Mappings
 ===============================================
 Combines:
   - Automated mappings from LSEG (3_build_isin_orgnr_mapping_LSEG.py)
-  - Manual mappings (data/manual_mappings/isin_orgnr_manual.csv)
+  - Manual mappings (data/mappings/manual/isin_orgnr_manual.csv)
 
 Manual mappings take priority over automated ones.
 
-Output: data/intermediate/isin_orgnr_mapping_final.csv
+Output: data/mappings/isin_orgnr_final.csv
 """
 
 import pandas as pd
 from pathlib import Path
 
-AUTO_MAPPING = Path('data/automated_mappings/isin_orgnr_mapping_auto.csv')
-MANUAL_MAPPING = Path('data/manual_mappings/isin_orgnr_manual.csv')
-OUTPUT_FINAL = Path('data/intermediate/isin_orgnr_mapping_final.csv')
+AUTO_MAPPING = Path('data/mappings/automated/isin_orgnr_automated.csv')
+MANUAL_MAPPING = Path('data/mappings/manual/isin_orgnr_manual.csv')
+OUTPUT_FINAL = Path('data/mappings/isin_orgnr_final.csv')
 
 
 def main():

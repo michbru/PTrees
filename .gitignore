@@ -49,3 +49,7 @@ desktop.ini
 data/raw/lseg/ptrees_final_dataset.csv
 data/intermediate/stock_with_accounting.csv
 data/intermediate/serrano_nyckeltal_full.csv
+
+# Mapping files - automated is generated, manual is tracked
+data/mappings/automated/
+data/mappings/isin_orgnr_final.csv

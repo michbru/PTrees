@@ -3,7 +3,7 @@ import pandas as pd
 print("Checking for ORGNR overlap...")
 
 # Load mapping
-df_mapping = pd.read_csv('data/intermediate/isin_orgnr_mapping_final.csv')
+df_mapping = pd.read_csv('data/mappings/isin_orgnr_final.csv')
 df_mapping = df_mapping.dropna(subset=['orgnr'])
 df_mapping['orgnr'] = df_mapping['orgnr'].astype(str).str.replace('-', '', regex=False)
 df_mapping['orgnr'] = pd.to_numeric(df_mapping['orgnr'], errors='coerce').astype('Int64')

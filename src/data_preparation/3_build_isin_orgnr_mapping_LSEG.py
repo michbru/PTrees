@@ -4,7 +4,7 @@ Build ISIN-ORGNR Mapping from LSEG (Automated)
 This script creates automated mappings using LSEG TaxID and name matching.
 Manual mappings are kept separate and merged later.
 
-Output: data/intermediate/isin_orgnr_mapping_auto.csv
+Output: data/mappings/automated/isin_orgnr_automated.csv
 """
 
 import pandas as pd
@@ -16,7 +16,7 @@ import re
 
 FINBAS_PATH = Path('data/intermediate/finbas/finbas_daily_clean.csv')
 SERRANO_PATH = Path('data/raw/serrano/Stata_2025/bokslut1.dta')
-OUTPUT_AUTO = Path('data/automated_mappings/isin_orgnr_mapping_auto.csv')
+OUTPUT_AUTO = Path('data/mappings/automated/isin_orgnr_automated.csv')
 
 
 def connect_lseg():

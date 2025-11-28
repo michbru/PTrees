@@ -164,7 +164,7 @@ INTERMEDIATE_DATA = {
                     'net_margin', 'sales_growth', 'debt_equity_ratio', 'equity_ratio', 'quick_ratio']
     },
     'isin_orgnr_mapping': {
-        'file': 'data/intermediate/isin_orgnr_mapping.csv',
+        'file': 'data/mappings/isin_orgnr_final.csv',
         'source': 'constructed',
         'description': 'Mapping between ISIN and ORGNR for Serrano linkage',
     },
