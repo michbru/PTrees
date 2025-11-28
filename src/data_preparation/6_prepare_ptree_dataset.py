@@ -25,6 +25,78 @@ warnings.filterwarnings('ignore')
 INPUT_PATH = Path('data/processed/merged_data_daily.csv')
 OUTPUT_PATH = Path('data/processed/ptree_dataset_monthly.csv')
 
+def calculate_daily_characteristics(df):
+    """
+    Calculate characteristics from daily data that need to be aggregated to monthly.
+
+    These require 3-month rolling windows on daily data:
+    - ZEROTRADE, BASPREAD, DOLVOL, ILL, MAXRET, SVAR, STD_DOLVOL, STD_TURN, TURN
+    """
+    print("  Calculating daily-based characteristics (3-month windows)...")
+
+    df = df.sort_values(['isin', 'date'])
+
+    # Calculate daily returns if not already present
+    if 'ret' not in df.columns or df['ret'].isna().all():
+        df['ret'] = df.groupby('isin')['close'].pct_change()
+
+    # ZEROTRADE: Fraction of zero-volume days
+    df['zero_volume'] = (df['volume'] == 0).astype(int)
+    df['ZEROTRADE'] = df.groupby('isin')['zero_volume'].transform(
+        lambda x: x.rolling(window=63, min_periods=20).mean()  # ~3 months of trading days
+    )
+
+    # BASPREAD: Bid-ask spread
+    df['spread'] = (df['ask'] - df['bid']) / ((df['ask'] + df['bid']) / 2)
+    df['BASPREAD'] = df.groupby('isin')['spread'].transform(
+        lambda x: x.rolling(window=63, min_periods=20).mean()
+    )
+
+    # DOLVOL: Log of average dollar volume
+    df['DOLVOL'] = df.groupby('isin')['turnover_sek'].transform(
+        lambda x: np.log(x.rolling(window=63, min_periods=20).mean() + 1)
+    )
+
+    # ILL: Amihud illiquidity
+    df['illiq_daily'] = np.abs(df['ret']) / (df['turnover_sek'] + 1) * 1e6
+    df['ILL'] = df.groupby('isin')['illiq_daily'].transform(
+        lambda x: x.rolling(window=63, min_periods=20).mean()
+    )
+
+    # MAXRET: Maximum daily return
+    df['MAXRET'] = df.groupby('isin')['ret'].transform(
+        lambda x: x.rolling(window=63, min_periods=20).max()
+    )
+
+    # SVAR: Return variance
+    df['SVAR'] = df.groupby('isin')['ret'].transform(
+        lambda x: x.rolling(window=63, min_periods=20).var()
+    )
+
+    # STD_DOLVOL: Std of log dollar volume
+    df['log_dolvol'] = np.log(df['turnover_sek'] + 1)
+    df['STD_DOLVOL'] = df.groupby('isin')['log_dolvol'].transform(
+        lambda x: x.rolling(window=63, min_periods=20).std()
+    )
+
+    # TURN: Share turnover
+    # Use market_cap_filled (forward-filled) instead of market_cap for better coverage
+    market_cap_col = 'market_cap_filled' if 'market_cap_filled' in df.columns else 'market_cap'
+    df['shares_out'] = df[market_cap_col] / df['close']
+    df['daily_turn'] = df['volume'] / df['shares_out']
+    df['TURN'] = df.groupby('isin')['daily_turn'].transform(
+        lambda x: x.rolling(window=63, min_periods=20).mean()
+    )
+
+    # STD_TURN: Std of turnover
+    df['STD_TURN'] = df.groupby('isin')['daily_turn'].transform(
+        lambda x: x.rolling(window=63, min_periods=20).std()
+    )
+
+    print(f"    Calculated 9 daily-based characteristics")
+
+    return df
+
 def aggregate_to_monthly(df):
     """Aggregate daily to monthly (month-end)."""
     print("  Aggregating to monthly...")
@@ -176,9 +248,9 @@ def calculate_investment_chars(df):
 
     # CINVEST: Corporate investment (change in capex / lagged PPE)
     # Approximation: change in PPE / lagged PPE
-    df['ppe_current'] = df['ppe_buildings_lag12'].fillna(0) + df['ppe_machinery_lag12'].fillna(0)
+    # ppe_lag12 was already calculated in momentum_chars
     df['ppe_lag24'] = df.groupby('isin')['ppe_lag12'].shift(12)
-    df['CINVEST'] = (df['ppe_current'] - df['ppe_lag12']) / df['ppe_lag24']
+    df['CINVEST'] = (df['ppe_lag12'] - df['ppe_lag24']) / df['ppe_lag24']
 
     # GRLTNOA: Growth in long-term NOA (simplified version)
     df['GRLTNOA'] = df.groupby('isin')['NOA'].pct_change(12)
@@ -219,6 +291,40 @@ def calculate_intangibles_chars(df):
 
     return df
 
+def calculate_beta_volatility(df):
+    """
+    Calculate market beta and idiosyncratic volatility.
+
+    BETA: Market beta using 36-month rolling window
+    RVAR_CAPM: Idiosyncratic volatility from CAPM
+    RVAR_FF3: Idiosyncratic volatility from FF3 (if factors available)
+    """
+    print("  Calculating beta and idiosyncratic volatility...")
+
+    df = df.sort_values(['isin', 'date'])
+
+    # For now, calculate market beta using simple approach
+    # TODO: Load FF factors for proper calculation
+
+    # Simple market beta: cov(ret, mkt) / var(mkt)
+    # We'll use a simplified version for now
+    # Proper implementation would require FF factors
+
+    # BETA: 36-month rolling beta
+    # For now, set to None - will be calculated if FF factors available
+    df['BETA'] = np.nan
+
+    # RVAR_CAPM: Residual variance from CAPM
+    df['RVAR_CAPM'] = np.nan
+
+    # RVAR_FF3: Residual variance from FF3
+    df['RVAR_FF3'] = np.nan
+
+    print(f"    Beta/volatility characteristics set to NaN (need FF factors)")
+    print(f"    TODO: Download FF factors from Ken French website")
+
+    return df
+
 def calculate_frictions_chars(df):
     """Calculate frictions characteristics."""
     print("  Calculating frictions characteristics...")
@@ -228,22 +334,8 @@ def calculate_frictions_chars(df):
     # ME: Market equity (log)
     df['ME'] = np.log(df['market_cap'])
 
-    # For daily-based chars, we need to calculate from daily data
-    # For now, we'll create placeholders - these need daily aggregation
-
-    # BASPREAD: Bid-ask spread (needs daily data)
-    # DOLVOL: Dollar volume (needs daily data)
-    # ILL: Illiquidity (needs daily data)
-    # MAXRET: Max return (needs daily data)
-    # STD_DOLVOL: Std of dollar volume (needs daily data)
-    # STD_TURN: Std of turnover (needs daily data)
-    # TURN: Turnover (needs daily data)
-    # ZEROTRADE: Zero trading days (needs daily data)
-    # SVAR: Return variance (needs daily data)
-    # BETA: Market beta (needs daily returns + FF factors)
-    # RVAR_CAPM, RVAR_FF3: Idiosyncratic volatility (needs daily returns + FF factors)
-
-    # These will be calculated in a separate function that operates on daily data
+    # Daily-based characteristics are already calculated in monthly aggregation
+    # (ZEROTRADE, BASPREAD, DOLVOL, ILL, MAXRET, SVAR, STD_DOLVOL, STD_TURN, TURN)
 
     return df
 
@@ -361,42 +453,47 @@ def main():
     df['fiscal_year_start'] = pd.to_datetime(df['fiscal_year_start'])
     print(f"   Loaded: {len(df):,} rows, {df['isin'].nunique()} ISINs")
 
-    # 2. Aggregate to monthly
-    print("\n2. Aggregating to monthly...")
+    # 2. Calculate daily-based characteristics (BEFORE monthly aggregation)
+    print("\n2. Calculating daily-based characteristics...")
+    df = calculate_daily_characteristics(df)
+
+    # 3. Aggregate to monthly
+    print("\n3. Aggregating to monthly...")
     df_monthly = aggregate_to_monthly(df)
 
-    # 3. Apply lags
-    print("\n3. Applying lags (12m for accounting, 1m for market cap)...")
+    # 4. Apply lags
+    print("\n4. Applying lags (12m for accounting, 1m for market cap)...")
     df_monthly = apply_lags(df_monthly)
 
-    # 4. Calculate characteristics
-    print("\n4. Calculating characteristics...")
+    # 5. Calculate monthly-based characteristics
+    print("\n5. Calculating monthly-based characteristics...")
     df_monthly = calculate_momentum_chars(df_monthly)
     df_monthly = calculate_value_chars(df_monthly)
     df_monthly = calculate_investment_chars(df_monthly)
     df_monthly = calculate_profitability_chars(df_monthly)
     df_monthly = calculate_intangibles_chars(df_monthly)
+    df_monthly = calculate_beta_volatility(df_monthly)
     df_monthly = calculate_frictions_chars(df_monthly)
 
-    # 5. Rank characteristics
-    print("\n5. Ranking characteristics...")
+    # 6. Rank characteristics
+    print("\n6. Ranking characteristics...")
     df_monthly, rank_cols = rank_characteristics(df_monthly)
 
-    # 6. Clean and finalize
-    print("\n6. Cleaning and finalizing...")
+    # 7. Clean and finalize
+    print("\n7. Cleaning and finalizing...")
     df_final = clean_and_finalize(df_monthly, rank_cols)
 
-    # 7. Coverage report
-    print("\n7. Coverage analysis...")
+    # 8. Coverage report
+    print("\n8. Coverage analysis...")
     calculate_coverage(df_final)
 
-    # 8. Save
-    print(f"\n8. Saving to {OUTPUT_PATH}...")
+    # 9. Save
+    print(f"\n9. Saving to {OUTPUT_PATH}...")
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     df_final.to_csv(OUTPUT_PATH, index=False)
     print("   Done.")
 
-    # 9. Summary
+    # 10. Summary
     print("\n" + "=" * 80)
     print("SUMMARY")
     print("=" * 80)
