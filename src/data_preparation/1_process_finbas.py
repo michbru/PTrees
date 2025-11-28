@@ -1,5 +1,5 @@
 """
-Step 0: Process Finbas Daily Data
+Step 1: Process Finbas Daily Data
 =================================
 Input:  data/raw/finbas/raw_finbas_daily.csv
 Output: data/intermediate/finbas/finbas_daily_clean.csv
@@ -17,7 +17,7 @@ OUTPUT_PATH = PROJECT_ROOT / 'data' / 'intermediate' / 'finbas' / 'finbas_daily_
 
 
 def main():
-    print("Step 0: Processing Finbas daily data...")
+    print("Step 1: Processing Finbas daily data...")
     
     # Load
     if not RAW_PATH.exists():
@@ -35,6 +35,10 @@ def main():
     
     print(f"  After SE/SEK filters: {len(df):,} rows, {df['isin'].nunique():,} ISINs")
     
+    # Standardize identifiers early
+    if 'isin' in df.columns:
+        df['isin'] = df['isin'].astype(str).str.upper().str.strip()
+
     # Rename columns
     df = df.rename(columns={
         'marketname': 'exchange',
@@ -58,19 +62,59 @@ def main():
     df['year'] = df['date'].dt.year
     df['month'] = df['date'].dt.month
     
-    # 2. Handle Duplicates (Critical for groupby)
-    # Keep the last entry if duplicates exist for same ISIN/Date
-    df = df.sort_values(['isin', 'date'])
-    df = df.drop_duplicates(subset=['isin', 'date'], keep='last')
-    
-    # 3. Forward-fill market cap (Option 2: Simple & Robust)
+    # 2. Coerce numeric columns to ensure math works correctly
+    numeric_cols = [
+        'close', 'high', 'low', 'bid', 'ask',
+        'turnover_sek', 'volume', 'book_value',
+        'market_cap', 'total_market_cap'
+    ]
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+
+    # 3. Deterministic de-duplication per ISIN/Date
+    # Prefer rows with higher turnover/volume and primary exchanges
+    # Define a light-weight exchange preference (lower is better)
+    exchange_pref = {
+        'NASDAQ STOCKHOLM': 1,
+        'FIRST NORTH STOCKHOLM': 2,
+        'NGM EQUITY': 3,
+        'SPOTLIGHT STOCK MARKET': 4,
+    }
+    if 'exchange' in df.columns:
+        df['exchange_norm'] = df['exchange'].astype(str).str.upper().str.strip()
+        df['exchange_rank'] = df['exchange_norm'].map(exchange_pref).fillna(99)
+    else:
+        df['exchange_rank'] = 99
+
+    # Sort for deduplication tie-breakers:
+    #  - date ascending (so time order preserved later)
+    #  - exchange_rank ascending (prefer primary venues)
+    #  - turnover_sek desc, volume desc (prefer liquid prints)
+    sort_cols = ['isin', 'date', 'exchange_rank']
+    asc_flags = [True, True, True]
+    if 'turnover_sek' in df.columns:
+        sort_cols.append('turnover_sek')
+        asc_flags.append(False)
+    if 'volume' in df.columns:
+        sort_cols.append('volume')
+        asc_flags.append(False)
+
+    df = df.sort_values(sort_cols, ascending=asc_flags)
+    before_dups = len(df)
+    df = df.drop_duplicates(subset=['isin', 'date'], keep='first')
+    after_dups = len(df)
+    if before_dups != after_dups:
+        print(f"  De-duplicated {before_dups - after_dups:,} rows on (isin, date) with liquidity/venue preference")
+
+    # 4. Forward-fill market cap (Option 2: Simple & Robust)
     # We use simple forward-fill because:
     # 1. It's standard academic practice when daily shares aren't available.
     # 2. It avoids complex split-adjustment issues with "implied shares".
     # 3. Most characteristics use month-end market cap anyway.
     df['market_cap_filled'] = df.groupby('isin')['market_cap'].ffill()
     
-    # 4. Calculate returns
+    # 5. Calculate returns
     # Handle potential 0 prices to avoid inf
     df['close'] = df['close'].replace(0, np.nan)
     df['ret'] = df.groupby('isin')['close'].pct_change(fill_method=None)
@@ -88,6 +132,12 @@ def main():
     available_cols = [c for c in output_cols if c in df.columns]
     df_out = df[available_cols].copy()
     
+    # Sanity checks
+    # Ensure uniqueness of (isin, date)
+    dup_ct = df_out.duplicated(subset=['isin', 'date']).sum()
+    if dup_ct > 0:
+        raise ValueError(f"Duplicate (isin, date) pairs remain after dedup: {dup_ct}")
+
     # Save
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     df_out.to_csv(OUTPUT_PATH, index=False)
@@ -99,7 +149,7 @@ def main():
     
     # Coverage stats
     print(f"  Coverage:")
-    for col in ['close', 'market_cap_filled', 'ret']:
+    for col in ['close', 'market_cap', 'market_cap_filled', 'ret']:
         if col in df_out.columns:
             print(f"    {col}: {df_out[col].notna().mean()*100:.1f}%")
     

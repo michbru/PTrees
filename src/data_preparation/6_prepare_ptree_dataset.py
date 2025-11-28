@@ -25,6 +25,24 @@ warnings.filterwarnings('ignore')
 INPUT_PATH = Path('data/processed/merged_data_daily.csv')
 OUTPUT_PATH = Path('data/processed/ptree_dataset_monthly.csv')
 
+
+def safe_div(numer, denom, eps: float = 1e-12):
+    """Safe elementwise division: returns NaN where denom is near zero or non-finite.
+
+    Supports pandas Series or numpy arrays. Keeps shape.
+    """
+    num = pd.to_numeric(numer, errors='coerce') if isinstance(numer, pd.Series) else numer
+    den = pd.to_numeric(denom, errors='coerce') if isinstance(denom, pd.Series) else denom
+    with np.errstate(divide='ignore', invalid='ignore'):
+        out = num / den
+        if isinstance(out, pd.Series):
+            mask = (~np.isfinite(out)) | (np.abs(den) < eps)
+            out = out.mask(mask)
+        else:
+            mask = (~np.isfinite(out)) | (np.abs(den) < eps)
+            out[mask] = np.nan
+    return out
+
 def calculate_daily_characteristics(df):
     """
     Calculate characteristics from daily data that need to be aggregated to monthly.
@@ -107,6 +125,10 @@ def aggregate_to_monthly(df):
     # Take last trading day of each month
     df_monthly = df.groupby(['isin', 'year_month']).last().reset_index()
 
+    # Ensure market_cap present: fill with market_cap_filled if available
+    if 'market_cap' in df_monthly.columns and 'market_cap_filled' in df_monthly.columns:
+        df_monthly['market_cap'] = df_monthly['market_cap'].fillna(df_monthly['market_cap_filled'])
+
     # Calculate monthly returns
     df_monthly = df_monthly.sort_values(['isin', 'date'])
     df_monthly['ret_monthly'] = df_monthly.groupby('isin')['close'].pct_change()
@@ -114,13 +136,37 @@ def aggregate_to_monthly(df):
     print(f"    Monthly observations: {len(df_monthly):,}")
     return df_monthly
 
-def apply_lags(df):
-    """Apply 12-month lag to accounting vars, 1-month lag to market_cap for ratios."""
-    print("  Applying lags...")
+def _months_between(date_a: pd.Series, date_b: pd.Series) -> pd.Series:
+    """Whole months difference: date_a - date_b (>= 0 when a >= b)."""
+    return (date_a.dt.year - date_b.dt.year) * 12 + (date_a.dt.month - date_b.dt.month)
 
-    df = df.sort_values(['isin', 'date'])
 
-    # Accounting variables to lag by 12 months
+def apply_publication_lag(df, pub_lag_months: int = 6):
+    """Apply publication lag to accounting vars and 1-month lag to market cap.
+
+    Logic:
+    - df contains monthly rows with accounting variables already aligned to the latest
+      fiscal_year_end <= date (from Step 5 as-of merge, i.e., no lag).
+    - For each month, if months_since_fye >= pub_lag_months, use current FY values;
+      else use previous FY values for accounting variables.
+    - This avoids double-lagging and enforces a realistic publication lag.
+    """
+    print(f"  Applying publication lag (accounting: {pub_lag_months} months, market_cap: 1 month)...")
+
+    df = df.sort_values(['isin', 'date']).copy()
+
+    # Ensure fiscal_year is integer
+    if 'fiscal_year' in df.columns:
+        df['fiscal_year'] = pd.to_numeric(df['fiscal_year'], errors='coerce').astype('Int64')
+
+    # Market cap 1-month lag for ratios/weights
+    if 'market_cap' in df.columns:
+        df['market_cap_lag1'] = df.groupby('isin')['market_cap'].shift(1)
+    elif 'market_cap_filled' in df.columns:
+        # Fallback if only filled variant exists
+        df['market_cap_lag1'] = df.groupby('isin')['market_cap_filled'].shift(1)
+
+    # Publication-lagged accounting variables
     accounting_vars = [
         'sales', 'cogs_materials', 'cogs_goods', 'personnel_expense',
         'depreciation', 'operating_income', 'interest_income', 'interest_expense',
@@ -128,18 +174,54 @@ def apply_lags(df):
         'intangible_assets', 'tangible_assets', 'ppe_buildings', 'ppe_machinery',
         'current_assets', 'inventory', 'cash', 'receivables', 'book_equity',
         'share_capital', 'long_term_debt', 'current_liabilities', 'accounts_payable',
-        'num_employees', 'fiscal_year', 'fiscal_year_start', 'fiscal_year_end'
+        'num_employees'
     ]
 
+    if 'fiscal_year_end' not in df.columns:
+        raise ValueError("fiscal_year_end missing; Step 5 output expected.")
+
+    # Compute months since fiscal year end
+    df['months_since_fye'] = _months_between(df['date'], df['fiscal_year_end'])
+
+    # Build FY-level frames to get previous-FY values per ISIN
+    # We take the last value within each (isin, fiscal_year) group (constant within FY segment)
+    base_cols = ['isin', 'fiscal_year'] + [col for col in accounting_vars if col in df.columns]
+    df_fy = df[base_cols].dropna(subset=['fiscal_year']).copy()
+    df_fy = df_fy.groupby(['isin', 'fiscal_year']).last().reset_index()
+    # For each var, compute previous FY value by group-wise shift
+    df_fy = df_fy.sort_values(['isin', 'fiscal_year'])
+    for var in accounting_vars:
+        if var in df_fy.columns:
+            df_fy[f'{var}_prev_fy'] = df_fy.groupby('isin')[var].shift(1)
+
+    # Merge FY-level previous values back to monthly df
+    df = df.merge(
+        df_fy[['isin', 'fiscal_year'] + [f'{v}_prev_fy' for v in accounting_vars if f'{v}_prev_fy' in df_fy.columns]],
+        on=['isin', 'fiscal_year'], how='left'
+    )
+
+    # Choose current vs previous FY according to publication lag
     for var in accounting_vars:
         if var in df.columns:
-            df[f'{var}_lag12'] = df.groupby('isin')[var].shift(12)
+            prev_col = f'{var}_prev_fy'
+            pub_col = f'{var}_pub'
+            if prev_col in df.columns:
+                df[pub_col] = np.where(df['months_since_fye'] >= pub_lag_months, df[var], df[prev_col])
 
-    # Market cap for ratios (1-month lag)
-    df['market_cap_lag1'] = df.groupby('isin')['market_cap'].shift(1)
+    rows_with_acct = df[[f'{v}_pub' for v in accounting_vars if f'{v}_pub' in df.columns]].notna().any(axis=1).sum()
+    print(f"    Rows with publication-lagged accounting: {rows_with_acct:,} ({rows_with_acct/len(df)*100:.1f}%)")
 
-    rows_with_acct = df['sales_lag12'].notna().sum()
-    print(f"    Rows with lagged accounting: {rows_with_acct:,} ({rows_with_acct/len(df)*100:.1f}%)")
+    # Verification (representative variable: sales)
+    if {'sales', 'sales_prev_fy', 'sales_pub'}.issubset(df.columns):
+        cond_prev = df['months_since_fye'] < pub_lag_months
+        # Only compare where both sides are non-null
+        prev_mask = cond_prev & df['sales_prev_fy'].notna() & df['sales_pub'].notna()
+        cur_mask = (~cond_prev) & df['sales'].notna() & df['sales_pub'].notna()
+        prev_eq = np.isclose(df.loc[prev_mask, 'sales_pub'], df.loc[prev_mask, 'sales_prev_fy'], rtol=1e-6, atol=1e-8)
+        cur_eq = np.isclose(df.loc[cur_mask, 'sales_pub'], df.loc[cur_mask, 'sales'], rtol=1e-6, atol=1e-8)
+        prev_share = prev_eq.mean() * 100 if prev_mask.sum() > 0 else float('nan')
+        cur_share = cur_eq.mean() * 100 if cur_mask.sum() > 0 else float('nan')
+        print(f"    Pub-lag check (sales): prev-FY used agreement {prev_share:.1f}% | current-FY used agreement {cur_share:.1f}%")
 
     return df
 
@@ -171,12 +253,15 @@ def calculate_momentum_chars(df):
     # SEAS1A: Same month last year
     df['SEAS1A'] = df.groupby('isin')['ret_monthly'].shift(12)
 
-    # CHTX: Change in tax expense
-    df['CHTX'] = df.groupby('isin')['tax_expense_lag12'].pct_change(12)
+    # CHTX: Change in tax expense (YoY on publication-lagged series)
+    if 'tax_expense_pub' in df.columns:
+        df['CHTX'] = df.groupby('isin')['tax_expense_pub'].pct_change(12)
 
-    # DEPR: Depreciation rate
-    df['ppe_lag12'] = df['ppe_buildings_lag12'].fillna(0) + df['ppe_machinery_lag12'].fillna(0)
-    df['DEPR'] = df['depreciation_lag12'] / df['ppe_lag12']
+    # DEPR: Depreciation rate (publication-lagged)
+    if ('ppe_buildings_pub' in df.columns) or ('ppe_machinery_pub' in df.columns):
+        df['ppe_pub'] = df.get('ppe_buildings_pub', 0).fillna(0) + df.get('ppe_machinery_pub', 0).fillna(0)
+    if 'depreciation_pub' in df.columns and 'ppe_pub' in df.columns:
+        df['DEPR'] = safe_div(df['depreciation_pub'], df['ppe_pub'])
 
     return df
 
@@ -184,26 +269,36 @@ def calculate_value_chars(df):
     """Calculate value characteristics."""
     print("  Calculating value characteristics...")
 
-    # BM: Book-to-Market (no lag - book_value from Finbas is already reported)
-    df['BM'] = df['book_value'] / df['market_cap']
+    # Helper for safe division
+    # BM: Book-to-Market using Serrano book equity (publication-lagged) and lagged market cap
+    if 'book_equity_pub' in df.columns:
+        df['BM'] = safe_div(df['book_equity_pub'], df['market_cap_lag1'])
 
     # EP, SP, CFP: Use lagged accounting + lagged market cap
-    df['EP'] = df['net_income_lag12'] / df['market_cap_lag1']
-    df['SP'] = df['sales_lag12'] / df['market_cap_lag1']
+    if 'net_income_pub' in df.columns:
+        df['EP'] = safe_div(df['net_income_pub'], df['market_cap_lag1'])
+    if 'sales_pub' in df.columns:
+        df['SP'] = safe_div(df['sales_pub'], df['market_cap_lag1'])
 
     # CFP: Operating cash flow approximation
-    df['operating_cashflow'] = df['net_income_lag12'] + df['depreciation_lag12']
-    df['CFP'] = df['operating_cashflow'] / df['market_cap_lag1']
+    if 'net_income_pub' in df.columns and 'depreciation_pub' in df.columns:
+        df['operating_cashflow'] = df['net_income_pub'] + df['depreciation_pub']
+        df['CFP'] = safe_div(df['operating_cashflow'], df['market_cap_lag1'])
 
     # Pure accounting ratios
-    df['CASH'] = df['cash_lag12'] / df['total_assets_lag12']
+    if 'cash_pub' in df.columns and 'total_assets_pub' in df.columns:
+        df['CASH'] = safe_div(df['cash_pub'], df['total_assets_pub'])
 
-    df['total_debt_lag12'] = df['long_term_debt_lag12'] + df['current_liabilities_lag12']
-    df['CASHDEBT'] = df['cash_lag12'] / df['total_debt_lag12']
+    if 'long_term_debt_pub' in df.columns and 'current_liabilities_pub' in df.columns:
+        df['total_debt_pub'] = df['long_term_debt_pub'] + df['current_liabilities_pub']
+        if 'cash_pub' in df.columns:
+            df['CASHDEBT'] = safe_div(df['cash_pub'], df['total_debt_pub'])
 
-    df['LEV'] = df['total_debt_lag12'] / df['total_assets_lag12']
+    if 'total_debt_pub' in df.columns and 'total_assets_pub' in df.columns:
+        df['LEV'] = safe_div(df['total_debt_pub'], df['total_assets_pub'])
 
-    df['SGR'] = df.groupby('isin')['sales_lag12'].pct_change(12)
+    if 'sales_pub' in df.columns:
+        df['SGR'] = df.groupby('isin')['sales_pub'].pct_change(12)
 
     return df
 
@@ -212,26 +307,38 @@ def calculate_investment_chars(df):
     print("  Calculating investment characteristics...")
 
     # AGR: Asset growth
-    df['AGR'] = df.groupby('isin')['total_assets_lag12'].pct_change(12)
+    if 'total_assets_pub' in df.columns:
+        df['AGR'] = df.groupby('isin')['total_assets_pub'].pct_change(12)
 
     # GMA: Gross profitability
-    df['cogs_total'] = df['cogs_materials_lag12'].fillna(0) + df['cogs_goods_lag12'].fillna(0)
-    df['gross_profit'] = df['sales_lag12'] - df['cogs_total']
-    df['GMA'] = df['gross_profit'] / df['total_assets_lag12']
+    if ('cogs_materials_pub' in df.columns) or ('cogs_goods_pub' in df.columns):
+        df['cogs_total'] = df.get('cogs_materials_pub', 0).fillna(0) + df.get('cogs_goods_pub', 0).fillna(0)
+    if 'sales_pub' in df.columns:
+        df['gross_profit'] = df['sales_pub'] - df['cogs_total']
+    if 'total_assets_pub' in df.columns:
+        df['GMA'] = safe_div(df['gross_profit'], df['total_assets_pub'])
 
     # LGR: Long-term debt growth
-    df['LGR'] = df.groupby('isin')['long_term_debt_lag12'].pct_change(12)
+    if 'long_term_debt_pub' in df.columns:
+        df['LGR'] = df.groupby('isin')['long_term_debt_pub'].pct_change(12)
 
     # ACC: Operating accruals
-    df['working_capital'] = df['current_assets_lag12'] - df['current_liabilities_lag12']
-    df['wc_lag12'] = df.groupby('isin')['working_capital'].shift(12)
-    df['delta_wc'] = df['working_capital'] - df['wc_lag12']
-    df['total_assets_lag24'] = df.groupby('isin')['total_assets_lag12'].shift(12)
-    df['avg_assets'] = (df['total_assets_lag12'] + df['total_assets_lag24']) / 2
-    df['ACC'] = (df['delta_wc'] - df['depreciation_lag12']) / df['avg_assets']
+    if 'current_assets_pub' in df.columns and 'current_liabilities_pub' in df.columns:
+        df['working_capital'] = df['current_assets_pub'] - df['current_liabilities_pub']
+        df['wc_lag12'] = df.groupby('isin')['working_capital'].shift(12)
+        df['delta_wc'] = df['working_capital'] - df['wc_lag12']
+    if 'total_assets_pub' in df.columns:
+        df['total_assets_pub_lag12'] = df.groupby('isin')['total_assets_pub'].shift(12)
+        df['total_assets_pub_lag24'] = df.groupby('isin')['total_assets_pub'].shift(24)
+        df['avg_assets'] = (df['total_assets_pub'] + df['total_assets_pub_lag12']) / 2
+    if 'depreciation_pub' in df.columns and 'avg_assets' in df.columns:
+        df['ACC'] = safe_div(df['delta_wc'] - df['depreciation_pub'], df['avg_assets'])
 
     # CHCSHO: Change in shares outstanding
-    df['shares'] = df['market_cap'] / df['close']
+    mkt_col = 'market_cap'
+    if mkt_col not in df.columns and 'market_cap_filled' in df.columns:
+        mkt_col = 'market_cap_filled'
+    df['shares'] = safe_div(df[mkt_col], df['close'])
     df['shares_lag12'] = df.groupby('isin')['shares'].shift(12)
     df['CHCSHO'] = (df['shares'] - df['shares_lag12']) / df['shares_lag12']
 
@@ -239,21 +346,27 @@ def calculate_investment_chars(df):
     df['NI'] = np.log(df['shares'] / df['shares_lag12'])
 
     # NOA: Net operating assets
-    df['operating_assets'] = df['total_assets_lag12'] - df['cash_lag12']
-    df['operating_liabilities'] = df['total_assets_lag12'] - df['book_equity_lag12'] - df['long_term_debt_lag12']
-    df['NOA'] = (df['operating_assets'] - df['operating_liabilities']) / df['total_assets_lag24']
+    if 'total_assets_pub' in df.columns and 'cash_pub' in df.columns:
+        df['operating_assets'] = df['total_assets_pub'] - df['cash_pub']
+    if 'book_equity_pub' in df.columns and 'long_term_debt_pub' in df.columns:
+        df['operating_liabilities'] = df['total_assets_pub'] - df['book_equity_pub'] - df['long_term_debt_pub']
+    if 'total_assets_pub_lag24' in df.columns:
+        df['NOA'] = safe_div(df['operating_assets'] - df['operating_liabilities'], df['total_assets_pub_lag24'])
 
     # PCTACC: Percent accruals
-    df['PCTACC'] = (df['ACC'] * df['avg_assets']) / np.abs(df['net_income_lag12'])
+    if 'ACC' in df.columns and 'avg_assets' in df.columns and 'net_income_pub' in df.columns:
+        df['PCTACC'] = safe_div(df['ACC'] * df['avg_assets'], np.abs(df['net_income_pub']))
 
     # CINVEST: Corporate investment (change in capex / lagged PPE)
     # Approximation: change in PPE / lagged PPE
     # ppe_lag12 was already calculated in momentum_chars
-    df['ppe_lag24'] = df.groupby('isin')['ppe_lag12'].shift(12)
-    df['CINVEST'] = (df['ppe_lag12'] - df['ppe_lag24']) / df['ppe_lag24']
+    if 'ppe_pub' in df.columns:
+        df['ppe_pub_lag12'] = df.groupby('isin')['ppe_pub'].shift(12)
+        df['CINVEST'] = safe_div(df['ppe_pub'] - df['ppe_pub_lag12'], df['ppe_pub_lag12'])
 
     # GRLTNOA: Growth in long-term NOA (simplified version)
-    df['GRLTNOA'] = df.groupby('isin')['NOA'].pct_change(12)
+    if 'NOA' in df.columns:
+        df['GRLTNOA'] = df.groupby('isin')['NOA'].pct_change(12)
 
     return df
 
@@ -261,21 +374,29 @@ def calculate_profitability_chars(df):
     """Calculate profitability characteristics."""
     print("  Calculating profitability characteristics...")
 
-    df['ROA'] = df['net_income_lag12'] / df['total_assets_lag12']
-    df['ROE'] = df['net_income_lag12'] / df['book_equity_lag12']
-    df['ATO'] = df['sales_lag12'] / df['avg_assets']
-    df['PM'] = df['net_income_lag12'] / df['sales_lag12']
+    if 'net_income_pub' in df.columns and 'total_assets_pub' in df.columns:
+        df['ROA'] = safe_div(df['net_income_pub'], df['total_assets_pub'])
+    if 'net_income_pub' in df.columns and 'book_equity_pub' in df.columns:
+        df['ROE'] = safe_div(df['net_income_pub'], df['book_equity_pub'])
+    if 'sales_pub' in df.columns and 'avg_assets' in df.columns:
+        df['ATO'] = safe_div(df['sales_pub'], df['avg_assets'])
+    if 'net_income_pub' in df.columns and 'sales_pub' in df.columns:
+        df['PM'] = safe_div(df['net_income_pub'], df['sales_pub'])
 
     # CHPM: Change in profit margin
     df['PM_lag12'] = df.groupby('isin')['PM'].shift(12)
     df['CHPM'] = df['PM'] - df['PM_lag12']
 
     # OP: Operating profitability
-    df['OP'] = (df['operating_income_lag12'] - df['interest_expense_lag12']) / df['book_equity_lag12']
+    # OP: Define as operating profitability distinct from GMA
+    if 'operating_income_pub' in df.columns and 'total_assets_pub' in df.columns:
+        df['OP'] = safe_div(df['operating_income_pub'], df['total_assets_pub'])
 
     # RNA: Return on NOA
-    df['NOA_denominator'] = df['operating_assets'] - df['operating_liabilities']
-    df['RNA'] = df['operating_income_lag12'] / df['NOA_denominator']
+    if 'operating_assets' in df.columns and 'operating_liabilities' in df.columns:
+        df['NOA_denominator'] = df['operating_assets'] - df['operating_liabilities']
+    if 'operating_income_pub' in df.columns and 'NOA_denominator' in df.columns:
+        df['RNA'] = safe_div(df['operating_income_pub'], df['NOA_denominator'])
 
     return df
 
@@ -284,7 +405,8 @@ def calculate_intangibles_chars(df):
     print("  Calculating intangibles characteristics...")
 
     # HIRE: Employee growth
-    df['HIRE'] = df.groupby('isin')['num_employees_lag12'].pct_change(12)
+    if 'num_employees_pub' in df.columns:
+        df['HIRE'] = df.groupby('isin')['num_employees_pub'].pct_change(12)
 
     # HERF: Industry concentration (skip for now - needs SNI codes)
     # TODO: Add HERF using SNI industry codes from Serrano ftg files
@@ -332,7 +454,9 @@ def calculate_frictions_chars(df):
     df = df.sort_values(['isin', 'date'])
 
     # ME: Market equity (log)
-    df['ME'] = np.log(df['market_cap'])
+    mkt_col = 'market_cap' if 'market_cap' in df.columns else ('market_cap_filled' if 'market_cap_filled' in df.columns else None)
+    if mkt_col:
+        df['ME'] = np.log(df[mkt_col])
 
     # Daily-based characteristics are already calculated in monthly aggregation
     # (ZEROTRADE, BASPREAD, DOLVOL, ILL, MAXRET, SVAR, STD_DOLVOL, STD_TURN, TURN)
@@ -350,15 +474,18 @@ def rank_characteristics(df):
     """
     print("  Ranking characteristics to [-1, 1] scale...")
 
-    # Get characteristic columns
+    # Get characteristic columns (raw uppercase feature names)
     char_cols = sorted([col for col in df.columns if col.isupper() and len(col) <= 10])
+    # Exclude placeholders not computed yet
+    char_cols = [c for c in char_cols if c not in {'BETA', 'RVAR_CAPM', 'RVAR_FF3'}]
 
     print(f"    Ranking {len(char_cols)} characteristics")
 
     # Rank each characteristic within each date
     for char in char_cols:
         # Create ranked version
-        df[f'rank_{char.lower()}'] = df.groupby('date')[char].transform(
+        # Rank by month (common cross-section), not literal date per stock
+        df[f'rank_{char.lower()}'] = df.groupby('year_month')[char].transform(
             lambda x: rank_to_minus1_plus1(x)
         )
 
@@ -427,16 +554,16 @@ def clean_and_finalize(df, rank_cols):
     return df_final
 
 def calculate_coverage(df):
-    """Calculate and report coverage for each characteristic."""
+    """Calculate and report coverage for ranked characteristics (non-zero share)."""
     print("\n  CHARACTERISTIC COVERAGE:")
     print("  " + "=" * 78)
 
-    char_cols = sorted([col for col in df.columns if col.isupper() and len(col) <= 10])
-
-    for char in char_cols:
-        coverage = df[char].notna().mean() * 100
-        count = df[char].notna().sum()
-        print(f"    {char:10s}: {coverage:5.1f}% ({count:,} obs)")
+    # Look at ranked features; measure non-zero share (since zeros denote neutral/missing)
+    rank_cols = sorted([col for col in df.columns if col.startswith('rank_')])
+    for col in rank_cols:
+        nonzero = (df[col] != 0).mean() * 100
+        count = (df[col] != 0).sum()
+        print(f"    {col:25s}: {nonzero:5.1f}% ({count:,} obs)")
 
     print("  " + "=" * 78)
 
@@ -461,9 +588,9 @@ def main():
     print("\n3. Aggregating to monthly...")
     df_monthly = aggregate_to_monthly(df)
 
-    # 4. Apply lags
-    print("\n4. Applying lags (12m for accounting, 1m for market cap)...")
-    df_monthly = apply_lags(df_monthly)
+    # 4. Apply publication lag (accounting) and 1m lag for market cap
+    print("\n4. Applying publication lag (accounting) and 1m lag (market cap)...")
+    df_monthly = apply_publication_lag(df_monthly, pub_lag_months=6)
 
     # 5. Calculate monthly-based characteristics
     print("\n5. Calculating monthly-based characteristics...")
@@ -501,7 +628,8 @@ def main():
     print(f"  Observations: {len(df_final):,}")
     print(f"  Companies: {df_final['isin'].nunique()}")
     print(f"  Date range: {df_final['date'].min()} to {df_final['date'].max()}")
-    print(f"  Months: {df_final['date'].nunique()}")
+    months_count = df_final['date'].dt.to_period('M').nunique()
+    print(f"  Months: {months_count}")
     print(f"  Avg companies/month: {len(df_final) / df_final['date'].nunique():.0f}")
 
     rank_cols_in_final = [col for col in df_final.columns if col.startswith('rank_')]

@@ -61,7 +61,7 @@ def clean_orgnr(orgnr_series):
 
 
 def main():
-    print("Step 5: Merging Datasets with Lagging...")
+    print("Step 5: Merging Datasets (no reporting lag)...")
     
     # 1. Load Data
     print("  Loading datasets...")
@@ -124,8 +124,8 @@ def main():
     df_serrano['fiscal_year_end'] = pd.to_datetime(df_serrano['fiscal_year_end'])
     df_serrano['fiscal_year_start'] = pd.to_datetime(df_serrano['fiscal_year_start'])
     
-    # Sort for asof merge (by fiscal_year_end)
-    df_serrano = df_serrano.sort_values('fiscal_year_end')
+    # Sort for asof merge: by ORGNR and time key
+    df_serrano = df_serrano.sort_values(['orgnr', 'fiscal_year_end'])
     
     # 6. Merge (asof)
     print("  Performing as-of merge...")
@@ -135,7 +135,7 @@ def main():
     
     # Prepare Finbas
     df_finbas['date'] = pd.to_datetime(df_finbas['date'])
-    df_finbas = df_finbas.sort_values('date')
+    df_finbas = df_finbas.sort_values(['orgnr', 'date'])
     
     # We can't do a simple merge_asof with 'by' argument if there are multiple stocks.
     # Pandas merge_asof supports 'by' argument!
@@ -148,9 +148,10 @@ def main():
     df_finbas_mapped['orgnr'] = df_finbas_mapped['orgnr'].astype('int64')
     df_serrano['orgnr'] = df_serrano['orgnr'].astype('int64')
     
-    # Sort by date for merge_asof
-    df_finbas_mapped = df_finbas_mapped.sort_values('date')
-    df_serrano = df_serrano.sort_values('fiscal_year_end')
+    # Sort for merge_asof (pandas requires 'on' keys globally sorted)
+    # Primary sort by time key to ensure global monotonicity; include 'by' as secondary
+    df_finbas_mapped = df_finbas_mapped.sort_values(['date', 'orgnr'])
+    df_serrano = df_serrano.sort_values(['fiscal_year_end', 'orgnr'])
     
     # Perform merge
     # For each date, get the most recent fiscal year data where fiscal_year_end <= date

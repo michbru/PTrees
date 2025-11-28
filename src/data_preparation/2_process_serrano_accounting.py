@@ -1,5 +1,5 @@
 """
-Step 1: Process Serrano Accounting Data
+Step 2: Process Serrano Accounting Data
 
 This script:
 1. Loads and merges all 10 nyckeltal files (financial ratios)
@@ -94,21 +94,26 @@ BOKSLUT_VARS = {
 
 def load_and_merge_files(file_pattern: str, var_mapping: dict, num_files: int = 10) -> pd.DataFrame:
     """
-    Load and concatenate multiple Stata files efficiently.
-    Selects only needed columns and cleans each file before merging.
+    Load and combine multiple Stata files for one dataset family (nyckeltal or bokslut).
+    - Reads only available columns (intersection with var_mapping keys), robust to schema differences.
+    - Ensures dates are parsed, fiscal_year extracted, and duplicates resolved deterministically.
+    - Concatenates vertically across files (typical Serrano distribution). If files carry different
+      subsets of variables, vertical concat is still safe since columns align by name.
 
     Args:
         file_pattern: Pattern with {} for file number (e.g., 'nyckeltal{}.dta')
-        var_mapping: Dictionary of columns to keep and rename
+        var_mapping: Mapping of raw columns to standardized names
         num_files: Number of files to load (default: 10)
 
     Returns:
-        Merged DataFrame
+        Cleaned, deduplicated DataFrame with standardized column names
     """
     print(f"Loading {file_pattern.replace('{}', '1-' + str(num_files))}...")
 
     dfs = []
     total_rows = 0
+
+    wanted_cols = list(var_mapping.keys())
 
     for i in range(1, num_files + 1):
         file_path = RAW_DIR / file_pattern.format(i)
@@ -118,29 +123,40 @@ def load_and_merge_files(file_pattern: str, var_mapping: dict, num_files: int = 
 
         print(f"  Loading {file_path.name}...", end='', flush=True)
 
-        # Only read columns we need
-        columns_to_read = list(var_mapping.keys())
-        df = pd.read_stata(file_path, columns=columns_to_read)
+        # Attempt to read only needed columns; fall back to full read if unsupported
+        try:
+            df_raw = pd.read_stata(file_path, columns=wanted_cols)
+        except Exception:
+            df_full = pd.read_stata(file_path)
+            available = [c for c in wanted_cols if c in df_full.columns]
+            df_raw = df_full[available].copy()
 
-        print(f" {len(df):,} rows -> ", end='', flush=True)
+        print(f" {len(df_raw):,} rows -> ", end='', flush=True)
 
         # Clean immediately to reduce memory
-        df = clean_orgnr(df)
-        df = extract_fiscal_year(df)
-        df = remove_duplicates(df, subset=['ORGNR', 'fiscal_year'])
+        df_raw = clean_orgnr(df_raw)
+        df_raw = ensure_datetime_columns(df_raw)
+        df_raw = extract_fiscal_year(df_raw)
+        df_raw = remove_duplicates(df_raw, subset=['ORGNR', 'fiscal_year'])
 
-        print(f"{len(df):,} rows after cleaning")
+        # Rename standardized columns and keep only mapped + fiscal_year
+        df_tidy = rename_columns(df_raw, var_mapping)
 
-        total_rows += len(df)
-        dfs.append(df)
+        print(f"{len(df_tidy):,} rows after cleaning")
+
+        total_rows += len(df_tidy)
+        dfs.append(df_tidy)
+
+    if not dfs:
+        return pd.DataFrame(columns=[v for v in var_mapping.values()] + ['fiscal_year'])
 
     # Concatenate all files
-    print(f"  Merging all files...")
+    print(f"  Concatenating all files...")
     merged = pd.concat(dfs, ignore_index=True)
-    print(f"  Total after merge: {len(merged):,} rows")
+    print(f"  Total after concat: {len(merged):,} rows")
 
-    # Final dedup across all files
-    merged = remove_duplicates(merged, subset=['ORGNR', 'fiscal_year'])
+    # Final dedup across all files on standardized cols
+    merged = remove_duplicates(merged, subset=['orgnr', 'fiscal_year'])
     print(f"  Total after final dedup: {len(merged):,} rows")
 
     return merged
@@ -175,6 +191,15 @@ def extract_fiscal_year(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
+def ensure_datetime_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Ensure date columns are proper datetimes when present."""
+    df = df.copy()
+    if 'BSLSLUT' in df.columns:
+        df['BSLSLUT'] = pd.to_datetime(df['BSLSLUT'], errors='coerce')
+    if 'BSLSTART' in df.columns:
+        df['BSLSTART'] = pd.to_datetime(df['BSLSTART'], errors='coerce')
+    return df
+
 def rename_columns(df: pd.DataFrame, var_mapping: dict) -> pd.DataFrame:
     """Rename columns according to mapping, keep only mapped columns + fiscal_year."""
     # Select only columns that exist in the mapping
@@ -201,11 +226,42 @@ def remove_duplicates(df: pd.DataFrame, subset: list) -> pd.DataFrame:
     """
     before = len(df)
     
-    # Ensure we have the date column for sorting
+    # Build robust sort keys to make dedup deterministic.
+    # Prefer active status if present, then latest fiscal year end date.
+    sort_cols = []
+    asc = []
+
+    if 'ORGNR' in df.columns:
+        sort_cols.append('ORGNR'); asc.append(True)
+    elif 'orgnr' in df.columns:
+        sort_cols.append('orgnr'); asc.append(True)
+
+    # Prefer active rows (STATUS or active_status)
+    if 'STATUS' in df.columns:
+        sort_cols.append('STATUS'); asc.append(False)
+    elif 'active_status' in df.columns:
+        sort_cols.append('active_status'); asc.append(False)
+
+    # Fiscal year end date desc
     if 'BSLSLUT' in df.columns:
-        # Sort by ORGNR and BSLSLUT (descending) so the latest report comes first
-        df = df.sort_values(by=['ORGNR', 'BSLSLUT'], ascending=[True, False])
-    
+        # Ensure dtype
+        if not np.issubdtype(df['BSLSLUT'].dtype, np.datetime64):
+            df['BSLSLUT'] = pd.to_datetime(df['BSLSLUT'], errors='coerce')
+        sort_cols.append('BSLSLUT'); asc.append(False)
+    elif 'fiscal_year_end' in df.columns:
+        if not np.issubdtype(df['fiscal_year_end'].dtype, np.datetime64):
+            df['fiscal_year_end'] = pd.to_datetime(df['fiscal_year_end'], errors='coerce')
+        sort_cols.append('fiscal_year_end'); asc.append(False)
+
+    # BSTYP/accounting_type as final tie-breaker (ascending as a stable order)
+    if 'BSTYP' in df.columns:
+        sort_cols.append('BSTYP'); asc.append(True)
+    elif 'accounting_type' in df.columns:
+        sort_cols.append('accounting_type'); asc.append(True)
+
+    if sort_cols:
+        df = df.sort_values(by=sort_cols, ascending=asc, kind='mergesort')
+
     df = df.drop_duplicates(subset=subset, keep='first')
     after = len(df)
 
@@ -220,7 +276,7 @@ def remove_duplicates(df: pd.DataFrame, subset: list) -> pd.DataFrame:
 
 def main():
     print("=" * 80)
-    print("STEP 1: PROCESS SERRANO ACCOUNTING DATA")
+    print("STEP 2: PROCESS SERRANO ACCOUNTING DATA")
     print("=" * 80)
     print()
 
@@ -229,8 +285,11 @@ def main():
     # -------------------------------------------------------------------------
     print("1. Loading nyckeltal files (financial ratios)...")
     nyckeltal = load_and_merge_files('nyckeltal{}.dta', NYCKELTAL_VARS, num_files=10)
-    nyckeltal = rename_columns(nyckeltal, NYCKELTAL_VARS)
     print(f"  Final nyckeltal: {len(nyckeltal):,} rows, {len(nyckeltal.columns)} columns")
+    if not nyckeltal.empty:
+        dup_nyc = nyckeltal.duplicated(subset=['orgnr', 'fiscal_year']).sum()
+        if dup_nyc:
+            raise ValueError(f"Nyckeltal contains {dup_nyc} duplicate (orgnr, fiscal_year) rows after cleaning.")
     print()
 
     # -------------------------------------------------------------------------
@@ -238,8 +297,11 @@ def main():
     # -------------------------------------------------------------------------
     print("2. Loading bokslut files (balance sheets)...")
     bokslut = load_and_merge_files('bokslut{}.dta', BOKSLUT_VARS, num_files=10)
-    bokslut = rename_columns(bokslut, BOKSLUT_VARS)
     print(f"  Final bokslut: {len(bokslut):,} rows, {len(bokslut.columns)} columns")
+    if not bokslut.empty:
+        dup_bok = bokslut.duplicated(subset=['orgnr', 'fiscal_year']).sum()
+        if dup_bok:
+            raise ValueError(f"Bokslut contains {dup_bok} duplicate (orgnr, fiscal_year) rows after cleaning.")
     print()
 
     # -------------------------------------------------------------------------
@@ -259,6 +321,17 @@ def main():
         suffixes=('', '_nyc')
     )
     print(f"  Merged: {len(merged):,} rows, {len(merged.columns)} columns")
+    if not merged.empty:
+        dup_mrg = merged.duplicated(subset=['orgnr', 'fiscal_year']).sum()
+        if dup_mrg:
+            raise ValueError(f"Merged dataset contains {dup_mrg} duplicate (orgnr, fiscal_year) keys.")
+    # Sanity: fiscal_year_end year vs fiscal_year
+    if 'fiscal_year_end' in merged.columns:
+        fy_end = pd.to_datetime(merged['fiscal_year_end'], errors='coerce')
+        match_rate = np.nan
+        if 'fiscal_year' in merged.columns:
+            match_rate = (fy_end.dt.year == merged['fiscal_year']).mean()
+            print(f"  Sanity: fiscal_year_end year matches fiscal_year in {match_rate*100:.1f}% of rows")
     print()
 
     # -------------------------------------------------------------------------
@@ -277,6 +350,15 @@ def main():
     print(f"  Unique companies (ORGNR): {merged['orgnr'].nunique():,}")
     print(f"  Fiscal years: {merged['fiscal_year'].min()} to {merged['fiscal_year'].max()}")
     print(f"  Total observations: {len(merged):,}")
+    # Coverage on key variables
+    key_cols = [
+        'sales', 'total_assets', 'book_equity',
+        'roa', 'roe', 'equity_ratio',
+    ]
+    for col in key_cols:
+        if col in merged.columns:
+            cov = merged[col].notna().mean() * 100
+            print(f"  Coverage {col}: {cov:.1f}%")
     print()
 
     print("  Sample of data:")
@@ -288,7 +370,7 @@ def main():
     print()
 
     print("=" * 80)
-    print("STEP 1 COMPLETE!")
+    print("STEP 2 COMPLETE!")
     print("=" * 80)
 
 if __name__ == '__main__':

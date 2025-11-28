@@ -1,8 +1,9 @@
 """
-Build ISIN-ORGNR Mapping from LSEG (Automated)
-===============================================
-This script creates automated mappings using LSEG TaxID and name matching.
-Manual mappings are kept separate and merged later.
+Step 3: Build ISIN-ORGNR Mapping (Automated via LSEG)
+=====================================================
+This script creates automated mappings using LSEG TaxID and conservative
+name matching against Serrano. Manual mappings are kept separate and merged
+later (Step 4).
 
 Output: data/mappings/automated/isin_orgnr_automated.csv
 """
@@ -15,7 +16,7 @@ import time
 import re
 
 FINBAS_PATH = Path('data/intermediate/finbas/finbas_daily_clean.csv')
-SERRANO_PATH = Path('data/raw/serrano/Stata_2025/bokslut1.dta')
+SERRANO_RAW_DIR = Path('data/raw/serrano/Stata_2025')
 OUTPUT_AUTO = Path('data/mappings/automated/isin_orgnr_automated.csv')
 
 
@@ -46,17 +47,27 @@ def connect_lseg():
         return False
 
 
-def extract_orgnr(tax_id):
-    """Extract 10-digit Swedish ORGNR from TaxID."""
-    if pd.isna(tax_id) or not isinstance(tax_id, str):
+def extract_orgnr(tax_id: str) -> int | None:
+    """Extract a 10-digit Swedish ORGNR from a TaxID string.
+
+    - Uppercase and strip; drop leading 'SE' if present
+    - Remove all non-digits (hyphens, spaces)
+    - If 12 digits ending with '01', drop trailing two (common VAT form)
+    - Return 10-digit integer or None
+    """
+    if pd.isna(tax_id):
         return None
-    clean = tax_id.upper().strip()
-    if clean.startswith('SE'):
-        clean = clean[2:]
-    if len(clean) == 12 and clean.endswith('01'):
-        clean = clean[:-2]
-    if len(clean) == 10 and clean.isdigit():
-        return int(clean)
+    s = str(tax_id).upper().strip()
+    if s.startswith('SE'):
+        s = s[2:]
+    s = re.sub(r'[^0-9]', '', s)
+    if len(s) == 12 and s.endswith('01'):
+        s = s[:-2]
+    if len(s) == 10 and s.isdigit():
+        try:
+            return int(s)
+        except Exception:
+            return None
     return None
 
 
@@ -77,14 +88,15 @@ def normalize_name(name):
 
 
 def main():
-    print("=" * 70)
-    print("BUILDING AUTOMATED ISIN-ORGNR MAPPING (LSEG)")
-    print("=" * 70)
+    print("=" * 80)
+    print("STEP 3: BUILD AUTOMATED ISIN-ORGNR MAPPING (LSEG)")
+    print("=" * 80)
 
     # Load ISINs
     print("\n[1] Loading ISINs...")
     df_finbas = pd.read_csv(FINBAS_PATH, usecols=['isin', 'name'])
-    unique_isins = df_finbas['isin'].unique().tolist()
+    df_finbas['isin'] = df_finbas['isin'].astype(str).str.upper().str.strip()
+    unique_isins = df_finbas['isin'].dropna().unique().tolist()
     print(f"  Found {len(unique_isins)} unique ISINs")
 
     # Connect to LSEG
@@ -105,6 +117,9 @@ def main():
         except Exception as e:
             print(f"  Batch {i//batch_size + 1} failed: {e}")
 
+    if not all_results:
+        print("  No results returned from LSEG.")
+        return
     df_lseg = pd.concat(all_results, ignore_index=True)
 
     # Normalize columns
@@ -124,10 +139,15 @@ def main():
     for col in ['isin', 'company_name', 'org_perm_id', 'tax_id', 'hq_country']:
         if col not in df_lseg.columns:
             df_lseg[col] = None
+    df_lseg['isin'] = df_lseg['isin'].astype(str).str.upper().str.strip()
+    df_lseg['company_name'] = df_lseg['company_name'].astype(str)
 
     # Strategy 1: Extract ORGNR from TaxID
     print("\n[3] Extracting ORGNR from TaxID...")
-    df_lseg['orgnr'] = df_lseg['tax_id'].apply(extract_orgnr)
+    is_se_hq = (df_lseg['hq_country'].astype(str).str.upper() == 'SE')
+    taxid_orgnr = df_lseg['tax_id'].apply(extract_orgnr)
+    taxid_is_se = df_lseg['tax_id'].astype(str).str.upper().str.startswith('SE')
+    df_lseg['orgnr'] = taxid_orgnr.where(is_se_hq | taxid_is_se, other=None)
     df_lseg['method'] = 'none'
     df_lseg.loc[df_lseg['orgnr'].notna(), 'method'] = 'lseg_taxid'
 
@@ -135,33 +155,60 @@ def main():
     print(f"  Mapped {strategy1_count} ISINs via TaxID")
 
     # Strategy 2: Name matching
-    print("\n[4] Name matching with Serrano...")
-    if SERRANO_PATH.exists():
-        df_serrano = pd.read_stata(SERRANO_PATH, columns=['ORGNR', 'KOMNAMN'], iterator=True).read(100000)
-        serrano_names = df_serrano[['ORGNR', 'KOMNAMN']].drop_duplicates()
-        serrano_names = serrano_names[serrano_names['KOMNAMN'].notna()]
-        serrano_names['name_norm'] = serrano_names['KOMNAMN'].apply(normalize_name)
+    print("\n[4] Name matching with Serrano (conservative)...")
+    serrano_frames = []
+    for i in range(1, 11):
+        f = SERRANO_RAW_DIR / f'bokslut{i}.dta'
+        if not f.exists():
+            continue
+        try:
+            df_ser = pd.read_stata(f, columns=['ORGNR', 'KOMNAMN'])
+        except Exception:
+            df_ser = pd.read_stata(f)[['ORGNR', 'KOMNAMN']]
+        serrano_frames.append(df_ser)
+
+    if serrano_frames:
+        df_serrano = pd.concat(serrano_frames, ignore_index=True)
+        serrano_names = df_serrano[['ORGNR', 'KOMNAMN']].dropna()
+        serrano_names = serrano_names.rename(columns={'ORGNR': 'orgnr', 'KOMNAMN': 'name'})
+        serrano_names['name_norm'] = serrano_names['name'].apply(normalize_name)
         serrano_names = serrano_names[serrano_names['name_norm'] != '']
-        serrano_lookup = serrano_names.set_index('name_norm')['ORGNR'].to_dict()
+
+        grp = serrano_names.groupby('name_norm')['orgnr']
+        unique_mask = grp.transform('nunique') == 1
+        serrano_unique = serrano_names[unique_mask].drop_duplicates('name_norm')
+        serrano_lookup = serrano_unique.set_index('name_norm')['orgnr'].to_dict()
 
         unmapped = df_lseg[df_lseg['orgnr'].isna()].copy()
         unmapped['name_norm'] = unmapped['company_name'].apply(normalize_name)
         unmapped = unmapped[unmapped['name_norm'] != '']
         unmapped['orgnr_matched'] = unmapped['name_norm'].map(serrano_lookup)
 
-        df_lseg = df_lseg.set_index('isin')
-        for isin, orgnr in zip(unmapped['isin'], unmapped['orgnr_matched']):
-            if pd.notna(orgnr):
-                df_lseg.loc[isin, 'orgnr'] = orgnr
-                df_lseg.loc[isin, 'method'] = 'name_matching'
-        df_lseg = df_lseg.reset_index()
-
+        to_apply = unmapped[unmapped['orgnr_matched'].notna()][['isin', 'orgnr_matched']]
+        if not to_apply.empty:
+            df_lseg = df_lseg.set_index('isin')
+            for isin, orgnr in to_apply.itertuples(index=False):
+                if pd.notna(orgnr) and isin in df_lseg.index:
+                    if pd.isna(df_lseg.loc[isin, 'orgnr']):
+                        df_lseg.loc[isin, 'orgnr'] = int(orgnr)
+                        df_lseg.loc[isin, 'method'] = 'name_matching'
+            df_lseg = df_lseg.reset_index()
         strategy2_count = (df_lseg['method'] == 'name_matching').sum()
-        print(f"  Mapped {strategy2_count} ISINs via name matching")
+        print(f"  Mapped {strategy2_count} ISINs via name matching (unique names only)")
     else:
+        print("  No Serrano bokslut files found for name matching.")
         strategy2_count = 0
 
     # Save automated mappings only
+    # Finalize: standardize dtypes, deduplicate by ISIN with method priority
+    method_rank = {'lseg_taxid': 1, 'name_matching': 2, 'none': 99}
+    if 'method' not in df_lseg.columns:
+        df_lseg['method'] = 'none'
+    df_lseg['method_rank'] = df_lseg['method'].map(method_rank).fillna(99)
+    df_lseg['orgnr'] = pd.to_numeric(df_lseg['orgnr'], errors='coerce').astype('Int64')
+    df_lseg = df_lseg.sort_values(['isin', 'method_rank'])
+    df_lseg = df_lseg.drop_duplicates(subset=['isin'], keep='first')
+
     total_auto = df_lseg['orgnr'].notna().sum()
     print(f"\n[5] Saving automated mappings...")
     print(f"  Total automated: {total_auto} ISINs")
@@ -170,9 +217,9 @@ def main():
     df_lseg.to_csv(OUTPUT_AUTO, index=False)
     print(f"  Saved: {OUTPUT_AUTO}")
 
-    print("\n" + "=" * 70)
+    print("\n" + "=" * 80)
     print("SUMMARY")
-    print("=" * 70)
+    print("=" * 80)
     print(f"  LSEG TaxID:      {strategy1_count} ISINs")
     print(f"  Name matching:   {strategy2_count} ISINs")
     print(f"  " + "-" * 32)
