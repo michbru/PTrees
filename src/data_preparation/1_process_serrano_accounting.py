@@ -1,243 +1,295 @@
 """
-================================================================================
-STEP 1: PROCESS SERRANO ACCOUNTING DATA
-================================================================================
+Step 1: Process Serrano Accounting Data
 
-PURPOSE:
-    Extract and consolidate Swedish accounting ratios from Serrano database
-    Stata files (nyckeltal1-10) into a single normalized dataset.
+This script:
+1. Loads and merges all 10 nyckeltal files (financial ratios)
+2. Loads and merges all 10 bokslut files (balance sheets)
+3. Keeps only relevant variables for our characteristics
+4. Saves to data/intermediate/serrano/serrano_accounting.csv
 
-INPUT:
-    - data/raw/serrano/Stata_2025/nyckeltal{1-10}.dta (10 Stata files)
-
-OUTPUT:
-    - data/intermediate/serrano_nyckeltal_full.csv
-
-WHAT THIS DOES:
-    1. Reads 10 Stata files containing pre-calculated accounting ratios
-       - Each file covers different company-year observations
-       - Total: ~666k firm-year observations from 1997-2024
-    
-    2. Extracts 12 key accounting ratios per company-year:
-       - Profitability: ROE, ROA, operating margin, net margin, profit %
-       - Liquidity: Cash liquidity ratio
-       - Leverage: Equity ratio, debt ratio
-       - Efficiency: Capital turnover, inventory turnover, receivables turnover
-       - Productivity: Revenue per employee
-    
-    3. Standardizes company identifiers:
-       - Converts ORGNR (Swedish organization number) to string format
-       - Removes hyphens: "556223-9227" → "5562239227"
-       - ORGNR is the key for matching with stock data via ISIN mapping
-    
-    4. Removes duplicate records:
-       - Keeps most recent fiscal year-end when multiple exist
-       - Deduplicates on [ORGNR, year]
-
-WHY WE DO THIS:
-    - Serrano provides comprehensive Swedish accounting data not available in LSEG
-    - Pre-calculated ratios (nyckeltal) are faster than computing from raw statements
-    - ORGNR is the Swedish standard company identifier needed for data integration
-    - Consolidated file simplifies downstream merging with stock data
-
-ASSUMPTIONS & LIMITATIONS:
-    1. Publication Timing:
-       - 4-month lag is the LEGAL MINIMUM (Årsredovisningslagen)
-       - Some companies may publish later, but we can't detect this from data
-       - Being conservative (using minimum) avoids look-ahead bias
-
-    2. Fiscal Year-End:
-       - Most Swedish companies use Dec 31 fiscal year-end
-       - Non-Dec 31 fiscal years are handled correctly via BSLSLUT date
-       - Example: June 30 fiscal year → 4 months → October availability
-
-    3. Data Quality:
-       - When duplicate company-years exist, keep='last' assumes latest is most accurate
-       - This handles fiscal year changes (e.g., company switched from Jun→Dec)
-       - Missing ratios are preserved as NaN (handled downstream)
-       
-    4. BSTYP Field (Individual vs Consolidated Accounts):
-       - BSTYP = "B" (Bokslut): Individual company accounts
-       - BSTYP = "K" (Koncern): Consolidated group accounts
-       - When a company has both B and K records for same year, K comes last alphabetically
-       - Combined with sort + drop_duplicates(keep='last'), this keeps consolidated accounts
-       - Consolidated accounts are preferred for stock analysis (full group picture)
-       - NOTE: This is accidental but beneficial behavior (not explicitly programmed)
-
-    4. ORGNR Standardization:
-       - Stata stores as float64, converted to string for merging
-       - Removes hyphens and spaces for consistency
-       - Critical for matching with ISIN mapping table
-
-VERIFICATION STATUS (2025-01-26):
-    ✓ Lag calculation verified with concrete examples
-    ✓ BSTYP handling verified (keeps K/consolidated correctly)
-    ✓ ORGNR type conversion verified
-    ✓ Output file format confirmed compatible with Step 2
-
-Author: Michael
-Date: 2025-01-23
-================================================================================
+Date: 2025-11-28
 """
 
 import pandas as pd
 import numpy as np
 from pathlib import Path
-import glob
-import os
+import warnings
+warnings.filterwarnings('ignore')
 
-def clean_orgnr(val):
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+
+RAW_DIR = Path('data/raw/serrano/Stata_2025')
+OUTPUT_DIR = Path('data/intermediate/serrano')
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# Key variables we need from the Serrano data
+# Based on VARIABLE_REGISTRY.py characteristics
+
+NYCKELTAL_VARS = {
+    # Identifiers and dates (always keep)
+    'ORGNR': 'orgnr',
+    'BSLSTART': 'fiscal_year_start',
+    'BSLSLUT': 'fiscal_year_end',
+    'BSTYP': 'accounting_type',
+
+    # Financial ratios (from nyckeltal files)
+    'AVKEGKAP': 'roe',  # Return on equity
+    'AVKTOTKAP': 'roa',  # Return on assets
+    'KAPOMS': 'asset_turnover',  # Asset turnover
+    'RORMARG': 'operating_margin',  # Operating margin
+    'NETTOMARG': 'net_margin',  # Net margin
+    'FONTOMS': 'sales_growth',  # Sales growth
+    'SKULDGRAD': 'debt_equity_ratio',  # Debt/Equity
+    'SOLIDITET': 'equity_ratio',  # Equity/Assets
+    'KASSLIKV': 'quick_ratio',  # Quick ratio
+}
+
+BOKSLUT_VARS = {
+    # Identifiers (always keep)
+    'ORGNR': 'orgnr',
+    'BSLSTART': 'fiscal_year_start',
+    'BSLSLUT': 'fiscal_year_end',
+
+    # Income statement items
+    'NTOMS': 'sales',  # Net sales
+    'RAVAR': 'cogs_materials',  # Cost of goods sold - materials
+    'HANDVAR': 'cogs_goods',  # Cost of goods sold - goods
+    'PERSKOS': 'personnel_expense',  # Personnel expenses
+    'AVSKRIV': 'depreciation',  # Depreciation
+    'RORRESUL': 'operating_income',  # Operating profit/loss
+    'RTEINEXT': 'interest_income',  # External interest income
+    'RTEKOEXT': 'interest_expense',  # External interest expense
+    'SKATTER': 'tax_expense',  # Taxes
+    'RESAR': 'net_income',  # Net profit/loss
+
+    # Balance sheet - Assets
+    'TILLGSU': 'total_assets',  # Total assets
+    'ANLTSU': 'fixed_assets',  # Total fixed assets
+    'IMANLSU': 'intangible_assets',  # Intangible fixed assets
+    'MATANLSU': 'tangible_assets',  # Tangible fixed assets (PPE)
+    'BYGGMARK': 'ppe_buildings',  # Buildings and land
+    'MASKINV': 'ppe_machinery',  # Machinery and equipment
+    'OMSTGSU': 'current_assets',  # Total current assets
+    'LAGERSU': 'inventory',  # Total inventories
+    'KABASU': 'cash',  # Liquid assets (cash)
+    'KUNDFORD': 'receivables',  # Accounts receivable
+
+    # Balance sheet - Equity and Liabilities
+    'EKSU': 'book_equity',  # Total equity
+    'AKTIEKAP': 'share_capital',  # Share capital
+    'LSKSU': 'long_term_debt',  # Total non-current liabilities
+    'KSKSU': 'current_liabilities',  # Total current liabilities
+    'KSKLEV': 'accounts_payable',  # Accounts payable
+
+    # Other useful items
+    'ANTANST': 'num_employees',  # Number of employees
+    'STATUS': 'active_status',  # Active at year end
+}
+
+# =============================================================================
+# FUNCTIONS
+# =============================================================================
+
+def load_and_merge_files(file_pattern: str, var_mapping: dict, num_files: int = 10) -> pd.DataFrame:
     """
-    Convert Swedish organization numbers (ORGNR) to standardized string format.
+    Load and concatenate multiple Stata files efficiently.
+    Selects only needed columns and cleans each file before merging.
 
-    WHY NEEDED: Stata files store ORGNR as float64 (5562239227.0), but our
-                ISIN mapping uses strings ("5562239227"). Without this, the
-                merge will fail with a dtype mismatch error.
+    Args:
+        file_pattern: Pattern with {} for file number (e.g., 'nyckeltal{}.dta')
+        var_mapping: Dictionary of columns to keep and rename
+        num_files: Number of files to load (default: 10)
 
-    Examples:
-        5562239227.0    →  "5562239227"  (Stata float)
-        "556223-9227"   →  "5562239227"  (formatted string)
-        5562239227      →  "5562239227"  (integer)
+    Returns:
+        Merged DataFrame
     """
-    try:
-        s = str(val).strip()
-        s = s.replace('-', '').replace(' ', '')
-        if s.endswith('.0'):
-            s = s[:-2]  # Slice off trailing '.0' from float conversion
-        return s
-    except:
-        return str(val)  # Fallback to prevent pipeline crash
+    print(f"Loading {file_pattern.replace('{}', '1-' + str(num_files))}...")
 
-def process_serrano_accounting():
-    """Process all Serrano nyckeltal files into a single dataset."""
+    dfs = []
+    total_rows = 0
 
-    all_data = []
+    for i in range(1, num_files + 1):
+        file_path = RAW_DIR / file_pattern.format(i)
+        if not file_path.exists():
+            print(f"  Warning: {file_path} not found, skipping...")
+            continue
 
-    # Path(__file__).parent gets directory containing this script
-    # .resolve() converts relative path to absolute path (for cross-platform compatibility)
-    script_dir = Path(__file__).parent
-    base_path = (script_dir / '../../data/raw/serrano/Stata_2025').resolve()
+        print(f"  Loading {file_path.name}...", end='', flush=True)
 
-    # glob.glob() finds files matching pattern (* wildcard matches any characters)
-    # sorted() ensures consistent file order (important for reproducibility)
-    files = sorted(glob.glob(str(base_path / 'nyckeltal*.dta')))
+        # Only read columns we need
+        columns_to_read = list(var_mapping.keys())
+        df = pd.read_stata(file_path, columns=columns_to_read)
 
-    if not files:
-        print(f"Error: No nyckeltal files found in {base_path}")
-        return pd.DataFrame()
+        print(f" {len(df):,} rows -> ", end='', flush=True)
 
-    print(f"Processing {len(files)} Serrano files...")
+        # Clean immediately to reduce memory
+        df = clean_orgnr(df)
+        df = extract_fiscal_year(df)
+        df = remove_duplicates(df, subset=['ORGNR', 'fiscal_year'])
 
-    # enumerate(files, 1) provides both index (starting at 1) and item from list
-    for idx, stata_file in enumerate(files, 1):
-        try:
-            file_name = os.path.basename(stata_file)  # Extract filename from full path
+        print(f"{len(df):,} rows after cleaning")
 
-            df = pd.read_stata(stata_file)  # Read Stata .dta format
-            print(f"  [{idx}/{len(files)}] {file_name}: {len(df):,} records", end="")  # end="" continues on same line
+        total_rows += len(df)
+        dfs.append(df)
 
-            # Extract year from fiscal year-end date
-            # BSLSLUT = Swedish "Balance Sheet End Date" (fiscal year-end)
-            df['BSLSLUT'] = pd.to_datetime(df['BSLSLUT'])
-            df['year'] = df['BSLSLUT'].dt.year  # .dt accessor for datetime operations
-            
-            # Rename Swedish column names to English
-            df = df.rename(columns={
-                'AVKEGKAP': 'roe',                    # Return on Equity
-                'AVKTOTKAP': 'roa',                   # Return on Assets
-                'RORMARG': 'operating_margin',        # Operating Margin
-                'NETTOMARG': 'net_margin',            # Net Margin
-                'KASSLIKV': 'cash_liquidity',         # Cash Liquidity
-                'SOLIDITET': 'equity_ratio',          # Equity Ratio (Solidity)
-                'SKULDGRAD': 'debt_ratio',            # Debt Ratio
-                'KAPOMS': 'capital_turnover',         # Capital Turnover
-                'LAGPAGOMS': 'inventory_turnover',    # Inventory Turnover
-                'FONTOMS': 'receivables_turnover',    # Receivables Turnover
-                'OMSPANST': 'revenue_per_employee',   # Revenue per Employee
-                'VINSTPCT': 'profit_pct'              # Profit Percentage
-            })
+    # Concatenate all files
+    print(f"  Merging all files...")
+    merged = pd.concat(dfs, ignore_index=True)
+    print(f"  Total after merge: {len(merged):,} rows")
 
-            # Standardize ORGNR format (critical for merging with stock data)
-            # .apply() vectorizes function application across all rows
-            df['orgnr'] = df['ORGNR'].apply(clean_orgnr)
-            
-            # CRITICAL: Calculate when accounting data becomes publicly available
-            # Prevents look-ahead bias: Can't trade on Dec 31, 2011 data on Jan 1, 2012
-            # Swedish law: Reports published within 4 months of fiscal year-end
-            # Source: Årsredovisningslagen (SFS 1995:1554), Chapter 7, §1
-            # Example: FY ends Dec 31, 2011 → Available April 2012
+    # Final dedup across all files
+    merged = remove_duplicates(merged, subset=['ORGNR', 'fiscal_year'])
+    print(f"  Total after final dedup: {len(merged):,} rows")
 
-            df['fiscal_month'] = df['BSLSLUT'].dt.month
-            df['available_month'] = df['fiscal_month'] + 4  # Add 4-month publication lag
-            df['available_year'] = df['year']
+    return merged
 
-            # Handle year rollover (e.g., Oct 31 + 4 months = Feb next year)
-            # .loc[] boolean indexing: select rows where condition is True
-            year_rollover = df['available_month'] > 12
-            df.loc[year_rollover, 'available_year'] += 1
-            df.loc[year_rollover, 'available_month'] -= 12
+def clean_orgnr(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert ORGNR to integer and remove any invalid values."""
+    df = df.copy()
 
-            # Store as accounting_year/month for join logic in next script
-            df['accounting_year'] = df['available_year']
-            df['accounting_month'] = df['available_month']
-            
-            # Select relevant columns only
-            cols = ['orgnr', 'year', 'BSLSLUT', 'accounting_year', 'accounting_month',
-                    'roe', 'roa', 'operating_margin',
-                    'net_margin', 'cash_liquidity', 'equity_ratio', 'debt_ratio',
-                    'capital_turnover', 'inventory_turnover', 'receivables_turnover',
-                    'revenue_per_employee', 'profit_pct']
+    # Convert to integer (some might be float)
+    df['ORGNR'] = df['ORGNR'].astype('Int64')
 
-            # List comprehension: filter for columns that exist (some files may be missing cols)
-            available_cols = [c for c in cols if c in df.columns]
-            df_subset = df[available_cols].copy()  # .copy() prevents SettingWithCopyWarning
+    # Remove any NaN or zero ORGNR
+    before = len(df)
+    df = df[df['ORGNR'].notna() & (df['ORGNR'] > 0)]
+    after = len(df)
 
-            all_data.append(df_subset)
-            print(f" → {len(df_subset):,} final")
+    if before > after:
+        print(f"  Removed {before - after:,} rows with invalid ORGNR")
 
-        except Exception as e:
-            print(f"\nWarning: Could not process {os.path.basename(stata_file)}: {e}")
-            continue  # Skip to next file if this one fails
+    return df
+
+def extract_fiscal_year(df: pd.DataFrame) -> pd.DataFrame:
+    """Extract fiscal year from BSLSLUT (end date)."""
+    df = df.copy()
+
+    # Critical: Drop rows where BSLSLUT is missing. 
+    # A report without a date cannot be used.
+    df = df.dropna(subset=['BSLSLUT'])
+
+    # Extract year from fiscal year end date
+    df['fiscal_year'] = pd.to_datetime(df['BSLSLUT']).dt.year
+
+    return df
+
+def rename_columns(df: pd.DataFrame, var_mapping: dict) -> pd.DataFrame:
+    """Rename columns according to mapping, keep only mapped columns + fiscal_year."""
+    # Select only columns that exist in the mapping
+    existing_cols = [col for col in var_mapping.keys() if col in df.columns]
+
+    # Also keep fiscal_year if it exists (created in extract_fiscal_year)
+    if 'fiscal_year' in df.columns:
+        cols_to_keep = existing_cols + ['fiscal_year']
+    else:
+        cols_to_keep = existing_cols
+
+    df_subset = df[cols_to_keep].copy()
+
+    # Rename to our standardized names
+    df_subset = df_subset.rename(columns=var_mapping)
+
+    return df_subset
+
+def remove_duplicates(df: pd.DataFrame, subset: list) -> pd.DataFrame:
+    """
+    Remove duplicate rows, keeping the entry with the latest fiscal year end date.
+    This handles cases where a company has multiple reports in the same year 
+    (e.g., restructuring).
+    """
+    before = len(df)
     
-    # Combine all files into single dataset
-    if not all_data:
-        print("\nError: No data processed.")
-        return pd.DataFrame()
-
-    print(f"\nConsolidating...")
-    # pd.concat() stacks DataFrames vertically
-    # ignore_index=True resets row numbers (0, 1, 2, ...) instead of preserving original indices
-    combined = pd.concat(all_data, ignore_index=True)
-
-    # Sort by company, year, then fiscal year-end date
-    # kind='mergesort' = stable sort (preserves order of equal elements)
-    combined = combined.sort_values(['orgnr', 'year', 'BSLSLUT'], kind='mergesort')
-
-    # Remove duplicate company-years (keep most recent fiscal year-end)
-    # Example: Company changed fiscal year from Jun 30 → Dec 31 in 2012 → keep Dec 31
-    before_dedup = len(combined)
-    # drop_duplicates: subset defines what makes a duplicate, keep='last' chooses which to keep
-    combined = combined.drop_duplicates(subset=['orgnr', 'year'], keep='last')
-    duplicates_removed = before_dedup - len(combined)
+    # Ensure we have the date column for sorting
+    if 'BSLSLUT' in df.columns:
+        # Sort by ORGNR and BSLSLUT (descending) so the latest report comes first
+        df = df.sort_values(by=['ORGNR', 'BSLSLUT'], ascending=[True, False])
     
-    # Save consolidated dataset
-    output_file = (script_dir / '../../data/intermediate/serrano_nyckeltal_full.csv').resolve()
-    combined.to_csv(output_file, index=False)  # index=False: don't write row numbers as column
+    df = df.drop_duplicates(subset=subset, keep='first')
+    after = len(df)
 
-    # Print summary statistics
-    print(f"\n{'='*80}")
-    print("SERRANO ACCOUNTING DATA PROCESSED")
-    print(f"{'='*80}")
-    print(f"  Records:             {len(combined):,}")  # :, adds thousands separator
-    print(f"  Unique companies:    {combined['orgnr'].nunique():,}")  # .nunique() counts distinct values
-    print(f"  Period:              {combined['year'].min()}-{combined['year'].max()}")
-    print(f"  Duplicates removed:  {duplicates_removed:,}")
-    print(f"  Publication lag:     4 months (Swedish Annual Accounts Act)")
-    print(f"  Output:              {output_file.name}")  # .name extracts filename from Path object
-    print(f"{'='*80}\n")
+    if before > after:
+        print(f"  Removed {before - after:,} duplicate rows")
 
-    return combined
+    return df
 
-# __name__ == '__main__': only runs when script executed directly (not imported)
+# =============================================================================
+# MAIN PROCESSING
+# =============================================================================
+
+def main():
+    print("=" * 80)
+    print("STEP 1: PROCESS SERRANO ACCOUNTING DATA")
+    print("=" * 80)
+    print()
+
+    # -------------------------------------------------------------------------
+    # 1. Load and merge nyckeltal files (financial ratios)
+    # -------------------------------------------------------------------------
+    print("1. Loading nyckeltal files (financial ratios)...")
+    nyckeltal = load_and_merge_files('nyckeltal{}.dta', NYCKELTAL_VARS, num_files=10)
+    nyckeltal = rename_columns(nyckeltal, NYCKELTAL_VARS)
+    print(f"  Final nyckeltal: {len(nyckeltal):,} rows, {len(nyckeltal.columns)} columns")
+    print()
+
+    # -------------------------------------------------------------------------
+    # 2. Load and merge bokslut files (balance sheets)
+    # -------------------------------------------------------------------------
+    print("2. Loading bokslut files (balance sheets)...")
+    bokslut = load_and_merge_files('bokslut{}.dta', BOKSLUT_VARS, num_files=10)
+    bokslut = rename_columns(bokslut, BOKSLUT_VARS)
+    print(f"  Final bokslut: {len(bokslut):,} rows, {len(bokslut.columns)} columns")
+    print()
+
+    # -------------------------------------------------------------------------
+    # 3. Merge nyckeltal and bokslut
+    # -------------------------------------------------------------------------
+    print("3. Merging nyckeltal and bokslut...")
+    # Drop duplicate columns from nyckeltal before merging
+    nyckeltal_cols_to_drop = ['fiscal_year_start', 'fiscal_year_end', 'accounting_type']
+    nyckeltal = nyckeltal.drop(columns=[col for col in nyckeltal_cols_to_drop if col in nyckeltal.columns])
+
+    # Merge on orgnr and fiscal_year
+    merged = pd.merge(
+        bokslut,
+        nyckeltal,
+        on=['orgnr', 'fiscal_year'],
+        how='left',  # Keep all bokslut records
+        suffixes=('', '_nyc')
+    )
+    print(f"  Merged: {len(merged):,} rows, {len(merged.columns)} columns")
+    print()
+
+    # -------------------------------------------------------------------------
+    # 4. Save to CSV
+    # -------------------------------------------------------------------------
+    output_file = OUTPUT_DIR / 'serrano_accounting.csv'
+    print(f"4. Saving to {output_file}...")
+    merged.to_csv(output_file, index=False)
+    print(f"  Saved {len(merged):,} rows, {len(merged.columns)} columns")
+    print()
+
+    # -------------------------------------------------------------------------
+    # 5. Summary statistics
+    # -------------------------------------------------------------------------
+    print("5. Summary statistics:")
+    print(f"  Unique companies (ORGNR): {merged['orgnr'].nunique():,}")
+    print(f"  Fiscal years: {merged['fiscal_year'].min()} to {merged['fiscal_year'].max()}")
+    print(f"  Total observations: {len(merged):,}")
+    print()
+
+    print("  Sample of data:")
+    print(merged.head())
+    print()
+
+    print("  Data types:")
+    print(merged.dtypes)
+    print()
+
+    print("=" * 80)
+    print("STEP 1 COMPLETE!")
+    print("=" * 80)
+
 if __name__ == '__main__':
-    process_serrano_accounting()
+    main()

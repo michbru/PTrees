@@ -1,0 +1,112 @@
+================================================================================
+PROMPT FOR AI BROWSER AGENT
+================================================================================
+
+TASK: Find Swedish organization numbers (ORGNR) for unmapped companies
+
+INPUT FILE: data/intermediate/unmapped_isins_for_manual_lookup.csv
+
+OUTPUT FILE: data/intermediate/manual_mappings_from_ai.csv
+
+OUTPUT FORMAT (CSV):
+isin,orgnr,company_name,source_url,notes
+
+================================================================================
+INSTRUCTIONS
+================================================================================
+
+For each row in the INPUT FILE:
+
+1. SEARCH for Swedish ORGNR:
+   Search: "[company_name] Sweden ORGNR organization number"
+
+2. PRIMARY SOURCE (check first):
+   - allabolag.se - Most reliable Swedish company registry
+   - Look for "Org.nr" or "Organisationsnummer"
+   - Format: XXXXXX-XXXX (10 digits with hyphen)
+
+3. VALIDATE ORGNR:
+   - Must be exactly 10 digits (remove hyphen)
+   - Remove "SE" prefix if present (that's VAT format)
+   - Remove "01" suffix if present (that's VAT suffix)
+   - Final result: 10 digits only
+
+4. SPECIAL CASES:
+   a) FOREIGN COMPANY (no Swedish ORGNR):
+      - If company is from Luxembourg, Malta, UK, Bermuda, etc.
+      - Output: isin,FOREIGN,company_name,source_url,foreign_company_[COUNTRY]
+
+   b) INACTIVE/DELISTED:
+      - If no recent trading (check last_date column)
+      - Output: isin,DELISTED,company_name,source_url,no_trading_since_[DATE]
+
+   c) ACQUIRED/MERGED:
+      - If company was acquired or merged
+      - Find parent company ORGNR
+      - Output: isin,[PARENT_ORGNR],company_name,source_url,acquired_by_[PARENT]
+
+5. VERIFICATION:
+   After finding ORGNR, verify by searching:
+   "ORGNR [number]"
+   This should return the SAME company name.
+
+================================================================================
+EXAMPLES
+================================================================================
+
+Example 1 - Swedish Company:
+Input: SE0012454072,Avanza Bank Holding AB,SE,205.06,376081,2020-12-30,77186641.86
+Search: "Avanza Bank Holding AB Sweden ORGNR"
+Found: allabolag.se shows 556274-8458
+Validate: Remove hyphen = 5562748458 (10 digits ✓)
+Verify: Search "ORGNR 5562748458" confirms Avanza Bank ✓
+Output: SE0012454072,5562748458,Avanza Bank Holding AB,https://www.allabolag.se/5562748458,verified
+
+Example 2 - Foreign Company:
+Input: SE0001174970,Millicom International Cellular SA,LU,258.42,960357,2020-12-30,248177101.94
+Search: "Millicom International Cellular SA Sweden ORGNR"
+Found: Company is from Luxembourg (hq_country=LU)
+Output: SE0001174970,FOREIGN,Millicom International Cellular SA,https://millicom.com,foreign_company_luxembourg
+
+Example 3 - Delisted:
+Input: SE0000100182,Linde Sverige AB,SE,,,
+Search: "Linde Sverige AB Sweden ORGNR"
+Found: No recent data, likely delisted
+Output: SE0000100182,DELISTED,Linde Sverige AB,none,no_trading_data
+
+================================================================================
+REQUIRED OUTPUT FORMAT
+================================================================================
+
+Create CSV file with these exact columns:
+isin,orgnr,company_name,source_url,notes
+
+Rules:
+- orgnr: 10-digit number OR "FOREIGN" OR "DELISTED"
+- source_url: Where you found the information
+- notes: "verified" OR "foreign_company_[COUNTRY]" OR "delisted" OR "acquired_by_[PARENT]"
+
+================================================================================
+PRIORITY ORDER
+================================================================================
+
+Process companies in ORDER of market_cap_proxy (highest first).
+The INPUT FILE is already sorted by importance.
+
+Focus on companies with:
+- last_date >= 2020 (still actively trading)
+- high avg_volume (liquid stocks)
+
+Skip or mark as DELISTED if:
+- last_date is empty or before 2015
+- avg_volume is very low or empty
+
+================================================================================
+START PROCESSING
+================================================================================
+
+Load: data/intermediate/unmapped_isins_for_manual_lookup.csv
+Output to: data/intermediate/manual_mappings_from_ai.csv
+
+Process ALL rows in the file.
+Return the complete CSV file with all results.

@@ -111,8 +111,8 @@ cat("X:", dim(X), "| Z:", dim(Z), "\n")
 
 min_leaf_size <- 3        
 max_depth <- 12           
-num_iter <- 15            
-num_cutpoints <- 20       
+num_iter <- 8            
+num_cutpoints <- 4       
 
 # Regularization
 # We use low regularization because we have a lot of data (months) relative to the number of factors.
