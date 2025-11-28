@@ -1,28 +1,30 @@
 """
-Step 3: Merge Datasets with Lagging
-===================================
+Step 5: Merge Datasets (Simple Merge - No Lagging)
+===================================================
 This script merges the daily Finbas market data with the annual Serrano accounting data.
 
-Lagging Strategy:
------------------
-To avoid look-ahead bias, we assume accounting data becomes available to investors
-6 months after the fiscal year end. This is a standard academic assumption (Fama-French).
+Strategy:
+---------
+Simple merge without lagging to verify data alignment first.
+For each date in Finbas, we match the most recent fiscal year data available
+based on fiscal_year_end <= date.
+
+Lagging will be applied in a separate step after verifying this merge works correctly.
 
 Logic:
 1. Load Finbas (Daily) and Serrano (Annual).
 2. Load ISIN-ORGNR Mapping.
 3. Add ORGNR to Finbas.
-4. Create 'available_date' in Serrano = fiscal_year_end + 6 months.
-5. Perform 'merge_asof':
+4. Perform 'merge_asof':
    - For each Finbas row (date t), find the most recent Serrano row 
-     where available_date <= t.
+     where fiscal_year_end <= t.
    - Group by ORGNR.
-6. Save merged dataset.
+5. Save merged dataset.
 
 Input:
   - data/intermediate/finbas/finbas_daily_clean.csv
   - data/intermediate/serrano/serrano_accounting.csv
-  - data/intermediate/isin_orgnr_mapping.csv
+  - data/intermediate/isin_orgnr_mapping_final.csv
 
 Output:
   - data/intermediate/merged_data_daily.csv
@@ -38,10 +40,8 @@ SERRANO_PATH = Path('data/intermediate/serrano/serrano_accounting.csv')
 MAPPING_PATH = Path('data/intermediate/isin_orgnr_mapping_final.csv')
 OUTPUT_PATH = Path('data/intermediate/merged_data_daily.csv')
 
-LAG_MONTHS = 6
-
 def main():
-    print("Step 3: Merging Datasets with Lagging...")
+    print("Step 5: Merging Datasets with Lagging...")
     
     # 1. Load Data
     print("  Loading datasets...")
@@ -61,7 +61,14 @@ def main():
     # Create ISIN -> ORGNR map
     # Drop duplicates if any (keep first)
     df_mapping = df_mapping.dropna(subset=['orgnr'])
-    df_mapping['orgnr'] = df_mapping['orgnr'].astype(int)
+    
+    # Clean ORGNR: remove hyphens and convert to int64
+    # Some manual entries have format like '556056-2091' instead of '5560562091'
+    # Swedish ORGNRs are 10 digits (e.g., 5562239227) which exceeds int32 max (2147483647)
+    # So we must use int64 to avoid overflow
+    df_mapping['orgnr'] = df_mapping['orgnr'].astype(str).str.replace('-', '', regex=False)
+    df_mapping['orgnr'] = pd.to_numeric(df_mapping['orgnr'], errors='coerce').astype('Int64')
+    
     isin_map = df_mapping.set_index('isin')['orgnr'].to_dict()
     
     # 3. Add ORGNR to Finbas
@@ -76,16 +83,14 @@ def main():
     print(f"    {mapped_rows:,} / {len(df_finbas):,} Finbas rows have mapped ORGNR ({mapped_rows/len(df_finbas)*100:.1f}%)")
     
     # 4. Prepare Serrano for Merge
-    print("  Preparing accounting data (Lagging)...")
+    print("  Preparing accounting data...")
     
     # Ensure dates are datetime
     df_serrano['fiscal_year_end'] = pd.to_datetime(df_serrano['fiscal_year_end'])
+    df_serrano['fiscal_year_start'] = pd.to_datetime(df_serrano['fiscal_year_start'])
     
-    # Create available_date = fiscal_year_end + 6 months
-    df_serrano['available_date'] = df_serrano['fiscal_year_end'] + pd.DateOffset(months=LAG_MONTHS)
-    
-    # Sort for asof merge
-    df_serrano = df_serrano.sort_values('available_date')
+    # Sort for asof merge (by fiscal_year_end)
+    df_serrano = df_serrano.sort_values('fiscal_year_end')
     
     # 5. Merge (asof)
     print("  Performing as-of merge...")
@@ -109,37 +114,36 @@ def main():
     df_finbas_mapped = df_finbas.dropna(subset=['orgnr']).copy()
     df_finbas_unmapped = df_finbas[df_finbas['orgnr'].isna()].copy()
     
-    df_finbas_mapped['orgnr'] = df_finbas_mapped['orgnr'].astype(int)
-    # Serrano orgnr is already int (from load or step 1) but let's ensure
-    df_serrano['orgnr'] = df_serrano['orgnr'].astype(int)
+    df_finbas_mapped['orgnr'] = df_finbas_mapped['orgnr'].astype('Int64')
+    # Serrano orgnr should already be int64, but let's ensure
+    df_serrano['orgnr'] = df_serrano['orgnr'].astype('Int64')
     
     # Sort by date for merge_asof
     df_finbas_mapped = df_finbas_mapped.sort_values('date')
-    df_serrano = df_serrano.sort_values('available_date')
+    df_serrano = df_serrano.sort_values('fiscal_year_end')
     
     # Perform merge
-    # left_on='date', right_on='available_date'
-    # by='orgnr'
+    # For each date, get the most recent fiscal year data where fiscal_year_end <= date
+    # This means we're using accounting data AS SOON AS the fiscal year ends
+    # (no lag applied - we'll add that in a separate step if needed)
     merged_mapped = pd.merge_asof(
         df_finbas_mapped,
         df_serrano,
         left_on='date',
-        right_on='available_date',
+        right_on='fiscal_year_end',
         by='orgnr',
-        direction='backward' # Find the latest available_date <= date
+        direction='backward' # Find the latest fiscal_year_end <= date
     )
     
     # Concatenate back with unmapped (which will have NaN for accounting)
     # Ensure columns match
-    # Get accounting columns from serrano (excluding join keys if needed)
-    acct_cols = [c for c in df_serrano.columns if c not in ['orgnr', 'available_date']]
+    # Get accounting columns from serrano (excluding join key)
+    acct_cols = [c for c in df_serrano.columns if c not in ['orgnr']]
     
     # For unmapped, add these columns as NaN
     for col in acct_cols:
-        df_finbas_unmapped[col] = np.nan
-        
-    # Also 'available_date'
-    df_finbas_unmapped['available_date'] = pd.NaT
+        if col not in df_finbas_unmapped.columns:
+            df_finbas_unmapped[col] = np.nan
     
     # Combine
     df_final = pd.concat([merged_mapped, df_finbas_unmapped], ignore_index=True)
@@ -155,18 +159,29 @@ def main():
     
     # Validation
     print("\n  Validation:")
-    sample = df_final.dropna(subset=['sales']).head(1)
+    sample = df_final.dropna(subset=['sales']).head(5)
     if not sample.empty:
-        print("    Sample row with accounting data:")
-        print(f"      Date: {sample.iloc[0]['date']}")
-        print(f"      Available Date: {sample.iloc[0]['available_date']}")
-        print(f"      Fiscal Year End: {sample.iloc[0]['fiscal_year_end']}")
-        lag = (sample.iloc[0]['date'] - sample.iloc[0]['fiscal_year_end']).days
-        print(f"      Actual Lag: {lag} days")
-        if lag < 180:
-             print("      [WARNING] Lag is less than 180 days!")
-        else:
-             print("      [OK] Lag is sufficient.")
+        print("    Sample rows with accounting data:")
+        for idx, row in sample.iterrows():
+            print(f"\n    Row {idx}:")
+            print(f"      ISIN: {row['isin']}")
+            print(f"      Date: {row['date']}")
+            print(f"      Fiscal Year End: {row['fiscal_year_end']}")
+            print(f"      Fiscal Year: {row['fiscal_year']}")
+            lag_days = (pd.to_datetime(row['date']) - pd.to_datetime(row['fiscal_year_end'])).days
+            print(f"      Days since fiscal year end: {lag_days}")
+            if lag_days < 0:
+                print(f"      [ERROR] Fiscal year end is AFTER the date! Data leak!")
+            else:
+                print(f"      [OK] Fiscal year end is before the date.")
+    
+    # Summary statistics
+    print("\n  Merge Statistics:")
+    total_rows = len(df_final)
+    rows_with_accounting = df_final['sales'].notna().sum()
+    print(f"    Total rows: {total_rows:,}")
+    print(f"    Rows with accounting data: {rows_with_accounting:,} ({rows_with_accounting/total_rows*100:.1f}%)")
+    print(f"    Rows without accounting: {total_rows - rows_with_accounting:,}")
 
 if __name__ == "__main__":
     main()

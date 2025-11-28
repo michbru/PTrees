@@ -2,8 +2,8 @@
 Merge Automated and Manual ISIN-ORGNR Mappings
 ===============================================
 Combines:
-  - Automated mappings from LSEG (2_build_isin_orgnr_mapping_LSEG.py)
-  - Manual mappings (data/intermediate/manual_mappings.csv)
+  - Automated mappings from LSEG (3_build_isin_orgnr_mapping_LSEG.py)
+  - Manual mappings (data/manual_mappings/isin_orgnr_manual.csv)
 
 Manual mappings take priority over automated ones.
 
