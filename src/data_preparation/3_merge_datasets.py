@@ -35,7 +35,7 @@ from pathlib import Path
 # Config
 FINBAS_PATH = Path('data/intermediate/finbas/finbas_daily_clean.csv')
 SERRANO_PATH = Path('data/intermediate/serrano/serrano_accounting.csv')
-MAPPING_PATH = Path('data/intermediate/isin_orgnr_mapping.csv')
+MAPPING_PATH = Path('data/intermediate/isin_orgnr_mapping_final.csv')
 OUTPUT_PATH = Path('data/intermediate/merged_data_daily.csv')
 
 LAG_MONTHS = 6
