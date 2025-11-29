@@ -1,0 +1,228 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>P-Tree Analysis Results - Swedish Stock Market</title>
+<style>
+body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+h2 { color: #34495e; margin-top: 30px; border-left: 4px solid #3498db; padding-left: 10px; }
+.summary-box { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.metric { display: inline-block; margin: 10px 20px; }
+.metric-label { font-size: 12px; color: #7f8c8d; text-transform: uppercase; }
+.metric-value { font-size: 24px; font-weight: bold; color: #2c3e50; }
+.positive { color: #27ae60; }
+.negative { color: #e74c3c; }
+table { width: 100%; border-collapse: collapse; background: white; margin: 20px 0; }
+th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+th { background-color: #3498db; color: white; }
+tr:hover { background-color: #f5f5f5; }
+img { max-width: 100%; height: auto; border-radius: 4px; margin: 20px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.chart-container { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; }
+</style>
+</head>
+<body>
+
+<h1>P-Tree Analysis Results - Swedish Stock Market</h1>
+
+<div class="summary-box">
+<h2>Executive Summary</h2>
+<div class="metric">
+  <div class="metric-label">Sharpe Ratio</div>
+  <div class="metric-value positive">1.25</div>
+</div>
+<div class="metric">
+  <div class="metric-label">Annual Return</div>
+  <div class="metric-value positive">19.07%</div>
+</div>
+<div class="metric">
+  <div class="metric-label">Annual Volatility</div>
+  <div class="metric-value">15.23%</div>
+</div>
+<div class="metric">
+  <div class="metric-label">Max Drawdown</div>
+  <div class="metric-value negative">-44.46%</div>
+</div>
+</div>
+
+<h2>Performance Statistics</h2>
+<table>
+ <thead>
+  <tr>
+   <th style="text-align:left;"> Metric </th>
+   <th style="text-align:left;"> Value </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td style="text-align:left;"> Mean Monthly Return </td>
+   <td style="text-align:left;"> 1.59% </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Std Monthly Return </td>
+   <td style="text-align:left;"> 4.40% </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Sharpe Ratio (Annual) </td>
+   <td style="text-align:left;"> 1.25 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Annualized Return </td>
+   <td style="text-align:left;"> 19.07% </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Annualized Volatility </td>
+   <td style="text-align:left;"> 15.23% </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Max Drawdown </td>
+   <td style="text-align:left;"> -44.46% </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Win Rate (months) </td>
+   <td style="text-align:left;"> 65.9% </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Best Month </td>
+   <td style="text-align:left;"> 16.83% </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Worst Month </td>
+   <td style="text-align:left;"> -14.52% </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Skewness </td>
+   <td style="text-align:left;"> -0.28 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Kurtosis </td>
+   <td style="text-align:left;"> 0.96 </td>
+  </tr>
+</tbody>
+</table>
+
+<h2>Data Coverage</h2>
+<table>
+ <thead>
+  <tr>
+   <th style="text-align:left;"> Metric </th>
+   <th style="text-align:left;"> Value </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td style="text-align:left;"> Time Period </td>
+   <td style="text-align:left;"> 1999-06-30 to 2020-11-30 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Number of Months </td>
+   <td style="text-align:left;"> 258 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Number of Stocks </td>
+   <td style="text-align:left;"> 696 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Total Observations </td>
+   <td style="text-align:left;"> 69830 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Avg Stocks/Month </td>
+   <td style="text-align:left;"> 270.7 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Characteristics Available </td>
+   <td style="text-align:left;"> 40 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Characteristics Used in Tree </td>
+   <td style="text-align:left;"> 3 </td>
+  </tr>
+</tbody>
+</table>
+
+<h2>Visual Analysis</h2>
+
+<div class="chart-container">
+<h3>Cumulative Returns</h3>
+<img src="1_cumulative_returns.png" alt="Cumulative Returns">
+</div>
+
+<div class="chart-container">
+<h3>Returns Distribution</h3>
+<img src="2_returns_distribution.png" alt="Returns Distribution">
+</div>
+
+<div class="chart-container">
+<h3>Rolling Sharpe Ratio</h3>
+<img src="3_rolling_sharpe.png" alt="Rolling Sharpe">
+</div>
+
+<div class="chart-container">
+<h3>Annual Returns</h3>
+<img src="4_annual_returns.png" alt="Annual Returns">
+</div>
+
+<div class="chart-container">
+<h3>Characteristic Usage</h3>
+<img src="5_characteristic_usage.png" alt="Characteristic Usage">
+</div>
+
+<div class="chart-container">
+<h3>Characteristic Importance</h3>
+<img src="6_characteristic_importance.png" alt="Characteristic Importance">
+</div>
+
+<div class="chart-container">
+<h3>Drawdown Analysis</h3>
+<img src="7_drawdown.png" alt="Drawdown">
+</div>
+
+<div class="chart-container">
+<h3>Calendar Heatmap</h3>
+<img src="8_calendar_heatmap.png" alt="Calendar Heatmap">
+</div>
+
+<div class="chart-container">
+<h3>Characteristic Distributions</h3>
+<img src="9_characteristic_distributions.png" alt="Characteristic Distributions">
+</div>
+
+<h2>Tree Structure</h2>
+<div class="summary-box">
+<pre>11
+1 38 -0.9215686275 1 0
+2 0 0 0 0
+3 20 0.8823529412 47 1
+6 38 -0.8823529412 2 2
+12 0 0 0 0
+13 38 -0.8431372549 3 3
+26 0 0 0 0
+27 24 0.7647058824 44 4
+54 0 0 0 0
+55 0 0 0 0
+7 0 0 0 0
+</pre>
+</div>
+
+<h2>Model Configuration</h2>
+<div class="summary-box">
+<ul>
+<li><strong>Boosting Iterations:</strong> 5</li>
+<li><strong>Min Leaf Size:</strong> 3</li>
+<li><strong>Max Depth:</strong> 8</li>
+<li><strong>Num Cutpoints:</strong> 50</li>
+<li><strong>Learning Rate (eta):</strong> 0.3</li>
+<li><strong>Equal Weight:</strong> TRUE</li>
+<li><strong>Regularization:</strong> None (lambda_cov = 0)</li>
+</ul>
+</div>
+
+<p style="text-align: center; color: #7f8c8d; margin-top: 50px;">
+Generated: 2025-11-29 03:03:55
+</p>
+
+</body>
+</html>
+

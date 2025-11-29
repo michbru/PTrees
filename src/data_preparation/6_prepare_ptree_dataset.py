@@ -115,6 +115,43 @@ def calculate_daily_characteristics(df):
 
     return df
 
+def detect_and_adjust_splits(df):
+    """
+    Detect stock splits/reverse splits in daily data and mark affected months.
+
+    Strategy:
+    - Detect single-day price changes > 200% (likely splits)
+    - These are NOT real returns but corporate actions
+    - We'll flag these for later removal from monthly returns
+    """
+    print("  Detecting stock splits/reverse splits...")
+
+    df = df.sort_values(['isin', 'date'])
+
+    # Calculate daily returns
+    df['daily_ret'] = df.groupby('isin')['close'].pct_change()
+
+    # Flag extreme single-day moves (likely splits/reverse splits)
+    # Use 200% threshold (3x price change) to catch splits
+    split_threshold = 2.0
+    df['potential_split'] = df['daily_ret'].abs() > split_threshold
+
+    splits_detected = df['potential_split'].sum()
+
+    if splits_detected > 0:
+        print(f"    Detected {splits_detected:,} potential split events")
+        print(f"    These will be excluded from return calculations")
+
+        # Show some examples
+        split_examples = df[df['potential_split']][['isin', 'date', 'close', 'daily_ret']].head(5)
+        print(f"\n    Example split events:")
+        for _, row in split_examples.iterrows():
+            print(f"      {row['isin']} on {row['date'].strftime('%Y-%m-%d')}: {row['daily_ret']:.1%} price change")
+    else:
+        print(f"    No splits detected (good!)")
+
+    return df
+
 def aggregate_to_monthly(df):
     """Aggregate daily to monthly (month-end)."""
     print("  Aggregating to monthly...")
@@ -122,16 +159,58 @@ def aggregate_to_monthly(df):
     df = df.sort_values(['isin', 'date'])
     df['year_month'] = df['date'].dt.to_period('M')
 
+    # Detect splits BEFORE aggregating
+    df = detect_and_adjust_splits(df)
+
     # Take last trading day of each month
     df_monthly = df.groupby(['isin', 'year_month']).last().reset_index()
+
+    # CRITICAL FIX: Align all dates to actual month-end
+    # This ensures all stocks in the same month share the same date,
+    # preventing PTrees from treating each unique date as a separate time period
+    print("  Aligning all dates to month-end...")
+    df_monthly['date'] = df_monthly['date'] + pd.offsets.MonthEnd(0)
+
+    # Verify alignment
+    dates_before = df_monthly['year_month'].nunique()
+    dates_after = df_monthly['date'].nunique()
+    print(f"    Year-months: {dates_before}, Unique dates after alignment: {dates_after}")
+    if dates_after > dates_before:
+        print(f"    WARNING: Still have {dates_after - dates_before} extra dates after alignment!")
 
     # Ensure market_cap present: fill with market_cap_filled if available
     if 'market_cap' in df_monthly.columns and 'market_cap_filled' in df_monthly.columns:
         df_monthly['market_cap'] = df_monthly['market_cap'].fillna(df_monthly['market_cap_filled'])
 
     # Calculate monthly returns
+    print("  Calculating monthly returns...")
     df_monthly = df_monthly.sort_values(['isin', 'date'])
     df_monthly['ret_monthly'] = df_monthly.groupby('isin')['close'].pct_change()
+
+    # ADDITIONAL SPLIT DETECTION: Check for extreme monthly returns
+    # These indicate splits that happened on last day of month
+    print("  Detecting splits via extreme monthly returns...")
+    monthly_split_threshold = 0.99  # 99% monthly return (likely split/data error)
+    extreme_monthly = df_monthly['ret_monthly'].abs() > monthly_split_threshold
+
+    # Combine with daily split detection
+    if 'potential_split' in df_monthly.columns:
+        total_splits = df_monthly['potential_split'] | extreme_monthly
+    else:
+        total_splits = extreme_monthly
+
+    split_count = total_splits.sum()
+    if split_count > 0:
+        print(f"    Detected {split_count:,} total split/data error events")
+        print(f"    Setting these monthly returns to NaN")
+
+        # Show some examples before removing
+        examples = df_monthly[total_splits][['isin', 'date', 'ret_monthly', 'market_cap']].head(5)
+        print(f"\n    Example split-affected returns:")
+        for _, row in examples.iterrows():
+            print(f"      {row['isin']} on {row['date'].strftime('%Y-%m-%d')}: {row['ret_monthly']:.2%}")
+
+        df_monthly.loc[total_splits, 'ret_monthly'] = np.nan
 
     print(f"    Monthly observations: {len(df_monthly):,}")
     return df_monthly
@@ -567,6 +646,66 @@ def calculate_coverage(df):
 
     print("  " + "=" * 78)
 
+def validate_data_quality(df):
+    """Validate data quality for PTrees analysis."""
+    print("\n  DATA QUALITY VALIDATION:")
+    print("  " + "=" * 78)
+
+    # Check 1: All dates should be month-end
+    df['is_month_end'] = df['date'] == (df['date'] + pd.offsets.MonthEnd(0))
+    month_end_pct = df['is_month_end'].mean() * 100
+    print(f"    Month-end alignment: {month_end_pct:.1f}% ({df['is_month_end'].sum():,}/{len(df):,})")
+    if month_end_pct < 100:
+        non_me_count = (~df['is_month_end']).sum()
+        print(f"    ⚠️  WARNING: {non_me_count:,} rows are NOT month-end dates!")
+        print(f"        This will cause PTrees to treat each date as separate time period")
+
+    # Check 2: Stocks per time period
+    stocks_per_date = df.groupby('date')['isin'].nunique()
+    print(f"\n    Stocks per month:")
+    print(f"      Min: {stocks_per_date.min()}")
+    print(f"      Median: {stocks_per_date.median():.0f}")
+    print(f"      Mean: {stocks_per_date.mean():.0f}")
+    print(f"      Max: {stocks_per_date.max()}")
+
+    if stocks_per_date.min() < 10:
+        low_count = (stocks_per_date < 10).sum()
+        print(f"    ⚠️  WARNING: {low_count} months have <10 stocks!")
+        print(f"        This can cause overfitting on individual stocks")
+
+    # Check 3: Extreme returns
+    extreme_returns = df['ret_monthly'].abs() > 1.0
+    extreme_pct = extreme_returns.mean() * 100
+    print(f"\n    Extreme returns (|ret| > 100%):")
+    print(f"      Count: {extreme_returns.sum():,} ({extreme_pct:.2f}%)")
+    if extreme_returns.any():
+        print(f"      Max positive: {df['ret_monthly'].max():.2%}")
+        print(f"      Max negative: {df['ret_monthly'].min():.2%}")
+        if extreme_pct > 0.5:
+            print(f"    ⚠️  WARNING: High frequency of extreme returns!")
+            print(f"        Consider winsorizing at 1st/99th percentile")
+
+    # Check 4: Unique dates vs unique months
+    unique_dates = df['date'].nunique()
+    unique_months = df['date'].dt.to_period('M').nunique()
+    print(f"\n    Time period structure:")
+    print(f"      Unique dates: {unique_dates}")
+    print(f"      Unique months: {unique_months}")
+    if unique_dates > unique_months:
+        extra_dates = unique_dates - unique_months
+        print(f"    ⚠️  WARNING: {extra_dates} extra dates beyond expected months!")
+        print(f"        Expected ~{unique_months} dates, found {unique_dates}")
+
+    print("  " + "=" * 78)
+
+    # Return validation status
+    is_valid = (month_end_pct == 100.0 and
+                stocks_per_date.min() >= 10 and
+                unique_dates == unique_months and
+                extreme_pct < 0.5)
+
+    return is_valid
+
 def main():
     print("=" * 80)
     print("Step 6: Prepare P-Tree Dataset with Proper Lagging")
@@ -614,13 +753,22 @@ def main():
     print("\n8. Coverage analysis...")
     calculate_coverage(df_final)
 
-    # 9. Save
-    print(f"\n9. Saving to {OUTPUT_PATH}...")
+    # 9. Data quality validation
+    print("\n9. Data quality validation...")
+    is_valid = validate_data_quality(df_final)
+
+    # 10. Save
+    print(f"\n10. Saving to {OUTPUT_PATH}...")
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     df_final.to_csv(OUTPUT_PATH, index=False)
     print("   Done.")
 
-    # 10. Summary
+    if not is_valid:
+        print("\n" + "!" * 80)
+        print("⚠️  DATA QUALITY WARNINGS DETECTED - Review validation output above")
+        print("!" * 80)
+
+    # 11. Summary
     print("\n" + "=" * 80)
     print("SUMMARY")
     print("=" * 80)

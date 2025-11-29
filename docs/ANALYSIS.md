@@ -4,7 +4,7 @@ This folder contains a small, modular analysis pipeline to train P-Tree factors 
 
 ## Prerequisites
 
-- R with the `PTree` package available. If missing, install from the authors' repository.
+- R with the `PTree` package available (install from the authors' repository).
 - The dataset `data/processed/ptree_dataset_monthly.csv` created by Step 6.
 
 ## Steps
@@ -23,14 +23,21 @@ This folder contains a small, modular analysis pipeline to train P-Tree factors 
      `results/analysis/models/ptree_unboosted_summary.csv`
 
 3) Train Boosted Trees (A3)
-   - Rmd: `src/analysis/03_train_boosted.Rmd` (to be added)
-   - Trains several trees with boosting (H contains prior factors), saves combined factor matrix and summary.
+  - Script: `src/analysis/03_train_boosted.R`
+  - Trains several trees with boosting (H contains prior factors), saves combined factor matrix and summary.
 
 4) Robustness (A4)
-   - Rmd: `src/analysis/04_robustness.Rmd` (to be added)
-   - Suggested checks: equal-weight vs value-weight, alternate start dates, parameter sweeps for `min_leaf_size` and `num_cutpoints`, and rolling-window OOS if time permits.
+  - Script: `src/analysis/04_robustness.R`
+  - Runs: equal-weight vs value-weight, alternate start dates, and a small parameter sweep.
 
-## Running
+5) Factor Diagnostics (A5)
+  - Script: `src/analysis/05_factor_diagnostics.R`
+  - Computes stats, t-stats, correlations; saves cumulative plots.
+
+6) In/Out-of-Sample Split (A6)
+  - Script: `src/analysis/06_oos_validation.R`
+  - Splits the sample (train to 2010-12-31, test after) and refits on each subset to assess stability (not strict OOS due to no predict()).
+
 ## Running
 
 Run from the repo root with Rscript:
@@ -38,6 +45,10 @@ Run from the repo root with Rscript:
 ```
 Rscript src/analysis/01_prepare_inputs.R
 Rscript src/analysis/02_train_unboosted.R
+Rscript src/analysis/03_train_boosted.R
+Rscript src/analysis/04_robustness.R
+Rscript src/analysis/05_factor_diagnostics.R
+Rscript src/analysis/06_oos_validation.R
 ```
 
 Proceed with boosted training and robustness once the basic factor is validated.

@@ -23,6 +23,12 @@ out_rds  <- file.path(out_dir, "ptree_inputs.rds")
 
 min_date <- as.IDate("1999-06-01")   # start date used in analysis
 cov_thr  <- 0.30                      # 30% non-zero coverage threshold
+use_excess <- tolower(Sys.getenv("PTREE_USE_EXCESS")) %in% c("1","true","yes","y")
+macro_path <- Sys.getenv("PTREE_MACRO_PATH")
+if (use_excess && !nzchar(macro_path)) {
+  # Default expected location if not overridden
+  macro_path <- file.path(repo_root, "data", "raw", "FamaFrench2020", "FF4F_monthly.csv")
+}
 
 cat("\n=== A1: PREPARE P-TREE INPUTS ===\n")
 cat("Repo root:", repo_root, "\n")
@@ -41,16 +47,32 @@ cat("Loaded:", nrow(dt), "rows x", ncol(dt), "cols\n")
 dt <- dt[date >= min_date]
 cat("Filtered from", as.character(min_date), "->", nrow(dt), "rows\n\n")
 
-# Characteristic coverage filter
+# Identify characteristics
 char_cols <- grep("^rank_", names(dt), value = TRUE)
+
+# Remove zero-variance characteristics (e.g. rank_zerotrade)
+# This prevents issues with models that expect variation
+vars <- sapply(dt[, ..char_cols], function(x) var(x, na.rm = TRUE))
+drop_zero_var_chars <- names(vars)[vars == 0 | is.na(vars)]
+if (length(drop_zero_var_chars) > 0) {
+  cat("Dropping zero-variance characteristics:", paste(drop_zero_var_chars, collapse=", "), "\n")
+  char_cols <- setdiff(char_cols, drop_zero_var_chars)
+}
+
+# Characteristic coverage filter
 nonzero_share <- sapply(char_cols, function(c) mean(dt[[c]] != 0, na.rm = TRUE))
 keep_chars <- names(nonzero_share)[nonzero_share >= cov_thr]
-drop_chars <- setdiff(char_cols, keep_chars)
+drop_low_coverage_chars <- setdiff(char_cols, keep_chars)
 
-cat("All characteristics:", length(char_cols), "\n")
+cat("All characteristics (after zero-variance filter):", length(char_cols), "\n")
+# Drop known collinear feature
+if ("rank_chcsho" %in% keep_chars && "rank_ni" %in% keep_chars) {
+  keep_chars <- setdiff(keep_chars, "rank_chcsho")
+  cat("Dropped collinear feature: rank_chcsho\n")
+}
 cat("Kept (>=", cov_thr * 100, "%) :", length(keep_chars), "\n")
-if (length(drop_chars)) {
-  cat("Dropped (low coverage):", paste(drop_chars, collapse = ", "), "\n")
+if (length(drop_low_coverage_chars)) {
+  cat("Dropped (coverage <", cov_thr, "):", paste(drop_low_coverage_chars, collapse=", "), "\n")
 }
 cat("\n")
 
@@ -59,9 +81,38 @@ cand_instr <- c("rank_me", "rank_bm", "rank_mom12m", "rank_roa", "rank_gma", "ra
 instr <- intersect(cand_instr, keep_chars)
 cat("Instruments:", ifelse(length(instr)>0, paste(instr, collapse = ", "), "<none>"), "\n\n")
 
+# Build returns: excess or raw
+ret_col <- "ret_monthly"
+if (use_excess) {
+  if (!file.exists(macro_path)) stop(sprintf("PTREE_USE_EXCESS=TRUE but macro file not found: %s", macro_path))
+  macro <- fread(macro_path)
+  if (!"ym" %in% names(macro)) {
+    if ("date" %in% names(macro)) macro[, ym := format(as.IDate(date), "%Y-%m")] else stop("Macro file must have 'ym' or 'date'")
+  }
+  dt[, ym := format(date, "%Y-%m")]
+  if (!("RF" %in% names(macro) || "rf" %in% names(macro))) stop("Macro file must contain risk-free column 'RF' or 'rf'")
+  rfcol <- if ("RF" %in% names(macro)) "RF" else "rf"
+  rf <- macro[, .(ym, rf = get(rfcol))]
+  dt <- merge(dt, rf, by = "ym", all.x = TRUE)
+  if (dt$rf[1] > 1) dt[, rf := rf/100]  # handle percent format
+  dt[, xret := ret_monthly - rf]
+  ret_col <- "xret"
+  cat("Using EXCESS returns (xret) computed from risk-free in:", macro_path, "\n")
+}
+
+# Fix Look-Ahead Bias: Predict NEXT month's return
+cat("Creating lead returns (target = t+1)...\n")
+setkey(dt, isin, date)
+dt[, ret_next := shift(get(ret_col), type = "lead"), by = isin]
+
+# Remove rows where target is NA (last month of each stock)
+dt <- dt[!is.na(ret_next)]
+cat("Filtered NA targets ->", nrow(dt), "rows\n")
+
 # Build objects for PTree
 X <- as.matrix(dt[, ..keep_chars])
-R <- as.vector(dt$ret_monthly)
+# Scale returns to PERCENT to match P-Tree defaults
+R <- as.vector(dt$ret_next) * 100
 Y <- R
 Z <- cbind(Intercept = 1, if (length(instr)>0) as.matrix(dt[, ..instr]) else NULL)
 
@@ -95,5 +146,5 @@ inputs <- list(
 
 saveRDS(inputs, out_rds)
 cat("Saved:", normalizePath(out_rds, mustWork = FALSE), "\n")
-cat("Observations:", nrow(dt), "| Months:", num_months, "| Stocks:", num_stocks, "\n\n")
-
+cat("Observations:", nrow(dt), "| Months:", num_months, "| Stocks:", num_stocks, "\n")
+cat("Target: next-month return (lead of", ret_col, ") scaled to percent\n\n")
