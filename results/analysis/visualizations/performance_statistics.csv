@@ -1,12 +1,12 @@
 Metric,Value
-Mean Monthly Return,1.59%
-Std Monthly Return,4.40%
-Sharpe Ratio (Annual),1.25
-Annualized Return,19.07%
-Annualized Volatility,15.23%
-Max Drawdown,-44.46%
-Win Rate (months),65.9%
-Best Month,16.83%
-Worst Month,-14.52%
-Skewness,-0.28
-Kurtosis,0.96
+Mean Monthly Return,0.62%
+Std Monthly Return,0.99%
+Sharpe Ratio (Annual),2.15
+Annualized Return,7.39%
+Annualized Volatility,3.44%
+Max Drawdown,Inf%
+Win Rate (months),75.2%
+Best Month,3.57%
+Worst Month,-2.81%
+Skewness,0.02
+Kurtosis,0.60

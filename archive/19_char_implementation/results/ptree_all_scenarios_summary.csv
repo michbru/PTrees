@@ -1,4 +1,0 @@
-"Scenario","Period","Months","Tree1_Nodes","Tree1_Sharpe","Tree2_Sharpe","Tree3_Sharpe","Runtime_Sec"
-"A: Full Sample","1998-02-27 to 2022-12-30",299,7,1.271,1.347,1.207,1.4
-"B: Time Split","1998-02-27 to 2009-12-30",143,19,2.836,1.497,2.498,1.2
-"C: Reverse Split","2010-01-29 to 2022-12-30",156,7,1.152,0.986,0.823,0.7

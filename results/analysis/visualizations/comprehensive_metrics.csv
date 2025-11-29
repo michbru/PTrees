@@ -1,0 +1,16 @@
+Metric,Value
+--- Factor Performance ---,""
+Annualized Return,7.39%
+Annualized Volatility,3.44%
+Sharpe Ratio,2.15
+Max Drawdown,Inf%
+Skewness,0.02
+Kurtosis,0.60
+--- Regression Alphas ---,""
+CAPM Alpha (Ann.),7.40% (t=9.78)
+FF3 Alpha (Ann.),7.21% (t=10.92)
+FF4 Alpha (Ann.),7.47% (t=10.42)
+--- Model Fit (R-Squared) ---,""
+CAPM Adj. R2,0.025
+FF3 Adj. R2,0.081
+FF4 Adj. R2,0.083

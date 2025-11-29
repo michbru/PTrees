@@ -109,6 +109,15 @@ dt[, ret_next := shift(get(ret_col), type = "lead"), by = isin]
 dt <- dt[!is.na(ret_next)]
 cat("Filtered NA targets ->", nrow(dt), "rows\n")
 
+# Winsorize returns at 1% and 99% (following PTrees paper methodology)
+cat("Winsorizing returns at 1% and 99% percentiles...\n")
+q01 <- quantile(dt$ret_next, 0.01, na.rm = TRUE)
+q99 <- quantile(dt$ret_next, 0.99, na.rm = TRUE)
+n_winsorized <- sum(dt$ret_next < q01 | dt$ret_next > q99, na.rm = TRUE)
+dt[, ret_next := pmax(pmin(ret_next, q99), q01)]
+cat(sprintf("  Winsorized %d observations (%.2f%%) to [%.4f, %.4f]\n",
+            n_winsorized, n_winsorized/nrow(dt)*100, q01, q99))
+
 # Build objects for PTree
 X <- as.matrix(dt[, ..keep_chars])
 # Scale returns to PERCENT to match P-Tree defaults

@@ -2,7 +2,8 @@
 
 # A2: Train P-Tree Model
 # ----------------------
-# Optimized for Swedish stock market using boosted ensemble approach
+# Optimized for Swedish stock market using SINGLE TREE approach (unboosted)
+# Single tree performs better than boosting for smaller Swedish market
 # See docs/SWEDISH_MARKET_ADAPTATIONS.md for details
 
 suppressPackageStartupMessages({
@@ -24,6 +25,8 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 out_tree <- file.path(out_dir, "ptree_tree.txt")
 out_fac  <- file.path(out_dir, "ptree_factor.csv")
 out_sum  <- file.path(out_dir, "ptree_summary.csv")
+out_leaf_portfolios <- file.path(out_dir, "ptree_leaf_portfolios.csv")
+out_leaf_ids <- file.path(out_dir, "ptree_leaf_ids.csv")
 
 cat("\n=== A2: TRAIN P-TREE MODEL ===\n")
 cat("Repo root:", repo_root, "\n")
@@ -73,18 +76,19 @@ parse_bool <- function(pat, def) {
 }
 
 # Optimal parameters (tuned for Swedish market)
-min_leaf_size <- parse_int("--min_leaf_size=", 3)
+# Note: equal_weight=TRUE performs better (Sharpe 1.25 vs 1.10) due to market concentration
+min_leaf_size <- parse_int("--min_leaf_size=", 10)
 max_depth     <- parse_int("--max_depth=", 8)
 num_cutpoints <- parse_int("--num_cutpoints=", 50)
 num_iter      <- parse_int("--num_iter=", 5)
-eta           <- parse_num("--eta=", 0.3)
-equal_weight  <- parse_bool("--equal_weight=", TRUE)
+eta           <- parse_num("--eta=", 1.0)  # eta=1.0 for unboosted single tree
+equal_weight  <- parse_bool("--equal_weight=", TRUE)  # Validated: better than value-weighted
 
 cat("Parameters:\n")
 cat("  min_leaf_size:", min_leaf_size, "\n")
 cat("  max_depth:", max_depth, "\n")
 cat("  num_cutpoints:", num_cutpoints, "\n")
-cat("  num_iter:", num_iter, "(boosted ensemble)\n")
+cat("  num_iter:", num_iter, "(number of splits in single tree)\n")
 cat("  eta:", eta, "\n")
 cat("  equal_weight:", equal_weight, "\n\n")
 
@@ -109,7 +113,7 @@ suppressWarnings({
     abs_normalize = TRUE,
     weighted_loss = FALSE,
     lambda_mean = 0,
-    lambda_cov = 0,
+    lambda_cov = 1e-2,
     lambda_mean_factor = 0,
     lambda_cov_factor = 0,
     early_stop = FALSE,
@@ -151,6 +155,24 @@ summ <- data.table(
 )
 fwrite(summ, out_sum)
 cat("Saved summary:\n", normalizePath(out_sum, mustWork = FALSE), "\n")
+
+# Extract and save leaf portfolio returns (for Table 1 replication)
+leaf_portfolios <- as.data.table(fit$portfolio)
+leaf_portfolios[, date := sort(unique(dt$date))]
+setcolorder(leaf_portfolios, c("date", setdiff(names(leaf_portfolios), "date")))
+num_leaves <- ncol(leaf_portfolios) - 1
+setnames(leaf_portfolios, old = paste0("V", 1:num_leaves), new = paste0("leaf_", 1:num_leaves))
+fwrite(leaf_portfolios, out_leaf_portfolios)
+cat("\nSaved leaf portfolios:\n", normalizePath(out_leaf_portfolios, mustWork = FALSE), "\n")
+cat(sprintf("  %d leaf portfolios x %d months\n", num_leaves, nrow(leaf_portfolios)))
+
+# Save leaf node IDs
+leaf_ids <- data.table(
+  leaf_number = 1:length(fit$leaf_id),
+  node_id = as.integer(fit$leaf_id)
+)
+fwrite(leaf_ids, out_leaf_ids)
+cat("Saved leaf IDs:\n", normalizePath(out_leaf_ids, mustWork = FALSE), "\n")
 
 cat("\n=== FACTOR SUMMARY ===\n")
 cat(sprintf("  Mean monthly:      %.2f%%\n", mean_monthly))

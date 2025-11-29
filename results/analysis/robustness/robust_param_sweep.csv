@@ -1,5 +1,0 @@
-min_leaf_size,num_cutpoints,mean_monthly,std_monthly,sharpe_annual
-3,5,0.949,6.016,0.547
-3,10,0.949,6.016,0.547
-5,5,0.949,6.016,0.547
-5,10,0.949,6.016,0.547
