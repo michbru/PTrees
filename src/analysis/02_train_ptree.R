@@ -95,7 +95,7 @@ train_ptree <- function(train_data, scenario_name, num_iter=1, eta=1.0) {
       lambda_mean_factor = 0,
       lambda_cov_factor = 0,
       early_stop = FALSE,
-      stop_threshold = 0.95,
+      stop_threshold = 0.999,
       lambda_ridge = 0,
       a1 = 0, a2 = 0,
       list_K = matrix(rep(0, 3), nrow = 3, ncol = 1),

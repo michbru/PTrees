@@ -49,8 +49,19 @@ dt <- dt[date >= min_date & date <= max_date]
 cat("Filtered period:", as.character(min_date), "to", as.character(max_date), "->", nrow(dt), "rows\n")
 cat("  (Constrained by Fama-French factor availability through 2019-12)\n\n")
 
+
 # Identify characteristics
 char_cols <- grep("^rank_", names(dt), value = TRUE)
+
+# Force numeric conversion for characteristics
+# This handles cases where "NA" strings or other issues caused character loading
+cat("Ensuring all characteristics are numeric...\n")
+for (col in char_cols) {
+  if (!is.numeric(dt[[col]])) {
+    cat("  Converting", col, "to numeric...\n")
+    set(dt, j=col, value=as.numeric(dt[[col]]))
+  }
+}
 
 # Remove zero-variance characteristics (e.g. rank_zerotrade)
 # This prevents issues with models that expect variation
