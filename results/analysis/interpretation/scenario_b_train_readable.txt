@@ -1,0 +1,27 @@
+P-Tree with 11 splits:
+
+Split 1: Asset Growth (rank_agr)
+  Threshold: 0.020
+  Left (≤ 0.020): Node 25
+  Right (> 0.020): Node 0
+
+Split 2: Specific Variance (rank_svar)
+  Threshold: -0.765
+  Left (≤ -0.765): Node 5
+  Right (> -0.765): Node 1
+
+Split 3: Return on Assets (rank_roa)
+  Threshold: -0.059
+  Left (≤ -0.059): Node 23
+  Right (> -0.059): Node 2
+
+Split 4: Market Equity (Size) (rank_me)
+  Threshold: 0.216
+  Left (≤ 0.216): Node 30
+  Right (> 0.216): Node 3
+
+Split 5: Net Income (rank_ni)
+  Threshold: 0.373
+  Left (≤ 0.373): Node 34
+  Right (> 0.373): Node 4
+

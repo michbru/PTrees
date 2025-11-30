@@ -1,0 +1,27 @@
+P-Tree with 11 splits:
+
+Split 1: Cash Flow-to-Price (rank_cfp)
+  Threshold: -0.686
+  Left (≤ -0.686): Node 7
+  Right (> -0.686): Node 0
+
+Split 2: Illiquidity (rank_ill)
+  Threshold: 0.608
+  Left (≤ 0.608): Node 40
+  Right (> 0.608): Node 1
+
+Split 3: Bid-Ask Spread (rank_baspread)
+  Threshold: -0.059
+  Left (≤ -0.059): Node 23
+  Right (> -0.059): Node 2
+
+Split 4: 12-Month Momentum (rank_mom12m)
+  Threshold: -0.294
+  Left (≤ -0.294): Node 17
+  Right (> -0.294): Node 3
+
+Split 5: Asset Turnover (rank_ato)
+  Threshold: 0.294
+  Left (≤ 0.294): Node 32
+  Right (> 0.294): Node 4
+

@@ -1,195 +1,183 @@
 #!/usr/bin/env Rscript
 
-# A3: Evaluate Model (Benchmarks & Robustness)
-# --------------------------------------------
-# Part A: Benchmark Regressions (CAPM, FF3, FF4)
-# Part B: Robustness Checks (EW vs VW, Start Date, Parameter Sweep)
+# A3: Evaluate P-Tree Models - Benchmark Regressions
+# ---------------------------------------------------
+# Calculates CAPM and Fama-French 3-factor alphas and t-statistics
+# for all three scenarios (A, B, C) to complete Table 1 in thesis
+#
+# Methodology:
+# - Time-series regressions of P-Tree factor returns on benchmark factors
+# - Newey-West standard errors with 3 lags (as per thesis specification)
+# - Monthly alphas converted to annualized percentages
 
 suppressPackageStartupMessages({
   library(data.table)
-  library(sandwich)
-  library(lmtest)
+  library(sandwich)   # For NeweyWest
+  library(lmtest)     # For coeftest
 })
-
-if (!requireNamespace("PTree", quietly = TRUE)) {
-  stop("The 'PTree' package is required. Install it before running.")
-}
 
 args <- commandArgs(trailingOnly = FALSE)
 file_arg <- sub("^--file=", "", args[grep("^--file=", args)])
 script_dir <- tryCatch(dirname(normalizePath(file_arg)), error = function(e) getwd())
 repo_root <- normalizePath(file.path(script_dir, "..", ".."), mustWork = FALSE)
 
-# Paths
-in_factor <- file.path(repo_root, "results", "analysis", "models", "ptree_factor.csv")
-in_leaf_portfolios <- file.path(repo_root, "results", "analysis", "models", "ptree_leaf_portfolios.csv")
-in_inputs <- file.path(repo_root, "results", "analysis", "inputs", "ptree_inputs.rds")
+# Input paths
+models_dir <- file.path(repo_root, "results", "analysis", "models")
+out_dir <- file.path(repo_root, "results", "analysis", "evaluation")
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-out_dir_bench <- file.path(repo_root, "results", "analysis", "evaluation", "benchmarks")
-out_dir_robust <- file.path(repo_root, "results", "analysis", "evaluation", "robustness")
-dir.create(out_dir_bench, recursive = TRUE, showWarnings = FALSE)
-dir.create(out_dir_robust, recursive = TRUE, showWarnings = FALSE)
+# Fama-French data
+ff_path <- file.path(repo_root, "data", "raw", "FamaFrench2020", "FF4F_monthly.csv")
 
-macro_default <- file.path(repo_root, "data", "raw", "FamaFrench2020", "FF4F_monthly.csv")
-macro_override <- Sys.getenv("PTREE_MACRO_PATH")
-macro_path <- if (nzchar(macro_override)) macro_override else macro_default
-
-cat("\n=== A3: EVALUATE MODEL ===\n")
+cat("\n═══════════════════════════════════════════════════════\n")
+cat("   A3: BENCHMARK REGRESSIONS (CAPM & FF3)\n")
+cat("═══════════════════════════════════════════════════════\n\n")
 cat("Repo root:", repo_root, "\n")
 
-# ==============================================================================
-# PART A: BENCHMARK REGRESSIONS
-# ==============================================================================
-cat("\n--- Part A: Benchmark Regressions ---\n")
+# Load Fama-French factors
+if (!file.exists(ff_path)) {
+  stop("Fama-French data not found at: ", ff_path)
+}
 
-if (file.exists(in_factor) && file.exists(in_leaf_portfolios) && file.exists(macro_path)) {
-  ptree_factor <- fread(in_factor)
-  leaf_portfolios <- fread(in_leaf_portfolios)
-  mac <- fread(macro_path)
+ff <- fread(ff_path)
+cat("Loaded Fama-French factors:", nrow(ff), "months (", min(ff$ym), "to", max(ff$ym), ")\n")
 
-  if (!"ym" %in% names(mac)) {
-    if ("date" %in% names(mac)) mac[, ym := format(as.IDate(date), "%Y-%m")] else stop("Macro: need 'ym' or 'date'")
+# Helper function to run regressions
+run_benchmark_regressions <- function(factor_data, scenario_name, date_range) {
+  cat("\n--- ", scenario_name, " ---\n", sep="")
+  cat("Date range:", date_range, "\n")
+
+  # Merge with FF factors
+  factor_data[, ym := format(as.IDate(date), "%Y-%m")]
+  merged <- merge(factor_data, ff, by = "ym", all.x = TRUE, all.y = FALSE)
+
+  # Check for missing FF data
+  n_missing <- sum(is.na(merged$rm_rf))
+  if (n_missing > 0) {
+    cat(sprintf("Warning: %d months missing FF factors (2020 data)\n", n_missing))
+    merged <- merged[!is.na(rm_rf)]
   }
 
-  to_ym <- function(d) format(as.IDate(d), "%Y-%m")
-  merge_facts <- function(df) merge(df, mac, by = "ym", all.x = TRUE, all.y = FALSE)
+  cat("Observations for regression:", nrow(merged), "\n")
 
-  ptree_factor[, ym := to_ym(date)]
-  factor_m <- merge_facts(ptree_factor)
-
-  leaf_portfolios[, ym := to_ym(date)]
-  leaf_m <- merge_facts(leaf_portfolios)
-
-  run_regs <- function(df, fact_cols, out_path_prefix) {
-    res <- list()
-    for (fc in fact_cols) {
-      y <- df[[fc]]
-      # CAPM
-      capm <- lm(y ~ rm_rf, data = df)
-      se1 <- sqrt(diag(NeweyWest(capm, lag=6, prewhite=FALSE)))
-      # FF3
-      ff3 <- lm(y ~ rm_rf + smb_vw + hml_vw, data = df)
-      se3 <- sqrt(diag(NeweyWest(ff3, lag=6, prewhite=FALSE)))
-      # FF4
-      if ("mom_vw" %in% names(df)) {
-        ff4 <- lm(y ~ rm_rf + smb_vw + hml_vw + mom_vw, data = df)
-        se4 <- sqrt(diag(NeweyWest(ff4, lag=6, prewhite=FALSE)))
-      } else {
-        ff4 <- NULL; se4 <- NULL
-      }
-      summ <- data.table(
-        factor = fc,
-        capm_alpha = coef(capm)[1], capm_t = ifelse(!is.na(se1[1]) && se1[1]>0, coef(capm)[1]/se1[1], NA_real_),
-        capm_r2    = summary(capm)$adj.r.squared,
-        ff3_alpha  = coef(ff3)[1],  ff3_t  = ifelse(!is.na(se3[1]) && se3[1]>0, coef(ff3)[1]/se3[1], NA_real_),
-        ff3_r2     = summary(ff3)$adj.r.squared,
-        ff4_alpha  = if (!is.null(ff4)) coef(ff4)[1] else NA_real_,
-        ff4_t      = if (!is.null(se4) && !is.na(se4[1]) && se4[1]>0) coef(ff4)[1]/se4[1] else NA_real_,
-        ff4_r2     = if (!is.null(ff4)) summary(ff4)$adj.r.squared else NA_real_
-      )
-      res[[fc]] <- summ
-    }
-    out <- rbindlist(res)
-    out[, `:=`(capm_alpha_ann = capm_alpha * 12,
-               ff3_alpha_ann  = ff3_alpha  * 12,
-               ff4_alpha_ann  = ff4_alpha  * 12)]
-    fwrite(out, paste0(out_path_prefix, "_alphas.csv"))
-    cat("Saved:", normalizePath(paste0(out_path_prefix, "_alphas.csv"), mustWork=FALSE), "\n")
+  if (nrow(merged) < 24) {
+    cat("ERROR: Insufficient data for regression (need at least 24 months)\n")
+    return(NULL)
   }
 
-  run_regs(factor_m, fact_cols = "factor", out_path_prefix = file.path(out_dir_bench, "ptree_factor"))
-  run_regs(leaf_m, fact_cols = grep("^leaf_", names(leaf_m), value = TRUE), out_path_prefix = file.path(out_dir_bench, "leaf_portfolios"))
+  # CAPM regression: factor = alpha + beta * rm_rf
+  capm_model <- lm(factor ~ rm_rf, data = merged)
+  capm_nw <- NeweyWest(capm_model, lag = 3, prewhite = FALSE)
+  capm_se <- sqrt(diag(capm_nw))
+  capm_alpha <- coef(capm_model)[1]
+  capm_t <- capm_alpha / capm_se[1]
+  capm_r2 <- summary(capm_model)$adj.r.squared
 
-} else {
-  cat("Skipping Part A: Missing input files (factor, portfolios, or macro data).\n")
+  # Fama-French 3-factor: factor = alpha + b1*rm_rf + b2*smb + b3*hml
+  ff3_model <- lm(factor ~ rm_rf + smb_vw + hml_vw, data = merged)
+  ff3_nw <- NeweyWest(ff3_model, lag = 3, prewhite = FALSE)
+  ff3_se <- sqrt(diag(ff3_nw))
+  ff3_alpha <- coef(ff3_model)[1]
+  ff3_t <- ff3_alpha / ff3_se[1]
+  ff3_r2 <- summary(ff3_model)$adj.r.squared
+
+  # Print results
+  cat(sprintf("  CAPM Alpha:  %.2f%% monthly (%.2f%% annualized), t-stat: %.2f\n",
+              capm_alpha, capm_alpha * 12, capm_t))
+  cat(sprintf("  FF3 Alpha:   %.2f%% monthly (%.2f%% annualized), t-stat: %.2f\n",
+              ff3_alpha, ff3_alpha * 12, ff3_t))
+
+  # Return results
+  data.table(
+    scenario = scenario_name,
+    n_months = nrow(merged),
+    capm_alpha_monthly = capm_alpha,
+    capm_alpha_annual = capm_alpha * 12,
+    capm_t_stat = capm_t,
+    capm_r2 = capm_r2,
+    ff3_alpha_monthly = ff3_alpha,
+    ff3_alpha_annual = ff3_alpha * 12,
+    ff3_t_stat = ff3_t,
+    ff3_r2 = ff3_r2
+  )
 }
 
 # ==============================================================================
-# PART B: ROBUSTNESS CHECKS
+# SCENARIO A: FULL SAMPLE
 # ==============================================================================
-cat("\n--- Part B: Robustness Checks ---\n")
+cat("\n╔══════════════════════════════════════════════════════╗\n")
+cat("║   SCENARIO A: FULL SAMPLE (1999-06 to 2020-11)      ║\n")
+cat("╚══════════════════════════════════════════════════════╝\n")
 
-if (file.exists(in_inputs)) {
-  inp <- readRDS(in_inputs)
-  dt <- copy(inp$dt)
-  keep_chars <- inp$char_cols
-  instr <- inp$instr_cols
+factor_a <- fread(file.path(models_dir, "scenario_a_factor.csv"))
+results_a <- run_benchmark_regressions(factor_a, "A: Full Sample", "1999-06 to 2020-11")
 
-  build_train <- function(dt_sub, keep_chars, instr) {
-    X <- as.matrix(dt_sub[, ..keep_chars])
-    R <- as.vector(dt_sub$ret_monthly)
-    Y <- R
-    Z <- cbind(Intercept = 1, if (length(instr)>0) as.matrix(dt_sub[, ..instr]) else NULL)
-    months <- as.integer(as.factor(dt_sub$date)) - 1L
-    stocks <- as.integer(as.factor(dt_sub$isin)) - 1L
-    list(X=X,R=R,Y=Y,Z=Z,months=months,stocks=stocks,
-         num_months=length(unique(months)), num_stocks=length(unique(stocks)))
-  }
+# ==============================================================================
+# SCENARIO B: TIME-SPLIT (TEST PERIOD)
+# ==============================================================================
+cat("\n╔══════════════════════════════════════════════════════╗\n")
+cat("║   SCENARIO B: TIME-SPLIT TEST (2010-01 to 2020-11)  ║\n")
+cat("╚══════════════════════════════════════════════════════╝\n")
 
-  run_unboosted <- function(dt_sub, keep_chars, instr, equal_weight=TRUE,
-                            min_leaf_size=10, num_cutpoints=50, num_iter=5) {
-    tr <- build_train(dt_sub, keep_chars, instr)
-    pw <- as.vector(dt_sub$lag_me); lw <- as.vector(dt_sub$lag_me)
-    suppressWarnings({
-      fit <- PTree::PTree(tr$R, tr$Y, tr$X, tr$Z, rep(0, tr$num_months),
-                          pw, lw, tr$stocks, tr$months,
-                          seq(0L, ncol(tr$X)-1L), seq(0L, ncol(tr$X)-1L),
-                          tr$num_stocks, tr$num_months,
-                          min_leaf_size, 8, num_iter, num_cutpoints,
-                          eta=1, equal_weight=equal_weight, no_H=TRUE,
-                          abs_normalize=TRUE, weighted_loss=FALSE,
-                          lambda_mean=0, lambda_cov=1e-2, lambda_mean_factor=0, lambda_cov_factor=0,
-                          early_stop=FALSE, stop_threshold=0.95, lambda_ridge=0,
-                          a1=0, a2=0, list_K=matrix(rep(0,3), nrow=3, ncol=1), random_split=FALSE)
-    })
-    ft <- as.numeric(fit$ft)
-    c(mean=mean(ft, na.rm=TRUE), sd=sd(ft, na.rm=TRUE), sharpe_ann=ifelse(sd(ft,na.rm=TRUE)>0, mean(ft,na.rm=TRUE)/sd(ft,na.rm=TRUE)*sqrt(12), NA))
-  }
+factor_b_test <- fread(file.path(models_dir, "scenario_b_test_factor.csv"))
+results_b <- run_benchmark_regressions(factor_b_test, "B: Time-Split (test)", "2010-01 to 2020-11")
 
-  # 1) EW vs VW
-  dt1 <- dt[date >= as.IDate("1999-06-01")]
-  cat("\n1. Testing EW vs VW...\n")
-  res_vw <- run_unboosted(dt1, keep_chars, instr, equal_weight=FALSE, num_iter=5)
-  res_ew <- run_unboosted(dt1, keep_chars, instr, equal_weight=TRUE, num_iter=5)
-  rb1 <- data.table(method=c("VW","EW"),
-                    mean_monthly=round(c(res_vw["mean"], res_ew["mean"]) * 100,3),
-                    std_monthly=round(c(res_vw["sd"], res_ew["sd"]) * 100,3),
-                    sharpe_annual=round(c(res_vw["sharpe_ann"], res_ew["sharpe_ann"]),3))
-  fwrite(rb1, file.path(out_dir_robust, "robust_ew_vs_vw.csv"))
-  cat("Saved:", normalizePath(file.path(out_dir_robust, "robust_ew_vs_vw.csv"), mustWork=FALSE), "\n")
+# ==============================================================================
+# SCENARIO C: REVERSE SPLIT (TEST PERIOD)
+# ==============================================================================
+cat("\n╔══════════════════════════════════════════════════════╗\n")
+cat("║   SCENARIO C: REVERSE SPLIT TEST (1999-06 to 2009-12)║\n")
+cat("╚══════════════════════════════════════════════════════╝\n")
 
-  # 2) Start Date
-  cat("2. Testing start date sensitivity...\n")
-  dt2 <- dt[date >= as.IDate("2003-01-01")]
-  res_1999 <- run_unboosted(dt1, keep_chars, instr, equal_weight=TRUE, num_iter=5)
-  res_2003 <- run_unboosted(dt2, keep_chars, instr, equal_weight=TRUE, num_iter=5)
-  rb2 <- data.table(start=c("1999-06","2003-01"),
-                    mean_monthly=round(c(res_1999["mean"], res_2003["mean"]) * 100,3),
-                    std_monthly=round(c(res_1999["sd"], res_2003["sd"]) * 100,3),
-                    sharpe_annual=round(c(res_1999["sharpe_ann"], res_2003["sharpe_ann"]),3))
-  fwrite(rb2, file.path(out_dir_robust, "robust_start_date.csv"))
-  cat("Saved:", normalizePath(file.path(out_dir_robust, "robust_start_date.csv"), mustWork=FALSE), "\n")
+factor_c_test <- fread(file.path(models_dir, "scenario_c_test_factor.csv"))
+results_c <- run_benchmark_regressions(factor_c_test, "C: Reverse Split (test)", "1999-06 to 2009-12")
 
-  # 3) Parameter Sweep (simplified for speed)
-  cat("3. Testing parameter sensitivity (simplified)...\n")
-  grid <- CJ(min_leaf_size=c(10), num_iter=c(3,7))  # Just 2 runs instead of 6
-  res_list <- list()
-  for (i in seq_len(nrow(grid))) {
-    g <- grid[i]
-    cat(sprintf("  Run %d/%d: min_leaf=%d, iter=%d\n", i, nrow(grid), g$min_leaf_size, g$num_iter))
-    m <- run_unboosted(dt1, keep_chars, instr, equal_weight=TRUE,
-                       min_leaf_size=g$min_leaf_size, num_iter=g$num_iter)
-    res_list[[i]] <- data.table(min_leaf_size=g$min_leaf_size, num_iter=g$num_iter,
-                                mean_monthly=round(m["mean"] * 100,3),
-                                std_monthly=round(m["sd"] * 100,3),
-                                sharpe_annual=round(m["sharpe_ann"],3))
-  }
-  rb3 <- rbindlist(res_list)
-  fwrite(rb3, file.path(out_dir_robust, "robust_param_sweep.csv"))
-  cat("Saved:", normalizePath(file.path(out_dir_robust, "robust_param_sweep.csv"), mustWork=FALSE), "\n")
+# ==============================================================================
+# COMBINE RESULTS AND CREATE TABLE 1
+# ==============================================================================
+cat("\n\n╔══════════════════════════════════════════════════════╗\n")
+cat("║          TABLE 1: BENCHMARK REGRESSION RESULTS       ║\n")
+cat("╚══════════════════════════════════════════════════════╝\n\n")
 
-} else {
-  cat("Skipping Part B: Missing inputs RDS.\n")
-}
+# Combine all results
+all_results <- rbindlist(list(results_a, results_b, results_c))
+
+# Load Sharpe ratios from Step 2
+sharpe_summary <- fread(file.path(models_dir, "all_scenarios_summary.csv"))
+
+# Merge Sharpe ratios with alpha results
+table1 <- merge(
+  sharpe_summary[, .(scenario, sharpe_ratio, mean_monthly_pct, annualized_return_pct)],
+  all_results[, .(scenario, n_months,
+                  capm_alpha_monthly, capm_alpha_annual, capm_t_stat,
+                  ff3_alpha_monthly, ff3_alpha_annual, ff3_t_stat)],
+  by = "scenario"
+)
+
+# Format for thesis Table 1
+table1_formatted <- table1[, .(
+  Scenario = scenario,
+  `Sharpe Ratio` = round(sharpe_ratio, 2),
+  `CAPM Alpha (%)` = round(capm_alpha_annual, 2),
+  `CAPM t-stat` = round(capm_t_stat, 2),
+  `FF3 Alpha (%)` = round(ff3_alpha_annual, 2),
+  `FF3 t-stat` = round(ff3_t_stat, 2),
+  `N months` = n_months
+)]
+
+print(table1_formatted)
+
+# Save results
+fwrite(all_results, file.path(out_dir, "benchmark_regressions_detailed.csv"))
+fwrite(table1_formatted, file.path(out_dir, "table1_thesis_results.csv"))
+
+cat("\n✓ Results saved to:\n")
+cat("  -", normalizePath(file.path(out_dir, "benchmark_regressions_detailed.csv"), mustWork=FALSE), "\n")
+cat("  -", normalizePath(file.path(out_dir, "table1_thesis_results.csv"), mustWork=FALSE), "\n")
+
+cat("\nNotes:\n")
+cat("  - Alphas represent monthly excess returns in percent\n")
+cat("  - t-statistics calculated using Newey-West standard errors (3 lags)\n")
+cat("  - FF data coverage: 1999-06 to 2019-12 (2020 data excluded from alphas)\n")
 
 cat("\nA3 complete.\n\n")

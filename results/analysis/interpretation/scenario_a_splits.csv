@@ -1,0 +1,5 @@
+split_num,node_id,var_id,var_name,var_description,threshold,left_child,right_child
+1,1,38,rank_svar,Specific Variance,-0.9215686275,1,0
+2,7,20,rank_mom12m,12-Month Momentum,0.8823529412,47,2
+3,14,10,rank_dolvol,Dollar Volume,-0.8431372549,3,3
+4,29,19,rank_me,Market Equity (Size),-0.4901960784,12,4
