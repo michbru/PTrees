@@ -1,4 +1,0 @@
-Scenario,Sharpe Ratio,CAPM Alpha (%),CAPM t-stat,FF3 Alpha (%),FF3 t-stat,N months
-A: Full Sample,2.46,9.09,9.32,8.88,9.32,246
-B: Time-Split (test),0.67,4.44,3.02,4.4,3.14,119
-C: Reverse Split (test),0.64,5.02,2.51,4.75,2.35,127

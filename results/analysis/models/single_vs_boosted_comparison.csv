@@ -1,3 +1,0 @@
-model,sharpe_ratio,mean_monthly_pct,std_monthly_pct,num_iter,eta,note
-Single Tree (Optimized),2.46,0.76,1.07,5,1,"min_leaf=5, lambda_cov=1e-3"
-Boosted Tree (Best),1.31318347111432,130.972882254078,345.498845314129,10,0.7,lambda_cov_factor=1e-04

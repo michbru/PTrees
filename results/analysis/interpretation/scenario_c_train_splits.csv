@@ -1,6 +1,0 @@
-split_num,node_id,var_id,var_name,var_description,threshold,left_child,right_child
-1,1,7,rank_cfp,Cash Flow-to-Price,-0.6862745098,7,0
-2,2,15,rank_ill,Illiquidity,0.6078431373,40,1
-3,3,3,rank_baspread,Bid-Ask Spread,-0.05882352941,23,2
-4,7,20,rank_mom12m,12-Month Momentum,-0.2941176471,17,3
-5,14,2,rank_ato,Asset Turnover,0.2941176471,32,4

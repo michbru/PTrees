@@ -22,8 +22,8 @@ script_dir <- tryCatch(dirname(normalizePath(file_arg)), error = function(e) get
 repo_root <- normalizePath(file.path(script_dir, "..", ".."), mustWork = FALSE)
 
 # Input paths
-models_dir <- file.path(repo_root, "results", "analysis", "models")
-out_dir <- file.path(repo_root, "results", "analysis", "evaluation")
+models_dir <- file.path(repo_root, "results", "models")
+out_dir <- file.path(repo_root, "results", "evaluation")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 # Fama-French data
@@ -106,7 +106,7 @@ run_benchmark_regressions <- function(factor_data, scenario_name, date_range) {
 # SCENARIO A: FULL SAMPLE
 # ==============================================================================
 cat("\n╔══════════════════════════════════════════════════════╗\n")
-cat("║   SCENARIO A: FULL SAMPLE (1999-06 to 2020-11)      ║\n")
+cat("║   SCENARIO A: FULL SAMPLE (1999-06 to 2019-12)      ║\n")
 cat("╚══════════════════════════════════════════════════════╝\n")
 
 factor_a <- fread(file.path(models_dir, "scenario_a_factor.csv"))
@@ -116,7 +116,7 @@ results_a <- run_benchmark_regressions(factor_a, "A: Full Sample", "1999-06 to 2
 # SCENARIO B: TIME-SPLIT (TEST PERIOD)
 # ==============================================================================
 cat("\n╔══════════════════════════════════════════════════════╗\n")
-cat("║   SCENARIO B: TIME-SPLIT TEST (2010-01 to 2020-11)  ║\n")
+cat("║   SCENARIO B: TIME-SPLIT TEST (2010-01 to 2019-12)  ║\n")
 cat("╚══════════════════════════════════════════════════════╝\n")
 
 factor_b_test <- fread(file.path(models_dir, "scenario_b_test_factor.csv"))
@@ -178,6 +178,6 @@ cat("  -", normalizePath(file.path(out_dir, "table1_thesis_results.csv"), mustWo
 cat("\nNotes:\n")
 cat("  - Alphas represent monthly excess returns in percent\n")
 cat("  - t-statistics calculated using Newey-West standard errors (3 lags)\n")
-cat("  - FF data coverage: 1999-06 to 2019-12 (2020 data excluded from alphas)\n")
+cat("  - Sample period: 1999-06 to 2019-12 (consistent with FF factor coverage)\n")
 
 cat("\nA3 complete.\n\n")

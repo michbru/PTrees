@@ -2,9 +2,10 @@
 
 # A2: Train P-Tree Models for Three Scenarios
 # --------------------------------------------
-# Scenario A: Full Sample (1999-06 to 2020-12) - train and evaluate on ALL data
-# Scenario B: Time-Split (train 1999-06 to 2009-12, test 2010-01 to 2020-12)
-# Scenario C: Reverse Split (train 2010-01 to 2020-12, test 1999-06 to 2009-12)
+# Scenario A: Full Sample (1999-06 to 2019-12) - train and evaluate on ALL data
+# Scenario B: Time-Split (train 1999-06 to 2009-12, test 2010-01 to 2019-12)
+# Scenario C: Reverse Split (train 2010-01 to 2019-12, test 1999-06 to 2009-12)
+# NOTE: Sample constrained to 2019-12 to match Fama-French factor coverage
 #
 # IMPORTANT: Scenarios B & C use TRUE OUT-OF-SAMPLE evaluation
 # - Train model on training period
@@ -30,8 +31,8 @@ file_arg <- sub("^--file=", "", args[grep("^--file=", args)])
 script_dir <- tryCatch(dirname(normalizePath(file_arg)), error = function(e) getwd())
 repo_root <- normalizePath(file.path(script_dir, "..", ".."), mustWork = FALSE)
 
-in_rds <- file.path(repo_root, "results", "analysis", "inputs", "ptree_inputs.rds")
-out_dir <- file.path(repo_root, "results", "analysis", "models")
+in_rds <- file.path(repo_root, "results", "inputs", "ptree_inputs.rds")
+out_dir <- file.path(repo_root, "results", "models")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 cat("\n=== A2: TRAIN P-TREE MODELS (THREE SCENARIOS) ===\n")
@@ -56,21 +57,20 @@ build_train_data <- function(dt_sub, keep_chars, instr) {
        pw=pw, lw=lw)
 }
 
-# Helper function to train single P-Tree
-train_ptree <- function(train_data, scenario_name) {
+# Helper function to train P-Tree (flexible parameters)
+train_ptree <- function(train_data, scenario_name, num_iter=1, eta=1.0) {
   cat(sprintf("\n--- Training %s ---\n", scenario_name))
   cat(sprintf("  Obs: %d | Months: %d | Stocks: %d\n",
               nrow(train_data$dt), train_data$num_months, train_data$num_stocks))
   cat(sprintf("  Date range: %s to %s\n",
               as.character(min(train_data$dt$date)), as.character(max(train_data$dt$date))))
+  cat(sprintf("  Parameters: num_iter=%d, eta=%.2f\n", num_iter, eta))
 
-  # Swedish market optimal parameters (from hyperparameter tuning)
-  # Tuning showed: Sharpe 2.460 vs 2.146 with optimized params
-  min_leaf_size <- 5   # Optimized: was 10
-  max_depth <- 8
+  # Swedish market optimal parameters (updated for stability)
+  min_leaf_size <- 40
+  max_depth <- 3
   num_cutpoints <- 50
-  num_iter <- 5        # Single tree with 5 splits
-  eta <- 1.0           # No boosting
+  # num_iter and eta passed as arguments
 
   suppressWarnings({
     fit <- PTree::PTree(
@@ -90,12 +90,12 @@ train_ptree <- function(train_data, scenario_name) {
       abs_normalize = TRUE,
       weighted_loss = FALSE,
       lambda_mean = 0,
-      lambda_cov = 1e-3,  # Optimized: was 1e-2
+      lambda_cov = 1.0,
       lambda_mean_factor = 0,
       lambda_cov_factor = 0,
       early_stop = FALSE,
       stop_threshold = 0.95,
-      lambda_ridge = 0,
+      lambda_ridge = 1e-3,
       a1 = 0, a2 = 0,
       list_K = matrix(rep(0, 3), nrow = 3, ncol = 1),
       random_split = FALSE
@@ -172,14 +172,47 @@ cat(sprintf("  Period 2 (train C): %s to %s (%d months)\n",
             length(unique(dt_full[date >= split_date]$date))))
 
 # ==============================================================================
+# MODEL COMPARISON: SINGLE TREE vs BOOSTED
+# ==============================================================================
+cat("\n\n╔════════════════════════════════════════════════╗\n")
+cat("║     COMPARISON: SINGLE TREE vs BOOSTED        ║\n")
+cat("╚════════════════════════════════════════════════╝\n")
+
+# Use full sample for comparison
+train_comp <- build_train_data(dt_full, keep_chars, instr)
+
+# 1. Single Tree
+model_single <- train_ptree(train_comp, "Single Tree", num_iter=1, eta=1.0)
+
+# 2. Boosted Tree (e.g., 50 iterations, learning rate 0.1)
+model_boosted <- train_ptree(train_comp, "Boosted Tree", num_iter=50, eta=0.1)
+
+cat("\nComparison Results (In-Sample):\n")
+cat(sprintf("  Single Tree (iter=1, eta=1.0): Sharpe = %.2f\n", model_single$sharpe))
+cat(sprintf("  Boosted Tree (iter=50, eta=0.1): Sharpe = %.2f\n", model_boosted$sharpe))
+cat("\nDecision: Using SINGLE TREE (num_iter=1) for main analysis as per thesis hypothesis.\n")
+
+# Save comparison results
+comp_table <- data.table(
+  model = c("Single Tree", "Boosted Tree"),
+  num_iter = c(1, 50),
+  eta = c(1.0, 0.1),
+  sharpe = c(model_single$sharpe, model_boosted$sharpe),
+  mean_monthly = c(model_single$mean, model_boosted$mean),
+  std_monthly = c(model_single$sd, model_boosted$sd)
+)
+fwrite(comp_table, file.path(out_dir, "model_comparison.csv"))
+
+
+# ==============================================================================
 # SCENARIO A: FULL SAMPLE
 # ==============================================================================
 cat("\n\n╔════════════════════════════════════════════════╗\n")
-cat("║     SCENARIO A: FULL SAMPLE (1999-2020)       ║\n")
+cat("║     SCENARIO A: FULL SAMPLE (1999-2019)       ║\n")
 cat("╚════════════════════════════════════════════════╝\n")
 
 train_a <- build_train_data(dt_full, keep_chars, instr)
-model_a <- train_ptree(train_a, "Scenario A")
+model_a <- train_ptree(train_a, "Scenario A", num_iter=1, eta=1.0)
 
 # Save outputs
 fwrite(data.table(date=sort(unique(dt_full$date)), factor=model_a$ft),
@@ -207,7 +240,7 @@ cat("╚════════════════════════
 train_b <- build_train_data(dt_full[date < split_date], keep_chars, instr)
 test_b <- build_train_data(dt_full[date >= split_date], keep_chars, instr)
 
-model_b_train <- train_ptree(train_b, "Scenario B - Train (1999-2009)")
+model_b_train <- train_ptree(train_b, "Scenario B - Train (1999-2009)", num_iter=1, eta=1.0)
 model_b_test <- evaluate_on_test(model_b_train, test_b, "Scenario B")
 
 # Save outputs
@@ -243,7 +276,7 @@ cat("╚════════════════════════
 train_c <- build_train_data(dt_full[date >= split_date], keep_chars, instr)
 test_c <- build_train_data(dt_full[date < split_date], keep_chars, instr)
 
-model_c_train <- train_ptree(train_c, "Scenario C - Train (2010-2020)")
+model_c_train <- train_ptree(train_c, "Scenario C - Train (2010-2020)", num_iter=1, eta=1.0)
 model_c_test <- evaluate_on_test(model_c_train, test_c, "Scenario C")
 
 # Save outputs

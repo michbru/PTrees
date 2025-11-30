@@ -17,11 +17,12 @@ script_dir <- tryCatch(dirname(normalizePath(file_arg)), error = function(e) get
 repo_root <- normalizePath(file.path(script_dir, "..", ".."), mustWork = FALSE)
 
 in_path  <- file.path(repo_root, "data", "processed", "ptree_dataset_monthly.csv")
-out_dir  <- file.path(repo_root, "results", "analysis", "inputs")
+out_dir  <- file.path(repo_root, "results", "inputs")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 out_rds  <- file.path(out_dir, "ptree_inputs.rds")
 
 min_date <- as.IDate("1999-06-01")   # start date used in analysis
+max_date <- as.IDate("2019-12-31")   # end date (match FF factor coverage)
 cov_thr  <- 0.30                      # 30% non-zero coverage threshold
 use_excess <- tolower(Sys.getenv("PTREE_USE_EXCESS")) %in% c("1","true","yes","y")
 macro_path <- Sys.getenv("PTREE_MACRO_PATH")
@@ -43,9 +44,10 @@ dt[, date := as.IDate(date)]
 
 cat("Loaded:", nrow(dt), "rows x", ncol(dt), "cols\n")
 
-# Filter sample period
-dt <- dt[date >= min_date]
-cat("Filtered from", as.character(min_date), "->", nrow(dt), "rows\n\n")
+# Filter sample period to match Fama-French factor coverage
+dt <- dt[date >= min_date & date <= max_date]
+cat("Filtered period:", as.character(min_date), "to", as.character(max_date), "->", nrow(dt), "rows\n")
+cat("  (Constrained by Fama-French factor availability through 2019-12)\n\n")
 
 # Identify characteristics
 char_cols <- grep("^rank_", names(dt), value = TRUE)
