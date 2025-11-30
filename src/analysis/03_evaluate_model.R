@@ -26,13 +26,28 @@ models_dir <- file.path(repo_root, "results", "models")
 out_dir <- file.path(repo_root, "results", "evaluation")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-# Fama-French data
-ff_path <- file.path(repo_root, "data", "raw", "FamaFrench2020", "FF4F_monthly.csv")
+# Fama-French / SHoF factor data (configurable via env var)
+# PTREE_FF_CSV can point to a Sweden-specific factor file from SHoF.
+ff_path <- Sys.getenv("PTREE_FF_CSV")
+if (!nzchar(ff_path)) {
+  # Prefer Sweden-specific file if present
+  shof_default <- file.path(repo_root, "data", "raw", "macro", "raw_macro_factors.csv")
+  if (file.exists(shof_default)) {
+    ff_path <- shof_default
+  } else {
+    ff_path <- file.path(repo_root, "data", "raw", "FamaFrench2020", "FF4F_monthly.csv")
+  }
+}
+
+# Newey–West lag length (monthly data standard: 12)
+nw_lags <- as.integer(Sys.getenv("PTREE_NW_LAGS", unset = "12"))
 
 cat("\n═══════════════════════════════════════════════════════\n")
 cat("   A3: BENCHMARK REGRESSIONS (CAPM & FF3)\n")
 cat("═══════════════════════════════════════════════════════\n\n")
 cat("Repo root:", repo_root, "\n")
+cat("Factor file:", normalizePath(ff_path, mustWork = FALSE), "\n")
+cat("Newey–West lags:", nw_lags, "\n")
 
 # Load Fama-French factors
 if (!file.exists(ff_path)) {
@@ -40,7 +55,53 @@ if (!file.exists(ff_path)) {
 }
 
 ff <- fread(ff_path)
-cat("Loaded Fama-French factors:", nrow(ff), "months (", min(ff$ym), "to", max(ff$ym), ")\n")
+
+# Ensure a 'ym' column exists (YYYY-MM)
+if (!("ym" %in% names(ff))) {
+  if ("date" %in% names(ff)) {
+    ff[, ym := format(as.IDate(date), "%Y-%m")]
+  } else if ("YM" %in% names(ff)) {
+    setnames(ff, "YM", "ym")
+  } else {
+    stop("Factor file must have a 'ym' or 'date' column for monthly alignment")
+  }
+}
+
+# Resolve column names for rm_rf, smb, hml with sensible fallbacks
+resolve_ff_columns <- function(dt) {
+  nms <- names(dt)
+  low <- tolower(nms)
+  map <- setNames(nms, low)
+  find <- function(cands) {
+    for (c in cands) {
+      if (c %in% names(map)) return(map[[c]])
+    }
+    NA_character_
+  }
+
+  col_rmrf <- find(c("rm_rf", "mktrf", "mkt_rf", "rmrf"))
+  col_rf   <- find(c("rf", "riskfree", "r_f"))
+  col_rm   <- find(c("rm", "mkt", "market"))
+  if (is.na(col_rmrf)) {
+    if (!is.na(col_rm) && !is.na(col_rf)) {
+      dt[, rm_rf := get(col_rm) - get(col_rf)]
+    } else {
+      stop("Could not resolve rm_rf: provide rm_rf or both rm and rf in factor file")
+    }
+  } else {
+    setnames(dt, col_rmrf, "rm_rf")
+  }
+
+  col_smb <- find(c("smb_vw", "smb", "smb_ew"))
+  col_hml <- find(c("hml_vw", "hml", "hml_ew"))
+  if (!is.na(col_smb)) setnames(dt, col_smb, "smb_vw")
+  if (!is.na(col_hml)) setnames(dt, col_hml, "hml_vw")
+
+  dt
+}
+
+ff <- resolve_ff_columns(ff)
+cat("Loaded factor rows:", nrow(ff), "months (", min(ff$ym), "to", max(ff$ym), ")\n")
 
 # Helper function to run regressions
 run_benchmark_regressions <- function(factor_data, scenario_name, date_range) {
@@ -50,6 +111,14 @@ run_benchmark_regressions <- function(factor_data, scenario_name, date_range) {
   # Merge with FF factors
   factor_data[, ym := format(as.IDate(date), "%Y-%m")]
   merged <- merge(factor_data, ff, by = "ym", all.x = TRUE, all.y = FALSE)
+
+  # CRITICAL FIX: Convert FF factors from decimals to percent to match P-Tree factor units
+  # P-Tree factor is in percent (e.g., 0.84 = 0.84%)
+  # FF factors are in decimals (e.g., 0.0084 = 0.84%)
+  # Multiply FF factors by 100 to align units
+  merged[, rm_rf := rm_rf * 100]
+  merged[, smb_vw := smb_vw * 100]
+  merged[, hml_vw := hml_vw * 100]
 
   # Check for missing FF data
   n_missing <- sum(is.na(merged$rm_rf))
@@ -67,7 +136,7 @@ run_benchmark_regressions <- function(factor_data, scenario_name, date_range) {
 
   # CAPM regression: factor = alpha + beta * rm_rf
   capm_model <- lm(factor ~ rm_rf, data = merged)
-  capm_nw <- NeweyWest(capm_model, lag = 3, prewhite = FALSE)
+  capm_nw <- NeweyWest(capm_model, lag = nw_lags, prewhite = FALSE)
   capm_se <- sqrt(diag(capm_nw))
   capm_alpha <- coef(capm_model)[1]
   capm_t <- capm_alpha / capm_se[1]
@@ -75,7 +144,7 @@ run_benchmark_regressions <- function(factor_data, scenario_name, date_range) {
 
   # Fama-French 3-factor: factor = alpha + b1*rm_rf + b2*smb + b3*hml
   ff3_model <- lm(factor ~ rm_rf + smb_vw + hml_vw, data = merged)
-  ff3_nw <- NeweyWest(ff3_model, lag = 3, prewhite = FALSE)
+  ff3_nw <- NeweyWest(ff3_model, lag = nw_lags, prewhite = FALSE)
   ff3_se <- sqrt(diag(ff3_nw))
   ff3_alpha <- coef(ff3_model)[1]
   ff3_t <- ff3_alpha / ff3_se[1]
@@ -177,7 +246,7 @@ cat("  -", normalizePath(file.path(out_dir, "table1_thesis_results.csv"), mustWo
 
 cat("\nNotes:\n")
 cat("  - Alphas represent monthly excess returns in percent\n")
-cat("  - t-statistics calculated using Newey-West standard errors (3 lags)\n")
-cat("  - Sample period: 1999-06 to 2019-12 (consistent with FF factor coverage)\n")
+cat(sprintf("  - t-statistics use Newey–West standard errors (%d lags)\n", nw_lags))
+cat("  - Sample period: 1999-06 to 2019-12 (consistent with factor coverage)\n")
 
 cat("\nA3 complete.\n\n")

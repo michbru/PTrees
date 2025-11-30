@@ -1,2 +1,2 @@
 Root Node
-|-- Split on rank_std_dolvol (Threshold: -0.22)
+|-- Split on rank_svar (Threshold: -0.88)

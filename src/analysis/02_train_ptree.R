@@ -5,18 +5,19 @@
 # Scenario A: Full Sample (1999-06 to 2019-12) - train and evaluate on ALL data
 # Scenario B: Time-Split (train 1999-06 to 2009-12, test 2010-01 to 2019-12)
 # Scenario C: Reverse Split (train 2010-01 to 2019-12, test 1999-06 to 2009-12)
-# NOTE: Sample constrained to 2019-12 to match Fama-French factor coverage
+# NOTE: Sample constrained to 2019-12 to match factor coverage
 #
 # IMPORTANT: Scenarios B & C use TRUE OUT-OF-SAMPLE evaluation
 # - Train model on training period
 # - Use predict() to apply SAME tree structure to test period
-# - This is the correct methodology per Cong et al. (2024)
 #
-# Based on Cong et al. (2024) Table 7 methodology
-# Adapted for Swedish market: SINGLE TREE (num_iter=5, eta=1.0)
-# - Testing shows single tree outperforms boosted (Sharpe 2.15 vs 0.92)
-# - Hyperparameter tuning improved Sharpe from 2.15 to 2.46
-# - Optimal params: min_leaf=5, lambda_cov=1e-3, equal_weight=TRUE
+# Swedish market configuration (current baseline):
+# - Single tree (num_iter=1, eta=1.0)
+# - Extreme capacity settings to allow complex trees if supported by data:
+#   min_leaf_size=10, max_depth=6, num_cutpoints=100
+# - No regularization: lambda_cov=0, lambda_ridge=0
+# - Equal-weighted leaves (equal_weight=TRUE) chosen empirically for Sweden
+#   (value-weighted can be tested as robustness)
 
 suppressPackageStartupMessages({
   library(data.table)
@@ -66,10 +67,10 @@ train_ptree <- function(train_data, scenario_name, num_iter=1, eta=1.0) {
               as.character(min(train_data$dt$date)), as.character(max(train_data$dt$date))))
   cat(sprintf("  Parameters: num_iter=%d, eta=%.2f\n", num_iter, eta))
 
-  # Swedish market optimal parameters (updated for stability)
-  min_leaf_size <- 40
-  max_depth <- 3
-  num_cutpoints <- 50
+  # Swedish market parameters (EXTREME capacity to allow deeper trees)
+  min_leaf_size <- 10
+  max_depth <- 6
+  num_cutpoints <- 100
   # num_iter and eta passed as arguments
 
   suppressWarnings({
@@ -90,12 +91,12 @@ train_ptree <- function(train_data, scenario_name, num_iter=1, eta=1.0) {
       abs_normalize = TRUE,
       weighted_loss = FALSE,
       lambda_mean = 0,
-      lambda_cov = 1.0,
+      lambda_cov = 0,
       lambda_mean_factor = 0,
       lambda_cov_factor = 0,
       early_stop = FALSE,
       stop_threshold = 0.95,
-      lambda_ridge = 1e-3,
+      lambda_ridge = 0,
       a1 = 0, a2 = 0,
       list_K = matrix(rep(0, 3), nrow = 3, ncol = 1),
       random_split = FALSE

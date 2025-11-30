@@ -5,7 +5,7 @@
 # - Loads data/processed/ptree_dataset_monthly.csv
 # - Filters period and characteristics by coverage
 # - Builds matrices/vectors required by PTree
-# - Saves RDS to results/analysis/inputs/ptree_inputs.rds
+# - Saves RDS to results/inputs/ptree_inputs.rds
 
 suppressPackageStartupMessages({
   library(data.table)
