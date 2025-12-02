@@ -1,4 +1,0 @@
-Root Node
-|-- Split on rank_me (Threshold: 0.76)
-|-- Split on rank_me (Threshold: 0.61)
-|-- Split on rank_me (Threshold: 0.45)

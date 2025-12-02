@@ -20,9 +20,6 @@ results/**/ptree_ready_data*.csv
 results/ptree_ready_data*.csv
 
 # Archive large files
-archive/19_char_implementation/results/ptree_ready_data_full.csv
-archive/19_char_implementation/results/ptree_28chars_swedish/ptree_ready_data_*.csv
-archive/19_char_implementation/results/ptree_27chars/ptree_ready_data_*.csv
 data/processed/ptrees_enhanced_dataset.csv
 data/processed/ptrees_final_dataset.csv
 
@@ -30,7 +27,7 @@ data/processed/ptrees_final_dataset.csv
 !analysis_dataset/**/ptree_factors.csv
 
 #PTree files
-PTree/
+archive/
 
 # Serrano database files (large)
 serrano/

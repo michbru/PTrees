@@ -20,6 +20,18 @@ models_dir <- file.path(repo_root, "results", "models")
 out_dir <- file.path(repo_root, "results", "evaluation")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
+# Clean up old results
+cat("\nCleaning up old evaluation results...\n")
+old_files <- list.files(out_dir, pattern = "\\.(csv|tex)$", full.names = TRUE)
+if (length(old_files) > 0) {
+  file.remove(old_files)
+  cat(sprintf("  Removed %d old file(s)\n", length(old_files)))
+}
+
+cat("\n╔════════════════════════════════════════════════╗\n")
+cat("║   A3: EVALUATE P-TREE MODELS                  ║\n")
+cat("╚════════════════════════════════════════════════╝\n\n")
+
 # Minimal LaTeX table writer (for benchmarking tables)
 write_tex_table <- function(dt, file, caption = NULL, label = NULL, digits = 3) {
   if (!inherits(dt, "data.table")) dt <- as.data.table(dt)
@@ -90,7 +102,10 @@ construct_mve <- function(factors_mat, lambda_cov = 1e-4) {
 # Helper function for alphas
 calc_alpha <- function(factor_dt, name) {
   # factor_dt should have columns: date, factor
+  # NOTE: Ensemble factors are in PERCENTAGE format (e.g., 0.2 = 0.2% monthly)
+  # We need to convert to DECIMAL format (e.g., 0.002) for regression
   f <- copy(factor_dt)
+  f[, factor := factor / 100]  # Convert from percentage to decimal
   f[, ym := format(as.IDate(date), "%Y-%m")]
 
   ff_sub <- copy(ff)
@@ -163,38 +178,31 @@ calc_alpha <- function(factor_dt, name) {
 }
 
 # Main Evaluation Loop
-files <- list.files(models_dir, pattern = "_20_factors.csv", full.names = TRUE)
+# Note: We use ENSEMBLE factors directly, not MVE, because boosted factors are highly correlated
+ensemble_files <- list.files(models_dir, pattern = "_ensemble.csv", full.names = TRUE)
 
 results_list <- list()
 
-for (fpath in files) {
+for (fpath in ensemble_files) {
   fname <- basename(fpath)
-  scenario <- sub("_20_factors.csv", "", fname)
+  scenario <- sub("_ensemble.csv", "", fname)
   
   cat("\n╔════════════════════════════════════════════════╗\n")
   cat(sprintf("║   EVALUATING: %s\n", scenario))
   cat("╚════════════════════════════════════════════════╝\n\n")
   
-  dt_factors <- fread(fpath)
-  date_col <- dt_factors$date
-  factors_mat <- as.matrix(dt_factors[, -1]) # Exclude date
+  ensemble_dt <- fread(fpath)
+  ensemble_dt[, date := as.IDate(date)]
   
-  # 1. Construct MVE
-  cat("Constructing MVE portfolio from 20 factors...\n")
-  mve <- construct_mve(factors_mat)
-  
-  # 2. Evaluate MVE
-  mve_dt <- data.table(date = date_col, factor = mve$ret)
-  res <- calc_alpha(mve_dt, paste0(scenario, " (MVE)"))
+  # Evaluate ensemble factor directly
+  cat("Evaluating ensemble factor...\n")
+  res <- calc_alpha(ensemble_dt[, .(date, factor = factor_ensemble)], paste0(scenario, " (Ensemble)"))
   
   if (!is.null(res)) results_list[[length(results_list)+1]] <- res
-  
-  # 3. Save MVE series
-  fwrite(mve_dt, file.path(out_dir, paste0(scenario, "_mve_factor.csv")))
 }
 
 final <- rbindlist(results_list)
 print(final)
-fwrite(final, file.path(out_dir, "final_mve_results.csv"))
+fwrite(final, file.path(out_dir, "final_ensemble_results.csv"))
 
 cat(sprintf("\n✓ Results saved to: %s\n\n", out_dir))

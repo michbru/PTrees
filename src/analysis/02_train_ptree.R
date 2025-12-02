@@ -4,7 +4,7 @@
 # ------------------------------------------------------------
 # - Trains both single-tree (num_iter=1) and boosted (num_iter>1) variants
 # - Performs parameter tuning on a validation split (pre-2010 only)
-# - Saves rich outputs: factor returns, leaf portfolios, tree text, summaries,
+# - Saves outputs: factor returns, leaf portfolios, tree text, summaries,
 #   parameter choices, and descriptive statistics for table building
 
 suppressPackageStartupMessages({
@@ -23,6 +23,14 @@ repo_root <- normalizePath(file.path(script_dir, "..", ".."), mustWork = FALSE)
 in_rds <- file.path(repo_root, "results", "inputs", "ptree_inputs.rds")
 out_dir <- file.path(repo_root, "results", "models")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+# Clean up old results
+cat("\nCleaning up old model results...\n")
+old_files <- list.files(out_dir, pattern = "\\.(csv|txt)$", full.names = TRUE)
+if (length(old_files) > 0) {
+  file.remove(old_files)
+  cat(sprintf("  Removed %d old file(s)\n", length(old_files)))
+}
 
 cat("\n╔════════════════════════════════════════════════╗\n")
 cat("║   A2: TRAIN P-TREE MODELS (SINGLE + BOOSTED)  ║\n")
@@ -340,23 +348,27 @@ dt <- copy(inp$dt)
 cat("\n\n--- SCENARIO A: FULL SAMPLE ---\n")
 train_a <- build_train_data(dt, inp$char_cols, inp$instr_cols)
 
-# Train 20 factors
+# Train single factor (20-factor ensemble produces identical copies)
 # Original paper uses num_iter=9, eta=1.0 (implied)
 # Adjusted parameters based on diagnostic: min_leaf=20, lambda_cov=1e-2
-model_a <- train_ptree_factors(train_a, "SCENARIO A", 
-                               num_factors = 20,
-                               num_iter = 9, 
-                               eta = 1.0, 
-                               min_leaf_size = 20, 
+# NOTE: All 20 factors were identical due to degenerate splitting (only rank_me used)
+model_a <- train_ptree_factors(train_a, "SCENARIO A",
+                               num_factors = 1,  # Changed from 20 - all factors identical
+                               num_iter = 9,
+                               eta = 1.0,
+                               min_leaf_size = 20,
                                lambda_cov = 1e-2,
                                lambda_ridge = 1e-4)
 
-# Save Factors
+# Save Factor(s)
 factors_dt <- data.table(
   date = unique(train_a$dt$date),
   model_a$factors
 )
-fwrite(factors_dt, file.path(out_dir, "scenario_a_20_factors.csv"))
+num_factors_actual <- ncol(model_a$factors)
+fwrite(factors_dt, file.path(out_dir, sprintf("scenario_a_%d_factor%s.csv",
+                                               num_factors_actual,
+                                               ifelse(num_factors_actual > 1, "s", ""))))
 
 # Save Ensemble
 ensemble_dt <- data.table(
@@ -373,5 +385,141 @@ for (k in 1:length(model_a$models)) {
 }
 sink()
 
-cat(sprintf("\n✓ Results saved to: %s\n", normalizePath(out_dir)))
-cat("\n✓ A2 complete - 20 Factors Extracted.\n\n")
+cat(sprintf("\n✓ Scenario A results saved to: %s\n", normalizePath(out_dir)))
+
+# Helper to predict ensemble on test data
+predict_ensemble <- function(models_list, test_data) {
+  num_factors <- length(models_list)
+  num_months <- test_data$num_months
+  
+  # Initialize H (prediction accumulator) for test set
+  H_test <- rep(0, num_months)
+  factors_list <- list()
+  
+  for (k in 1:num_factors) {
+    # PTree predict returns the factor for this tree
+    # Note: predict() signature depends on PTree package version. 
+    # Based on evaluate_on_test usage: predict(fit, X, R, months, pw)
+    pred <- predict(models_list[[k]], test_data$X, test_data$R, test_data$months, test_data$pw)
+    
+    ft <- as.numeric(pred$ft)
+    factors_list[[k]] <- ft
+    
+    # Update H (accumulate factors)
+    H_test <- H_test + ft
+  }
+  
+  # Combine factors
+  factors_mat <- do.call(cbind, factors_list)
+  colnames(factors_mat) <- paste0("F", 1:num_factors)
+  
+  list(factors=factors_mat, H=H_test)
+}
+
+# ============================================================================
+# SCENARIO B: TIME-SPLIT (Train: 1998-2009, Test: 2010-2019)
+# ============================================================================
+cat("\n\n--- SCENARIO B: TIME-SPLIT ---\n")
+split_date <- as.IDate("2010-01-01")
+
+dt_train_b <- dt[date < split_date]
+dt_test_b <- dt[date >= split_date]
+
+cat(sprintf("Train period: %s to %s (%d obs)\n", 
+            min(dt_train_b$date), max(dt_train_b$date), nrow(dt_train_b)))
+cat(sprintf("Test period: %s to %s (%d obs)\n", 
+            min(dt_test_b$date), max(dt_test_b$date), nrow(dt_test_b)))
+
+# Train on early period
+train_b <- build_train_data(dt_train_b, inp$char_cols, inp$instr_cols)
+model_b <- train_ptree_factors(train_b, "SCENARIO B (Train)",
+                               num_factors = 1,  # Changed from 20 - all factors identical
+                               num_iter = 9,
+                               eta = 1.0,
+                               min_leaf_size = 20,
+                               lambda_cov = 1e-2,
+                               lambda_ridge = 1e-4)
+
+# Predict on late period (Test)
+test_b <- build_train_data(dt_test_b, inp$char_cols, inp$instr_cols)
+pred_b <- predict_ensemble(model_b$models, test_b)
+
+# Save TEST factors (for evaluation)
+factors_b_test <- data.table(
+  date = unique(test_b$dt$date),
+  pred_b$factors
+)
+num_factors_b <- ncol(pred_b$factors)
+fwrite(factors_b_test, file.path(out_dir, sprintf("scenario_b_test_%d_factor%s.csv",
+                                                   num_factors_b,
+                                                   ifelse(num_factors_b > 1, "s", ""))))
+
+ensemble_b_test <- data.table(
+  date = unique(test_b$dt$date),
+  factor_ensemble = pred_b$H
+)
+fwrite(ensemble_b_test, file.path(out_dir, "scenario_b_test_ensemble.csv"))
+
+# Save Tree Structures for B
+sink(file.path(out_dir, "scenario_b_trees.txt"))
+for (k in 1:length(model_b$models)) {
+  cat(sprintf("\n--- Factor %d ---\n", k))
+  print(model_b$models[[k]]$tree)
+}
+sink()
+
+cat(sprintf("\n✓ Scenario B complete (Train + Test).\n"))
+
+# ============================================================================
+# SCENARIO C: REVERSE SPLIT (Train: 2010-2019, Test: 1998-2009)
+# ============================================================================
+cat("\n\n--- SCENARIO C: REVERSE SPLIT ---\n")
+
+dt_train_c <- dt[date >= split_date]
+dt_test_c <- dt[date < split_date]
+
+cat(sprintf("Train period: %s to %s (%d obs)\n", 
+            min(dt_train_c$date), max(dt_train_c$date), nrow(dt_train_c)))
+cat(sprintf("Test period: %s to %s (%d obs)\n", 
+            min(dt_test_c$date), max(dt_test_c$date), nrow(dt_test_c)))
+
+# Train on late period
+train_c <- build_train_data(dt_train_c, inp$char_cols, inp$instr_cols)
+model_c <- train_ptree_factors(train_c, "SCENARIO C (Train)",
+                               num_factors = 1,  # Changed from 20 - all factors identical
+                               num_iter = 9,
+                               eta = 1.0,
+                               min_leaf_size = 20,
+                               lambda_cov = 1e-2,
+                               lambda_ridge = 1e-4)
+
+# Predict on early period (Test)
+test_c <- build_train_data(dt_test_c, inp$char_cols, inp$instr_cols)
+pred_c <- predict_ensemble(model_c$models, test_c)
+
+# Save TEST factors (for evaluation)
+factors_c_test <- data.table(
+  date = unique(test_c$dt$date),
+  pred_c$factors
+)
+num_factors_c <- ncol(pred_c$factors)
+fwrite(factors_c_test, file.path(out_dir, sprintf("scenario_c_test_%d_factor%s.csv",
+                                                   num_factors_c,
+                                                   ifelse(num_factors_c > 1, "s", ""))))
+
+ensemble_c_test <- data.table(
+  date = unique(test_c$dt$date),
+  factor_ensemble = pred_c$H
+)
+fwrite(ensemble_c_test, file.path(out_dir, "scenario_c_test_ensemble.csv"))
+
+# Save Tree Structures for C
+sink(file.path(out_dir, "scenario_c_trees.txt"))
+for (k in 1:length(model_c$models)) {
+  cat(sprintf("\n--- Factor %d ---\n", k))
+  print(model_c$models[[k]]$tree)
+}
+sink()
+
+cat(sprintf("\n✓ Scenario C complete (Train + Test).\n"))
+cat(sprintf("\n✓ A2 complete - All scenarios saved to: %s\n\n", normalizePath(out_dir)))

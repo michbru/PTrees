@@ -3,4 +3,5 @@ firms present in the data frame (COMPLETED - see results/validation/coverage_ana
 - Calculate R squared for each characteristics, how much return can each characteristic explain
 - Compare final dataset to "original" dataset
 - Try to tweak variables, and see if ptrees split
+- Proportion of 0s in each of the characteristics
 - 

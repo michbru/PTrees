@@ -1,0 +1,19 @@
+\begin{table}[!ht]
+\centering
+\caption{P-Tree Structure by Scenario}
+\label{tab:tree_structure}
+\begin{tabular}{l|l|l|c|c}
+\hline
+Scenario & Period & Splitting Variables & Depth & Num Vars \\
+\hline
+A: Full & 1998--2019 & \texttt{rank\_bm} & 1 & 1 \\
+B: Train Early & 1998--2009 & \texttt{rank\_ep} & 1 & 1 \\
+C: Train Late & 2010--2019 & \texttt{rank\_mom36m}, \texttt{rank\_lev} & 2 & 2 \\
+\hline
+\end{tabular}
+\\[1em]
+\begin{minipage}{0.9\textwidth}
+\small
+\textit{Note:} Each scenario produces a single boosted factor (9 iterations). Depth = number of splits, Num Vars = number of unique characteristics used. Trees are parsed dynamically from model outputs.
+\end{minipage}
+\end{table}

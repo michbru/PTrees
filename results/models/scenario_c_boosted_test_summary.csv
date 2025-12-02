@@ -1,2 +1,0 @@
-scenario,test,sharpe_ratio,mean_monthly_pct,std_monthly_pct,annualized_return_pct,num_leaves
-scenario_c_boosted,TRUE,0.604136028254963,1.15235377284938,6.60756912192123,13.8282452741926,5

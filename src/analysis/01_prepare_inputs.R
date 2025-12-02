@@ -19,7 +19,19 @@ repo_root <- normalizePath(file.path(script_dir, "..", ".."), mustWork = FALSE)
 in_path  <- file.path(repo_root, "data", "processed", "ptree_dataset_monthly.csv")
 out_dir  <- file.path(repo_root, "results", "inputs")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+# Clean up old results
+cat("\nCleaning up old results...\n")
+old_files <- list.files(out_dir, pattern = "\\.rds$", full.names = TRUE)
+if (length(old_files) > 0) {
+  file.remove(old_files)
+  cat(sprintf("  Removed %d old RDS file(s)\n", length(old_files)))
+}
+
 out_rds  <- file.path(out_dir, "ptree_inputs.rds")
+
+cat("\n=== A1: PREPARE P-TREE INPUTS ===\n")
+cat("Repo root:", repo_root, "\n")
 
 min_date <- as.IDate("1997-10-01")   # start date used in analysis
 max_date <- as.IDate("2019-12-31")   # end date (match FF factor coverage)

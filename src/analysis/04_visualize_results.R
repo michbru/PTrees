@@ -1,17 +1,19 @@
 #!/usr/bin/env Rscript
 
-# A4: Visualize Results (Consolidated)
-# -------------------------------------
-# Generates key tables and figures from Steps 2–3 for the thesis:
-# - Tables: descriptive stats, coverage, factor stats, regression diagnostics
-# - Figures: cumulative returns per scenario, variable importance, performance bars, correlations, split diagram
+# A4: Visualize Results (Single-Factor P-Tree Analysis)
+# -----------------------------------------------------------
+# Generates key tables and figures for the thesis based on the current pipeline:
+# - Table 1: Data Summary Statistics (LaTeX)
+# - Table 2: Model Performance (Sharpe, Alpha) (LaTeX)
+# - Figure 1: Cumulative Returns (MVE vs Market)
+# - Figure 2: Factor Correlation Heatmap
+# - Figure 3: Monthly Returns Distribution
 
 suppressPackageStartupMessages({
   library(data.table)
   library(ggplot2)
   library(lmtest)
   library(sandwich)
-  library(PTree)
 })
 
 args <- commandArgs(trailingOnly = FALSE)
@@ -26,11 +28,19 @@ eval_dir <- file.path(repo_root, "results", "evaluation")
 out_dir <- file.path(repo_root, "results", "thesis_visualisations")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-# Ensure thesis visualisations folder has no stale tables
-unlink(Sys.glob(file.path(out_dir, "*.csv")))
-unlink(Sys.glob(file.path(out_dir, "*.tex")))
+# Clean up old results
+cat("\nCleaning up old visualizations...\n")
+old_files <- list.files(out_dir, pattern = "\\.(csv|tex|png)$", full.names = TRUE)
+if (length(old_files) > 0) {
+  file.remove(old_files)
+  cat(sprintf("  Removed %d old file(s)\n", length(old_files)))
+}
 
-# Minimal LaTeX table writer (for benchmarking table only)
+cat("\n╔════════════════════════════════════════════════╗\n")
+cat("║   A4: VISUALIZE RESULTS                        ║\n")
+cat("╚════════════════════════════════════════════════╝\n\n")
+
+# LaTeX table writer
 write_tex_table <- function(dt, file, caption = NULL, label = NULL, digits = 3) {
   if (!inherits(dt, "data.table")) dt <- as.data.table(dt)
   for (cn in names(dt)) if (is.numeric(dt[[cn]])) dt[[cn]] <- round(dt[[cn]], digits)
@@ -50,469 +60,482 @@ write_tex_table <- function(dt, file, caption = NULL, label = NULL, digits = 3) 
   writeLines("\\end{table}", con)
 }
 
-cat("\n=== A4: VISUALIZE RESULTS (CONSOLIDATED) ===\n")
-cat("Repo root:", repo_root, "\n\n")
+# ==============================================================================
+# 1. TABLE 1: DATA SUMMARY STATISTICS
+# ==============================================================================
+cat("Generating Table 1: Data Summary Statistics...\n")
 
 if (!file.exists(in_rds)) stop("Inputs RDS not found. Run Step 1 first.")
 inp <- readRDS(in_rds)
 dt <- copy(inp$dt)
 
-# Scenarios (files from Step 2)
-scenarios <- list(
-  list(name = "A: Full Sample (Single)",  file = file.path(models_dir, "scenario_a_single_factor.csv")),
-  list(name = "A: Full Sample (Boosted)", file = file.path(models_dir, "scenario_a_boosted_factor.csv")),
-  list(name = "B: Time-Split (Single)",   file = file.path(models_dir, "scenario_b_single_test_factor.csv")),
-  list(name = "B: Time-Split (Boosted)",  file = file.path(models_dir, "scenario_b_boosted_test_factor.csv")),
-  list(name = "C: Reverse Split (Single)",file = file.path(models_dir, "scenario_c_single_test_factor.csv")),
-  list(name = "C: Reverse Split (Boosted)",file = file.path(models_dir, "scenario_c_boosted_test_factor.csv"))
-)
-
-## No table writers; visuals only
-
-## No Table 1 output (LaTeX removed)
-
-# ==============================================================================
-# 2. FIGURE 1: CUMULATIVE RETURNS
-# ==============================================================================
-cat("Generating Cumulative Return Figures...\n")
-
-# Helper to compute cumulative plot for a factor vs simple EW market
-plot_cumulative <- function(factor_file, title_suffix, out_name) {
-  if (!file.exists(factor_file)) {
-    cat("  Skipping (missing):", basename(factor_file), "\n")
-    return(NULL)
-  }
-  f <- fread(factor_file)
-  f[, date := as.IDate(date)]
-  f[, Strategy := "P-Tree Factor"]
-  f[, Return := factor]
-
-  market <- dt[, .(Return = mean(ret_next * 100, na.rm=TRUE)), by=date]
-  market[, Strategy := "Market (EW)"]
-
-  combined <- rbind(f[, .(date, Strategy, Return)], market[, .(date, Strategy, Return)])
-  setorder(combined, date)
-  combined[, Cumulative := cumprod(1 + Return/100) - 1, by=Strategy]
-
-  p <- ggplot(combined, aes(x=date, y=Cumulative*100, color=Strategy)) +
-    geom_line(linewidth=1) +
-    geom_hline(yintercept=0, linetype="dashed", color="gray50") +
-    scale_color_manual(values=c("P-Tree Factor"="#2E86AB", "Market (EW)"="#A23B72")) +
-    labs(title=paste0("Cumulative Returns: ", title_suffix), x="", y="Cumulative Return (%)") +
-    theme_minimal(base_size=12) + theme(legend.position="bottom", plot.title=element_text(face="bold"))
-
-  ggsave(file.path(out_dir, out_name), p, width=10, height=6, dpi=300)
-  cat("  Saved:", out_name, "\n")
-}
-
-plot_cumulative(file.path(models_dir, "scenario_a_single_factor.csv"),  "A (Full Sample, Single)",  "figure_cum_A_single.png")
-plot_cumulative(file.path(models_dir, "scenario_a_boosted_factor.csv"), "A (Full Sample, Boosted)", "figure_cum_A_boosted.png")
-plot_cumulative(file.path(models_dir, "scenario_b_single_test_factor.csv"),  "B (OOS, Single)",  "figure_cum_B_single.png")
-plot_cumulative(file.path(models_dir, "scenario_b_boosted_test_factor.csv"), "B (OOS, Boosted)", "figure_cum_B_boosted.png")
-plot_cumulative(file.path(models_dir, "scenario_c_single_test_factor.csv"),  "C (OOS, Single)",  "figure_cum_C_single.png")
-plot_cumulative(file.path(models_dir, "scenario_c_boosted_test_factor.csv"), "C (OOS, Boosted)", "figure_cum_C_boosted.png")
-
-# ==============================================================================
-# 3. FIGURE 2: TREE STRUCTURE (DECODED)
-# ==============================================================================
-cat("Generating Tree Structure Text (A scenarios)...\n")
-
-# Characteristic mapping
-char_map <- setNames(inp$char_cols, as.character(0:(length(inp$char_cols)-1)))
-
-# Simple parser
-parse_tree_text <- function(tree_file) {
-  lines <- readLines(tree_file)
-  if (length(lines) < 2) return("Single Node Tree")
-  
-  desc <- c("Root Node")
-  for (i in 2:length(lines)) {
-    parts <- as.numeric(strsplit(trimws(lines[i]), "\\s+")[[1]])
-    if (length(parts) < 5 || parts[2] == 0) next
-    
-    var_name <- char_map[as.character(parts[2])]
-    threshold <- parts[3]
-    desc <- c(desc, sprintf("|-- Split on %s (Threshold: %.2f)", var_name, threshold))
-  }
-  paste(desc, collapse="\n")
-}
-
-tree_text_single <- parse_tree_text(file.path(models_dir, "scenario_a_single_tree.txt"))
-writeLines(tree_text_single, file.path(out_dir, "tree_structure_A_single.txt"))
-tree_text_boost  <- parse_tree_text(file.path(models_dir, "scenario_a_boosted_tree.txt"))
-writeLines(tree_text_boost,  file.path(out_dir, "tree_structure_A_boosted.txt"))
-cat("  Saved: tree_structure_A_single.txt, tree_structure_A_boosted.txt\n")
-
-# ==============================================================================
-# 4. FIGURE 3: VARIABLE IMPORTANCE
-# ==============================================================================
-cat("Generating Variable Importance (A scenarios)...\n")
-
-# Count splits in Scenario A tree
-plot_importance <- function(tree_file, title_suffix, out_name) {
-  if (!file.exists(tree_file)) {
-    cat("  Skipping (missing):", basename(tree_file), "\n")
-    return(NULL)
-  }
-  tree_lines <- readLines(tree_file)
-  counts <- table(sapply(tree_lines[-1], function(x) {
-    parts <- as.numeric(strsplit(trimws(x), "\\s+")[[1]])
-    if (length(parts) >= 5 && parts[2] != 0) char_map[as.character(parts[2])] else NA
-  }))
-  importance <- data.table(Characteristic = names(counts), Count = as.numeric(counts))
-  importance <- importance[!is.na(Characteristic)]
-  setorder(importance, -Count)
-  if (nrow(importance) == 0) { cat("  No splits found for", basename(tree_file), "\n"); return(NULL) }
-  p <- ggplot(importance, aes(x=reorder(Characteristic, Count), y=Count)) +
-    geom_bar(stat="identity", fill="#2E86AB", width=0.6) +
-    coord_flip() +
-    labs(title=paste0("Variable Importance: ", title_suffix), x="", y="Split Count") +
-    theme_minimal(base_size=12) + theme(plot.title=element_text(face="bold"))
-  ggsave(file.path(out_dir, out_name), p, width=8, height=6, dpi=300)
-  cat("  Saved:", out_name, "\n")
-}
-
-plot_importance(file.path(models_dir, "scenario_a_single_tree.txt"),  "A (Single)",  "figure_importance_A_single.png")
-plot_importance(file.path(models_dir, "scenario_a_boosted_tree.txt"), "A (Boosted)", "figure_importance_A_boosted.png")
-
-# ==============================================================================
-# 5. FIGURE 4: PERFORMANCE COMPARISON
-# ==============================================================================
-cat("Generating Performance Comparison (Sharpe ratios)...\n")
-
-summary_all <- fread(file.path(models_dir, "all_scenarios_summary.csv"))
-summary_all[, Type := ifelse(grepl("Test", period), "Out-of-Sample", "In-Sample")]
-
-p_sharpe <- ggplot(summary_all, aes(x=scenario, y=sharpe, fill=Type)) +
-  geom_bar(stat="identity", width=0.6) +
-  geom_hline(yintercept=0, color="black") +
-  scale_fill_manual(values=c("In-Sample"="#2E86AB", "Out-of-Sample"="#A23B72")) +
-  labs(title="Model Performance Across Scenarios", x="", y="Sharpe Ratio") +
-  theme_minimal(base_size=12) + theme(legend.position="bottom", plot.title=element_text(face="bold")) +
-  coord_flip()
-
-ggsave(file.path(out_dir, "figure_performance_sharpe.png"), p_sharpe, width=10, height=6, dpi=300)
-cat("  Saved: figure_performance_sharpe.png\n")
-
-# Mean-Std scatter (akin to the paper's mean-std exhibits)
-cat("Generating mean-std scatter...\n")
-ms_rows <- list()
-for (sc in scenarios) {
-  if (!file.exists(sc$file)) next
-  f <- fread(sc$file)
-  x <- as.numeric(f$factor)
-  ms_rows[[length(ms_rows)+1]] <- data.table(scenario = sc$name,
-                                             mean = mean(x, na.rm=TRUE),
-                                             sd = sd(x, na.rm=TRUE))
-}
-ms <- rbindlist(ms_rows, fill = TRUE)
-if (nrow(ms)) {
-  if (!requireNamespace("ggrepel", quietly = TRUE)) {
-    warning("ggrepel not installed; labels may overlap in mean-std figure")
-    p_ms <- ggplot(ms, aes(x=sd, y=mean)) +
-      geom_point(color="#2E86AB", size=3) +
-      geom_text(aes(label=scenario), hjust=0, vjust=1, size=3) +
-      labs(title="Mean vs. Std of Monthly P-Tree Factor Returns", x="Std (pct)", y="Mean (pct)") +
-      theme_minimal(base_size=12)
-  } else {
-    p_ms <- ggplot(ms, aes(x=sd, y=mean, label=scenario)) +
-      geom_point(color="#2E86AB", size=3) +
-      ggrepel::geom_text_repel(size=3, max.overlaps=20) +
-      labs(title="Mean vs. Std of Monthly P-Tree Factor Returns", x="Std (pct)", y="Mean (pct)") +
-      theme_minimal(base_size=12)
-  }
-  ggsave(file.path(out_dir, "figure_mean_std.png"), p_ms, width=9, height=6, dpi=300)
-  cat("  Saved: figure_mean_std.png\n")
-}
-
-# ==============================================================================
-# 6. FIGURE 5: CHARACTERISTIC CORRELATION HEATMAP
-# ==============================================================================
-cat("Generating Characteristic Correlation Heatmap...\n")
-
-# Select numeric columns starting with "rank_"
-char_cols <- grep("^rank_", names(dt), value=TRUE)
-# Filter to a curated set to avoid overcrowding
-base_keys <- c("rank_mom12m", "rank_bm", "rank_me", "rank_roa",
-               "rank_op", "rank_inv", "rank_lev", "rank_mom1m", "rank_mom36m")
-key_chars_ext <- intersect(base_keys, char_cols)
-
-dt_corr <- dt[, ..key_chars_ext]
-dt_corr <- dt_corr[complete.cases(dt_corr)]
-
-if (nrow(dt_corr) > 0) {
-  cor_matrix <- cor(dt_corr)
-  cor_dt <- as.data.table(cor_matrix, keep.rownames = TRUE)
-  cor_melt <- melt(cor_dt, id.vars = "rn", variable.name = "Var2", value.name = "value")
-  setnames(cor_melt, "rn", "Var1")
-  
-  p5 <- ggplot(cor_melt, aes(Var1, Var2, fill=value)) +
-    geom_tile() +
-    scale_fill_gradient2(low="#A23B72", mid="white", high="#2E86AB", midpoint=0, limit=c(-1,1)) +
-    theme_minimal(base_size=10) +
-    theme(axis.text.x = element_text(angle=45, vjust=1, hjust=1),
-          axis.title = element_blank(),
-          plot.title = element_text(face="bold")) +
-    labs(title="Characteristic Correlation Matrix")
-  
-  ggsave(file.path(out_dir, "figure_correlation_heatmap.png"), p5, width=10, height=8, dpi=300)
-  cat("  Saved: figure_correlation_heatmap.png\n")
-}
-
-## No Table 2 output (LaTeX removed)
-
-# ==============================================================================
-# 8. FIGURE 6: TIME PERIOD SPLIT DIAGRAM
-# ==============================================================================
-cat("Generating Time Period Split Diagram...\n")
-
-# Define periods
-periods <- data.table(
-  Scenario = c("A: Full Sample", "A: Full Sample", 
-               "B: Time-Split", "B: Time-Split", 
-               "C: Reverse Split", "C: Reverse Split"),
-  Type = c("Train", "Test (In-Sample)", 
-           "Train", "Test (Out-of-Sample)", 
-           "Test (Out-of-Sample)", "Train"),
-  Start = as.Date(c("1999-06-01", "1999-06-01", 
-                    "1999-06-01", "2010-01-01", 
-                    "1999-06-01", "2010-01-01")),
-  End = as.Date(c("2019-12-31", "2019-12-31", 
-                  "2009-12-31", "2019-12-31", 
-                  "2009-12-31", "2019-12-31"))
-)
-
-# Order scenarios for plotting
-periods[, Scenario := factor(Scenario, levels=c("C: Reverse Split", "B: Time-Split", "A: Full Sample"))]
-
-p6 <- ggplot(periods, aes(y=Scenario, x=Start, xend=End, color=Type)) +
-  geom_segment(linewidth=6) +
-  scale_color_manual(values=c("Train"="#2E86AB", "Test (Out-of-Sample)"="#A23B72", "Test (In-Sample)"="#6D9DC5")) +
-  scale_x_date(date_breaks="2 years", date_labels="%Y") +
-  labs(
-    title="Data Splitting Scenarios",
-    subtitle="Training and Testing Periods",
-    x="", y=""
-  ) +
-  theme_minimal(base_size=12) +
-  theme(legend.position="bottom", plot.title=element_text(face="bold"))
-
-ggsave(file.path(out_dir, "figure_time_splits.png"), p6, width=10, height=5, dpi=300)
-cat("  Saved: figure_time_splits.png\n")
-
-# ==============================================================================
-# 9. FACTOR DESCRIPTIVES (all scenarios)
-# ==============================================================================
-## No factor descriptive tables (LaTeX removed)
-
-# ==============================================================================
-# 10. REGRESSION DIAGNOSTICS (CAPM and FF3)
-# ==============================================================================
-## No regression diagnostics table (LaTeX removed)
-
-# ==============================================================================
-# 11. PERFORMANCE + ALPHA SUMMARY (from Step 3)
-# ==============================================================================
-## No performance+alpha LaTeX table
-
-# ==============================================================================
-# 12. ALPHA–BETA SCATTER (CAPM, NW robust)
-# ==============================================================================
-cat("Generating alpha–beta scatter (CAPM, NW robust)...\n")
-
-# Load factors only for this figure
-ff_path <- Sys.getenv("PTREE_FF_CSV")
-if (!nzchar(ff_path)) {
-  shof_default <- file.path(repo_root, "data", "raw", "macro", "raw_macro_factors.csv")
-  if (file.exists(shof_default)) {
-    ff_path <- shof_default
-  } else {
-    ff_path <- file.path(repo_root, "data", "raw", "FamaFrench2020", "FF4F_monthly.csv")
-  }
-}
-ff <- fread(ff_path)
-if (!"ym" %in% names(ff)) {
-  if ("date" %in% names(ff)) ff[, ym := format(as.IDate(date), "%Y-%m")] else stop("Macro factors need ym or date column")
-}
-if ("rm_rf" %in% names(ff) && !"mkt_rf" %in% names(ff)) ff[, mkt_rf := rm_rf]
-if ("smb_ew" %in% names(ff) && !"smb" %in% names(ff)) ff[, smb := smb_ew]
-if ("hml_ew" %in% names(ff) && !"hml" %in% names(ff)) ff[, hml := hml_ew]
-for (col in c("mkt_rf","smb","hml")) if (col %in% names(ff) && max(abs(ff[[col]]), na.rm=TRUE) < 10) ff[[col]] <- ff[[col]] * 100
-
-ab_rows <- list()
-for (sc in scenarios) {
-  if (!file.exists(sc$file)) next
-  f <- fread(sc$file)
-  f[, ym := format(as.IDate(date), "%Y-%m")]
-  d <- merge(f, ff, by="ym", all.x=TRUE)
-  # normalize columns as done above
-  if (!"mkt_rf" %in% names(d) && "rm_rf" %in% names(d)) d[, mkt_rf := rm_rf]
-  for (col in c("mkt_rf")) if (col %in% names(d) && max(abs(d[[col]]), na.rm=TRUE) < 10) d[[col]] <- d[[col]] * 100
-  d <- d[complete.cases(d[, .(factor, mkt_rf)])]
-  if (nrow(d) < 24) next
-  m <- lm(factor ~ mkt_rf, data = d)
-  vc <- NeweyWest(m, lag = 12)
-  ct <- coeftest(m, vcov = vc)
-  alpha_m <- as.numeric(coef(m)["(Intercept)"])
-  beta <- as.numeric(coef(m)["mkt_rf"])
-  t_alpha <- as.numeric(ct["(Intercept)", "t value"])
-  t_beta  <- as.numeric(ct["mkt_rf", "t value"])
-  ab_rows[[length(ab_rows)+1]] <- data.table(
-    scenario = sc$name,
-    alpha_ann = alpha_m * 12,
-    t_alpha = t_alpha,
-    beta = beta,
-    t_beta = t_beta
+summary_stats <- data.table(
+  Metric = c("Observations", "Companies", "Months", "Characteristics", 
+             "Date Range", "Avg Companies/Month"),
+  Value = c(
+    format(nrow(dt), big.mark = ","),
+    format(length(unique(dt$isin)), big.mark = ","),
+    format(length(unique(dt$date)), big.mark = ","),
+    length(inp$char_cols),
+    paste(min(dt$date), "to", max(dt$date)),
+    format(round(nrow(dt) / length(unique(dt$date))), big.mark = ",")
   )
-}
-ab <- rbindlist(ab_rows, fill = TRUE)
-if (nrow(ab)) {
-  p_ab <- ggplot(ab, aes(x=beta, y=alpha_ann, label=scenario)) +
-    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
-    geom_vline(xintercept = 1, linetype = "dotted", color = "gray70") +
-    geom_point(color="#2E86AB", size=3) +
-    {if (requireNamespace("ggrepel", quietly = TRUE)) ggrepel::geom_text_repel(size=3) else geom_text(hjust=0, vjust=1, size=3)} +
-    labs(title = "Alpha–Beta (CAPM) across scenarios", x = "Beta (MKT)", y = "Annualized Alpha (%)") +
-    theme_minimal(base_size=12)
-  ggsave(file.path(out_dir, "figure_alpha_beta.png"), p_ab, width=9, height=6, dpi=300)
-  cat("  Saved: figure_alpha_beta.png\n")
+)
+
+write_tex_table(summary_stats, file.path(out_dir, "table1_data_summary.tex"),
+                caption = "Data Summary Statistics",
+                label = "tab:data_summary")
+cat("  Saved: table1_data_summary.tex\n")
+
+# ==============================================================================
+# 2. TABLE 2: MODEL PERFORMANCE (from Step 3)
+# ==============================================================================
+cat("Generating Table 2: Model Performance...\n")
+
+perf_file <- file.path(eval_dir, "final_ensemble_results.csv")
+if (file.exists(perf_file)) {
+  perf <- fread(perf_file)
+  
+  # Format for thesis
+  # Note: mean_ann and sd_ann are already annualized, just need *100 for percentage
+  # capm_alpha and ff3_alpha are already annualized, just need *100 for percentage
+  perf_table <- data.table(
+    Scenario = perf$scenario,
+    Sharpe = round(perf$sharpe, 3),
+    `Mean (%)` = round(perf$mean_ann * 100, 2),
+    `Std (%)` = round(perf$sd_ann * 100, 2),
+    `CAPM Alpha (%)` = round(perf$capm_alpha * 100, 2),
+    `CAPM t-stat` = round(perf$capm_tstat, 2),
+    `FF3 Alpha (%)` = round(perf$ff3_alpha * 100, 2),
+    `FF3 t-stat` = round(perf$ff3_tstat, 2),
+    `N Months` = perf$n_months
+  )
+  
+  write_tex_table(perf_table, file.path(out_dir, "table2_model_performance.tex"),
+                  caption = "P-Tree Ensemble Performance (All Scenarios)",
+                  label = "tab:performance")
+  cat("  Saved: table2_model_performance.tex\n")
+} else {
+  cat("  Warning: final_ensemble_results.csv not found. Skipping Table 2.\n")
 }
 
 # ==============================================================================
-# 13. LEAF BASIS PORTFOLIO EVALUATION (Scenario A, Single+Boosted)
+# 3. TABLE 3: TREE STRUCTURES (DYNAMIC)
 # ==============================================================================
-cat("Evaluating leaf basis portfolios for Scenario A...\n")
+cat("Generating Table 3: Tree Structures...\n")
 
-build_data <- function(dt_sub) {
-  Xdt <- dt_sub[, ..inp$char_cols]
-  # Ensure numeric matrix
-  for (cn in names(Xdt)) if (!is.numeric(Xdt[[cn]])) Xdt[[cn]] <- as.numeric(Xdt[[cn]])
-  X <- as.matrix(Xdt)
-  R <- as.numeric(dt_sub$ret_next) * 100
-  months <- as.integer(as.factor(dt_sub$date)) - 1L
-  weight <- as.numeric(dt_sub$lag_me)
-  list(X=X, R=R, months=months, weight=weight, dates=sort(unique(dt_sub$date)))
-}
+# Function to parse tree structure from tree text file
+parse_tree <- function(tree_file, char_names) {
+  if (!file.exists(tree_file)) return(NULL)
 
-eval_leaf_model <- function(model_path, dt_sub) {
-  if (!file.exists(model_path)) return(NULL)
-  # Try prediction; if not available, try loading from saved CSVs (Scenario A only)
-  try_pred <- try({
-    mdl <- readRDS(model_path)
-    d <- build_data(dt_sub)
-    pred <- predict(mdl, d$X, d$R, d$months, d$weight)
-    leaf_mat <- as.matrix(pred$portfolio) # rows=months, cols=leaves
-    list(returns=leaf_mat, dates=d$dates)
-  }, silent = TRUE)
-  if (!inherits(try_pred, "try-error")) return(try_pred)
-  # Fallback: if Scenario A, load from files saved by Step 2
-  if (grepl("scenario_a_", basename(model_path))) {
-    tag <- if (grepl("single", basename(model_path))) "scenario_a_single" else "scenario_a_boosted"
-    leaf_file <- file.path(models_dir, sprintf("%s_leaf_portfolios.csv", tag))
-    fact_file <- file.path(models_dir, sprintf("%s_factor.csv", tag))
-    if (file.exists(leaf_file) && file.exists(fact_file)) {
-      lf <- fread(leaf_file)
-      ff <- fread(fact_file)
-      ff[, date := as.IDate(date)]
-      return(list(returns=as.matrix(lf), dates=sort(unique(ff$date))))
+  tree_lines <- readLines(tree_file)
+  splits <- list()
+
+  for (line in tree_lines) {
+    if (grepl("^\\[1\\]", line)) {
+      # Parse tree structure
+      tree_str <- gsub('\\[1\\] "', '', line)
+      tree_str <- gsub('"', '', tree_str)
+      parts <- strsplit(tree_str, "\\\\n")[[1]]
+
+      # Parse each node
+      for (i in 2:length(parts)) {
+        if (nchar(trimws(parts[i])) == 0) next
+        node <- strsplit(trimws(parts[i]), "\\s+")[[1]]
+        if (length(node) >= 3 && node[2] != "0") {
+          var_idx <- as.integer(node[2])
+          threshold <- as.numeric(node[3])
+          splits[[length(splits) + 1]] <- list(
+            var_idx = var_idx,
+            var_name = char_names[var_idx + 1],  # 0-indexed
+            threshold = threshold
+          )
+        }
+      }
     }
   }
-  NULL
+
+  return(splits)
 }
 
-# Scenario A uses full sample
-dt_full <- copy(dt)
-leaf_a_single <- eval_leaf_model(file.path(models_dir, "scenario_a_single_model.rds"), dt_full)
-leaf_a_boost  <- eval_leaf_model(file.path(models_dir, "scenario_a_boosted_model.rds"), dt_full)
-
-leaf_stats <- function(leaf_obj, tag) {
-  if (is.null(leaf_obj)) return(NULL)
-  m <- leaf_obj$returns
-  cols <- ncol(m)
-  rows <- list()
-  for (j in seq_len(cols)) {
-    x <- as.numeric(m[, j])
-    rows[[length(rows)+1]] <- data.table(
-      scenario = tag,
-      leaf = j,
-      n = sum(is.finite(x)),
-      mean_monthly = mean(x, na.rm=TRUE),
-      sd_monthly = sd(x, na.rm=TRUE),
-      sharpe = ifelse(sd(x, na.rm=TRUE)>0, mean(x, na.rm=TRUE)/sd(x, na.rm=TRUE)*sqrt(12), NA_real_),
-      min = min(x, na.rm=TRUE), p05 = quantile(x, 0.05, na.rm=TRUE), median = median(x, na.rm=TRUE),
-      p95 = quantile(x, 0.95, na.rm=TRUE), max = max(x, na.rm=TRUE)
-    )
-  }
-  rbindlist(rows)
-}
-
-ls_single <- leaf_stats(leaf_a_single, "A (Single)")
-ls_boost  <- leaf_stats(leaf_a_boost,  "A (Boosted)")
-leaf_eval <- rbindlist(list(ls_single, ls_boost), fill = TRUE)
-## No leaf basis LaTeX table; stats computed if needed downstream
-
-# ==============================================================================
-# 14. EFFICIENT FRONTIER (Scenario A Boosted leaves + Market)
-# ==============================================================================
-cat("Generating efficient frontier (Scenario A Boosted leaves + Market)...\n")
-
-compute_frontier <- function(Rmat) {
-  # Rmat: T x N returns in percent
-  mu <- colMeans(Rmat, na.rm=TRUE)
-  S <- cov(Rmat, use = "pairwise.complete.obs")
-  # Regularize covariance if needed
-  eps <- 1e-6
-  S <- S + diag(eps, ncol(S))
-  Sinv <- tryCatch(solve(S), error=function(e) MASS::ginv(S))
-  one <- rep(1, length(mu))
-  A <- as.numeric(t(one) %*% Sinv %*% one)
-  B <- as.numeric(t(one) %*% Sinv %*% mu)
-  C <- as.numeric(t(mu)  %*% Sinv %*% mu)
-  D <- A*C - B^2
-  mseq <- seq(min(mu), max(mu), length.out = 100)
-  vars <- (A * mseq^2 - 2 * B * mseq + C) / D
-  data.table(mean = mseq, sd = sqrt(pmax(vars, 0)))
-}
-
-if (!is.null(leaf_a_boost)) {
-  # Build returns: leaf columns + market EW
-  m <- leaf_a_boost$returns
-  keep <- which(colSums(abs(m)) > 0)
-  m <- m[, keep, drop=FALSE]
-  # market EW from dt
-  market <- dt_full[, .(date, ret = mean(ret_next * 100, na.rm=TRUE))]
-  market <- market[date %in% leaf_a_boost$dates]
-  market <- market[match(leaf_a_boost$dates, market$date)]
-  Rmat <- cbind(m, market$ret)
-  ef <- compute_frontier(Rmat)
-  pts <- data.table(asset = c(paste0("Leaf", seq_len(ncol(m))), "Market"),
-                    mean = colMeans(Rmat, na.rm=TRUE),
-                    sd = apply(Rmat, 2, sd, na.rm=TRUE))
-  p_ef <- ggplot() +
-    geom_path(data = ef, aes(x=sd, y=mean), color="#2E86AB", linewidth=1) +
-    geom_point(data = pts, aes(x=sd, y=mean), color="#A23B72") +
-    labs(title = "Efficient Frontier (Scenario A Boosted Leaves + Market)", x = "Std (pct)", y = "Mean (pct)") +
-    theme_minimal(base_size=12)
-  ggsave(file.path(out_dir, "figure_efficient_frontier_A_boosted.png"), p_ef, width=9, height=6, dpi=300)
-  cat("  Saved: figure_efficient_frontier_A_boosted.png\n")
-}
-
-# ==============================================================================
-# 15. BENCHMARKING TABLE (from Step 3, LaTeX)
-# ==============================================================================
-bench_csv <- file.path(eval_dir, "final_results_table.csv")
-if (file.exists(bench_csv)) {
-  cat("Generating benchmarking table (LaTeX)...\n")
-  bench <- fread(bench_csv)
-  setnames(bench, old = c("return_pct"), new = c("ann_return"), skip_absent = TRUE)
-  keep <- c("scenario","n_months","sharpe","ann_return","capm_alpha","capm_tstat","ff3_alpha","ff3_tstat","leaves")
-  bench_out <- bench[, intersect(keep, names(bench)), with=FALSE]
-  write_tex_table(bench_out, file.path(out_dir, "table_benchmarking.tex"),
-                  caption = "Benchmarking P-Tree factors against CAPM and FF3 (Newey–West)",
-                  label = "tab:benchmarking")
-  cat("  Saved: table_benchmarking.tex\n")
+# Load characteristic names
+if (file.exists(in_rds)) {
+  inp_check <- readRDS(in_rds)
+  char_names <- inp_check$char_cols
 } else {
-  cat("Warning: final_results_table.csv not found; skip benchmarking LaTeX table\n")
+  stop("Cannot load characteristic names from inputs")
 }
 
-cat("\nAll visualisations saved to:", out_dir, "\n")
+# Parse trees for all scenarios
+tree_files <- list(
+  A = file.path(models_dir, "scenario_a_trees.txt"),
+  B = file.path(models_dir, "scenario_b_trees.txt"),
+  C = file.path(models_dir, "scenario_c_trees.txt")
+)
+
+tree_data <- list()
+for (scenario_name in names(tree_files)) {
+  splits <- parse_tree(tree_files[[scenario_name]], char_names)
+  if (!is.null(splits)) {
+    tree_data[[scenario_name]] <- splits
+  }
+}
+
+# Build LaTeX table
+tree_tex_file <- file.path(out_dir, "table3_tree_structures.tex")
+con <- file(tree_tex_file, open = "wt")
+writeLines("\\begin{table}[!ht]", con)
+writeLines("\\centering", con)
+writeLines("\\caption{P-Tree Structure by Scenario}", con)
+writeLines("\\label{tab:tree_structure}", con)
+writeLines("\\begin{tabular}{l|l|l|c|c}", con)
+writeLines("\\hline", con)
+writeLines("Scenario & Period & Splitting Variables & Depth & Num Vars \\\\", con)
+writeLines("\\hline", con)
+
+# Scenario A
+if ("A" %in% names(tree_data)) {
+  splits_a <- tree_data$A
+  vars_a <- paste0("\\texttt{", sapply(splits_a, function(x) gsub("_", "\\\\_", x$var_name)), "}")
+  thresh_a <- sapply(splits_a, function(x) sprintf("%.3f", x$threshold))
+  writeLines(sprintf("A: Full & 1998--2019 & %s & %d & %d \\\\",
+                     paste(vars_a, collapse = ", "), length(splits_a), length(unique(sapply(splits_a, function(x) x$var_name)))), con)
+}
+
+# Scenario B
+if ("B" %in% names(tree_data)) {
+  splits_b <- tree_data$B
+  vars_b <- paste0("\\texttt{", sapply(splits_b, function(x) gsub("_", "\\\\_", x$var_name)), "}")
+  writeLines(sprintf("B: Train Early & 1998--2009 & %s & %d & %d \\\\",
+                     paste(vars_b, collapse = ", "), length(splits_b), length(unique(sapply(splits_b, function(x) x$var_name)))), con)
+}
+
+# Scenario C
+if ("C" %in% names(tree_data)) {
+  splits_c <- tree_data$C
+  vars_c <- paste0("\\texttt{", sapply(splits_c, function(x) gsub("_", "\\\\_", x$var_name)), "}")
+  writeLines(sprintf("C: Train Late & 2010--2019 & %s & %d & %d \\\\",
+                     paste(vars_c, collapse = ", "), length(splits_c), length(unique(sapply(splits_c, function(x) x$var_name)))), con)
+}
+
+writeLines("\\hline", con)
+writeLines("\\end{tabular}", con)
+writeLines("\\\\[1em]", con)
+writeLines("\\begin{minipage}{0.9\\textwidth}", con)
+writeLines("\\small", con)
+writeLines("\\textit{Note:} Each scenario produces a single boosted factor (9 iterations). Depth = number of splits, Num Vars = number of unique characteristics used. Trees are parsed dynamically from model outputs.", con)
+writeLines("\\end{minipage}", con)
+writeLines("\\end{table}", con)
+close(con)
+
+cat("  Saved: table3_tree_structures.tex\n")
+
+# ==============================================================================
+# 4. FIGURE 1: CUMULATIVE RETURNS (MVE vs Market)
+# ==============================================================================
+cat("Generating Figure 1: Cumulative Returns...\n")
+
+# Load all ensemble files
+ensemble_files <- list.files(models_dir, pattern = "_ensemble.csv", full.names = TRUE)
+if (length(ensemble_files) > 0) {
+  plot_data_list <- list()
+  
+  # Market EW (calculate once)
+  market <- dt[, .(Return = mean(ret_next, na.rm = TRUE)), by = date]
+  market[, Strategy := "Market (EW)"]
+  plot_data_list[[1]] <- market
+  
+  for (f in ensemble_files) {
+    ens <- fread(f)
+    ens[, date := as.IDate(date)]
+    
+    # Determine strategy name from filename
+    fname <- basename(f)
+    strat_name <- "Unknown"
+    if (grepl("scenario_a", fname)) strat_name <- "Scenario A (Full)"
+    if (grepl("scenario_b_test", fname)) strat_name <- "Scenario B (OOS)"
+    if (grepl("scenario_c_test", fname)) strat_name <- "Scenario C (OOS)"
+    
+    if (strat_name != "Unknown") {
+      ens[, Strategy := strat_name]
+      ens[, Return := factor_ensemble]  # Already in decimal form
+      plot_data_list[[length(plot_data_list)+1]] <- ens[, .(date, Return, Strategy)]
+    }
+  }
+  
+  combined <- rbindlist(plot_data_list)
+  setorder(combined, date)
+  combined[, Cumulative := cumprod(1 + Return) - 1, by = Strategy]
+  
+  p1 <- ggplot(combined, aes(x = date, y = Cumulative * 100, color = Strategy)) +
+    geom_line(linewidth = 1) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+    scale_color_manual(values = c(
+      "Scenario A (Full)" = "#2E86AB", 
+      "Scenario B (OOS)" = "#F24333",
+      "Scenario C (OOS)" = "#F2A900",
+      "Market (EW)" = "#A23B72"
+    )) +
+    labs(title = "Cumulative Returns: P-Tree Scenarios vs Market",
+         x = "", y = "Cumulative Return (%)") +
+    theme_minimal(base_size = 12) +
+    theme(legend.position = "bottom", plot.title = element_text(face = "bold"))
+  
+  ggsave(file.path(out_dir, "figure1_cumulative_returns.png"), p1, width = 10, height = 6, dpi = 300)
+  cat("  Saved: figure1_cumulative_returns.png\n")
+}
+
+# ==============================================================================
+# 5. FIGURE 2: FACTOR TIME SERIES
+# ==============================================================================
+cat("Generating Figure 2: Factor Time Series...\n")
+
+factors_file <- list.files(models_dir, pattern = "scenario_a_.*_factor.*\\.csv", full.names = TRUE)[1]
+if (!is.na(factors_file) && file.exists(factors_file)) {
+  factors <- fread(factors_file)
+  factors[, date := as.IDate(date)]
+
+  # Plot time series of the factor
+  p2 <- ggplot(factors, aes(x = date, y = F1 * 100)) +
+    geom_line(color = "#2E86AB", linewidth = 0.8) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+    labs(title = "P-Tree Factor Returns Over Time (Scenario A)",
+         subtitle = "Single boosted factor (9 iterations), splits only on firm size",
+         x = "", y = "Monthly Return (%)") +
+    theme_minimal(base_size = 12) +
+    theme(plot.title = element_text(face = "bold"),
+          plot.subtitle = element_text(size = 9, color = "gray40"))
+
+  ggsave(file.path(out_dir, "figure2_factor_timeseries.png"), p2, width = 10, height = 6, dpi = 300)
+  cat("  Saved: figure2_factor_timeseries.png\n")
+} else {
+  cat("  Warning: Factor file not found. Skipping Figure 2.\n")
+}
+
+# ==============================================================================
+# 5. FIGURE 3: MONTHLY RETURNS DISTRIBUTION
+# ==============================================================================
+cat("Generating Figure 3: Monthly Returns Distribution...\n")
+
+if (exists("ensemble_files") && length(ensemble_files) > 0) {
+  # Use Scenario A ensemble
+  ens_a <- fread(ensemble_files[grepl("scenario_a", ensemble_files)][1])
+  ens_a[, Return := factor_ensemble]  # Already in decimal form
+
+  p3 <- ggplot(ens_a, aes(x = Return * 100)) +
+    geom_histogram(bins = 30, fill = "#2E86AB", color = "white", alpha = 0.8) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
+    labs(title = "Distribution of Monthly Ensemble Returns (Scenario A)",
+         x = "Monthly Return (%)", y = "Frequency") +
+    theme_minimal(base_size = 12) +
+    theme(plot.title = element_text(face = "bold"))
+  
+  ggsave(file.path(out_dir, "figure3_returns_distribution.png"), p3, width = 10, height = 6, dpi = 300)
+  cat("  Saved: figure3_returns_distribution.png\n")
+}
+
+# ==============================================================================
+# 6. FIGURE 4: TREE STRUCTURE VISUALIZATION (DEGENERACY ANALYSIS)
+# ==============================================================================
+cat("Generating Figure 4: Tree Structure Visualization...\n")
+
+# Parse tree structures to extract splitting variables
+tree_file <- file.path(models_dir, "scenario_a_trees.txt")
+if (file.exists(tree_file)) {
+  tree_lines <- readLines(tree_file)
+
+  # Extract factor numbers and splitting variables
+  variable_usage <- list()
+
+  current_factor <- 0
+  for (line in tree_lines) {
+    if (grepl("^--- Factor", line)) {
+      current_factor <- as.integer(sub(".*Factor ([0-9]+).*", "\\1", line))
+    } else if (grepl("^\\[1\\]", line)) {
+      # Parse tree structure: "3\n1 3 0.137..."
+      # Format: node_id split_var threshold left_child right_child
+      tree_str <- gsub('\\[1\\] "', '', line)
+      tree_str <- gsub('"', '', tree_str)
+      parts <- strsplit(tree_str, "\\\\n")[[1]]
+
+      if (length(parts) >= 2) {
+        # First split (root node)
+        root <- strsplit(trimws(parts[2]), "\\s+")[[1]]
+        if (length(root) >= 2) {
+          split_var <- as.integer(root[2])
+          variable_usage[[length(variable_usage) + 1]] <- data.table(
+            Factor = current_factor,
+            SplitVariable = split_var
+          )
+        }
+      }
+    }
+  }
+
+  variable_usage <- rbindlist(variable_usage)
+
+  if (nrow(variable_usage) > 0) {
+    # Count variable usage across all factors
+    var_counts <- variable_usage[, .N, by = SplitVariable]
+
+    # Load actual characteristic names from inputs (in correct order)
+    if (file.exists(in_rds)) {
+      inp_check <- readRDS(in_rds)
+      char_names <- inp_check$char_cols
+    } else {
+      # Fallback to alphabetical order (matches actual data)
+      char_names <- c("rank_acc", "rank_agr", "rank_ato", "rank_bm", "rank_cash",
+                     "rank_cashdebt", "rank_cfp", "rank_chpm", "rank_chtx", "rank_ep",
+                     "rank_gma", "rank_grltnoa", "rank_hire", "rank_lev", "rank_lgr",
+                     "rank_me", "rank_mom12m", "rank_mom1m", "rank_mom36m", "rank_mom60m",
+                     "rank_mom6m", "rank_ni", "rank_noa", "rank_op", "rank_pctacc",
+                     "rank_pm", "rank_rna", "rank_roa", "rank_roe", "rank_seas1a",
+                     "rank_sgr", "rank_sp")
+    }
+
+    # Expand to show ALL characteristics (including unused ones)
+    all_vars <- data.table(
+      SplitVariable = 0:31,
+      CharName = char_names
+    )
+    var_counts_full <- merge(all_vars, var_counts, by = "SplitVariable", all.x = TRUE)
+    var_counts_full[is.na(N), N := 0]
+    setorder(var_counts_full, -N, SplitVariable)
+
+    # Highlight the dominant variable
+    var_counts_full[, Color := ifelse(N > 15, "Dominant", "Unused/Rare")]
+
+    p4 <- ggplot(var_counts_full[1:20], aes(x = reorder(CharName, N), y = N, fill = Color)) +
+      geom_bar(stat = "identity") +
+      geom_text(aes(label = N), hjust = -0.2, size = 3) +
+      coord_flip() +
+      scale_fill_manual(values = c("Dominant" = "#F24333", "Unused/Rare" = "#CCCCCC")) +
+      labs(title = "Variable Usage in P-Tree Training (Scenario A)",
+           subtitle = "Single-factor model: shows which characteristic the tree splits on",
+           x = "Characteristic", y = "Number of Times Split On") +
+      theme_minimal(base_size = 11) +
+      theme(legend.position = "bottom",
+            plot.title = element_text(face = "bold"),
+            plot.subtitle = element_text(size = 9, color = "gray40"))
+
+    ggsave(file.path(out_dir, "figure4_variable_usage.png"), p4, width = 10, height = 7, dpi = 300)
+    cat("  Saved: figure4_variable_usage.png\n")
+  }
+}
+
+# ==============================================================================
+# 7. FIGURE 5: RETURNS DISTRIBUTION COMPARISON (A, B, C)
+# ==============================================================================
+cat("Generating Figure 5: Returns Distribution (All Scenarios)...\n")
+
+if (exists("ensemble_files") && length(ensemble_files) > 0) {
+  dist_data_list <- list()
+
+  for (f in ensemble_files) {
+    ens <- fread(f)
+    ens[, Return := factor_ensemble]  # Already in decimal form
+
+    fname <- basename(f)
+    scenario <- "Unknown"
+    if (grepl("scenario_a_ensemble", fname)) scenario <- "A: Full Sample"
+    if (grepl("scenario_b_test_ensemble", fname)) scenario <- "B: OOS (2010-2019)"
+    if (grepl("scenario_c_test_ensemble", fname)) scenario <- "C: OOS (1998-2009)"
+
+    if (scenario != "Unknown") {
+      ens[, Scenario := scenario]
+      dist_data_list[[length(dist_data_list)+1]] <- ens[, .(Return, Scenario)]
+    }
+  }
+
+  if (length(dist_data_list) > 0) {
+    dist_combined <- rbindlist(dist_data_list)
+
+    # Calculate summary stats for annotation
+    dist_stats <- dist_combined[, .(
+      Mean = mean(Return, na.rm = TRUE),
+      SD = sd(Return, na.rm = TRUE),
+      N = .N
+    ), by = Scenario]
+
+    p5 <- ggplot(dist_combined, aes(x = Return * 100, fill = Scenario)) +
+      geom_histogram(bins = 30, alpha = 0.7, position = "identity", color = "white") +
+      geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
+      facet_wrap(~ Scenario, ncol = 1, scales = "free_y") +
+      scale_fill_manual(values = c(
+        "A: Full Sample" = "#2E86AB",
+        "B: OOS (2010-2019)" = "#F24333",
+        "C: OOS (1998-2009)" = "#F2A900"
+      )) +
+      labs(title = "Monthly Ensemble Returns Distribution by Scenario",
+           subtitle = "Comparing in-sample (A) vs out-of-sample (B, C) performance",
+           x = "Monthly Return (%)", y = "Frequency") +
+      theme_minimal(base_size = 11) +
+      theme(legend.position = "none",
+            plot.title = element_text(face = "bold"),
+            plot.subtitle = element_text(size = 9, color = "gray40"),
+            strip.text = element_text(face = "bold"))
+
+    ggsave(file.path(out_dir, "figure5_returns_distribution_all.png"), p5, width = 10, height = 9, dpi = 300)
+    cat("  Saved: figure5_returns_distribution_all.png\n")
+  }
+}
+
+# ==============================================================================
+# 8. FIGURE 6: MARKET CAP DISTRIBUTION BY LEAF (SIZE SEGMENTATION)
+# ==============================================================================
+cat("Generating Figure 6: Market Cap Distribution by Leaf...\n")
+
+# Load scenario A factor file
+leaf_file <- list.files(models_dir, pattern = "scenario_a_.*_factor.*\\.csv", full.names = TRUE)[1]
+if (file.exists(leaf_file)) {
+  factors_a <- fread(leaf_file)
+  factors_a[, date := as.IDate(date)]
+
+  # Merge with input data to get market cap
+  if (exists("dt")) {
+    # For first factor, analyze leaf assignments
+    # We need to reconstruct which stocks are in which leaf
+    # This requires re-running predictions, so we'll create a proxy visualization
+
+    # Alternative: Show distribution of market cap by deciles (since trees split on rank_me)
+    dt[, me_decile := cut(rank_me, breaks = quantile(rank_me, probs = seq(0, 1, 0.1), na.rm = TRUE),
+                          labels = paste0("D", 1:10), include.lowest = TRUE)]
+
+    # Calculate average return by market cap decile
+    me_analysis <- dt[, .(
+      avg_return = mean(ret_next, na.rm = TRUE) * 100,
+      median_me = median(lag_me, na.rm = TRUE),
+      n_obs = .N
+    ), by = me_decile]
+
+    me_analysis <- me_analysis[!is.na(me_decile)]
+    setorder(me_analysis, me_decile)
+
+    p6 <- ggplot(me_analysis, aes(x = me_decile, y = avg_return)) +
+      geom_bar(stat = "identity", fill = "#2E86AB", alpha = 0.8) +
+      geom_text(aes(label = sprintf("%.2f%%", avg_return)), vjust = -0.5, size = 3) +
+      labs(title = "Average Returns by Firm Size Decile",
+           subtitle = "P-Trees exclusively split on firm size (rank_me), creating size-based portfolios",
+           x = "Market Equity Decile (D1 = Smallest, D10 = Largest)",
+           y = "Average Monthly Return (%)") +
+      theme_minimal(base_size = 11) +
+      theme(plot.title = element_text(face = "bold"),
+            plot.subtitle = element_text(size = 9, color = "gray40"))
+
+    ggsave(file.path(out_dir, "figure6_size_decile_returns.png"), p6, width = 10, height = 6, dpi = 300)
+    cat("  Saved: figure6_size_decile_returns.png\n")
+  }
+}
+
+cat("\n✓ All visualizations saved to:", out_dir, "\n")
+cat("\nGenerated files:\n")
+cat("  Tables (LaTeX only):\n")
+cat("    - table1_data_summary.tex - Data summary statistics\n")
+cat("    - table2_model_performance.tex - Performance metrics\n")
+cat("    - table3_tree_structures.tex - Tree splits by scenario\n")
+cat("  Figures (PNG):\n")
+cat("    - figure1_cumulative_returns.png - P-Tree vs Market comparison\n")
+cat("    - figure2_factor_timeseries.png - Factor returns over time\n")
+cat("    - figure3_returns_distribution.png - Scenario A distribution\n")
+cat("    - figure4_variable_usage.png - Variable usage by scenario\n")
+cat("    - figure5_returns_distribution_all.png - All scenarios comparison\n")
