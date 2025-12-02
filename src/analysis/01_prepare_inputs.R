@@ -57,9 +57,12 @@ char_cols <- grep("^rank_", names(dt), value = TRUE)
 # This handles cases where "NA" strings or other issues caused character loading
 cat("Ensuring all characteristics are numeric...\n")
 for (col in char_cols) {
+  # Always force conversion to be safe
   if (!is.numeric(dt[[col]])) {
     cat("  Converting", col, "to numeric...\n")
-    set(dt, j=col, value=as.numeric(dt[[col]]))
+    # Convert via character to handle factors/mixed types safely
+    val <- as.numeric(as.character(dt[[col]]))
+    set(dt, j=col, value=val)
   }
 }
 
@@ -132,11 +135,34 @@ cat(sprintf("  Winsorized %d observations (%.2f%%) to [%.4f, %.4f]\n",
             n_winsorized, n_winsorized/nrow(dt)*100, q01, q99))
 
 # Build objects for PTree
-X <- as.matrix(dt[, ..keep_chars])
-# Scale returns to PERCENT to match P-Tree defaults
-R <- as.vector(dt$ret_next) * 100
+# Use .SDcols to ensure correct extraction (avoiding potential .. syntax issues)
+X <- as.matrix(dt[, .SD, .SDcols = keep_chars])
+
+# Ensure X is numeric and handle NAs
+if (!is.numeric(X)) {
+  cat("Warning: X matrix is not numeric. Forcing conversion...\n")
+  mode(X) <- "numeric"
+}
+if (any(is.na(X))) {
+  cat(sprintf("Warning: X contains %d NAs. Filling with 0...\n", sum(is.na(X))))
+  X[is.na(X)] <- 0
+}
+
+# Returns (Decimal)
+R <- as.vector(dt$ret_next) # No scaling (decimal)
 Y <- R
-Z <- cbind(Intercept = 1, if (length(instr)>0) as.matrix(dt[, ..instr]) else NULL)
+Z_instr <- if (length(instr)>0) as.matrix(dt[, .SD, .SDcols = instr]) else NULL
+Z <- cbind(Intercept = 1, Z_instr)
+
+# Ensure Z is numeric and handle NAs
+if (!is.numeric(Z)) {
+  cat("Warning: Z matrix is not numeric. Forcing conversion...\n")
+  mode(Z) <- "numeric"
+}
+if (any(is.na(Z))) {
+  cat(sprintf("Warning: Z contains %d NAs. Filling with 0...\n", sum(is.na(Z))))
+  Z[is.na(Z)] <- 0
+}
 
 # Indices (0-indexed)
 months <- as.integer(as.factor(dt$date)) - 1L

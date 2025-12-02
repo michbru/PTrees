@@ -57,20 +57,40 @@ cat("║   A3: EVALUATE P-TREE MODELS                  ║\n")
 cat("╚════════════════════════════════════════════════╝\n\n")
 cat("Factor file:", ff_path, "\n")
 cat("Newey-West lags:", nw_lags, "\n\n")
+cat("Factor file:", ff_path, "\n")
+cat("Newey-West lags:", nw_lags, "\n\n")
 
 if (!file.exists(ff_path)) stop("Factor file not found")
 
 ff <- fread(ff_path)
 cat(sprintf("Loaded factor data: %d months\n\n", nrow(ff)))
 
-# Helper function for alphas
-calc_alpha <- function(factor_file, scenario_name) {
-  if (!file.exists(factor_file)) {
-    cat(sprintf("  ✗ File not found: %s\n", basename(factor_file)))
-    return(NULL)
-  }
+# Helper function to construct MVE portfolio
+construct_mve <- function(factors_mat, lambda_cov = 1e-4) {
+  # factors_mat: T x K matrix of factor returns
+  mu <- colMeans(factors_mat)
+  Sigma <- cov(factors_mat)
+  
+  # Regularize covariance
+  Sigma_reg <- Sigma + diag(lambda_cov, ncol(Sigma))
+  
+  # Solve for weights: w = Sigma^-1 * mu
+  w <- solve(Sigma_reg, mu)
+  
+  # Normalize to sum to 1 (optional, but standard for portfolio)
+  # Original paper does w = w / sum(w)
+  w <- w / sum(w)
+  
+  # Construct portfolio returns
+  mve_ret <- factors_mat %*% w
+  
+  list(ret = as.vector(mve_ret), weights = w)
+}
 
-  f <- fread(factor_file)
+# Helper function for alphas
+calc_alpha <- function(factor_dt, name) {
+  # factor_dt should have columns: date, factor
+  f <- copy(factor_dt)
   f[, ym := format(as.IDate(date), "%Y-%m")]
 
   ff_sub <- copy(ff)
@@ -85,12 +105,15 @@ calc_alpha <- function(factor_file, scenario_name) {
   if ("smb_ew" %in% names(reg_data) && !"smb" %in% names(reg_data)) reg_data[, smb := smb_ew]
   if ("hml_ew" %in% names(reg_data) && !"hml" %in% names(reg_data)) reg_data[, hml := hml_ew]
 
-  # Scale factors to percent if they look like decimals (|x|<10 is a safe heuristic)
+  # Scale FF factors to decimal if they are in percent (heuristic)
+  # Our P-Tree factors are now DECIMAL (we removed *100).
+  # FF data is usually percent. We should convert FF to decimal.
   for (col in c("mkt_rf","smb","hml")) {
     if (col %in% names(reg_data)) {
       rng <- reg_data[[col]]
-      if (is.numeric(rng) && max(abs(rng), na.rm = TRUE) < 10) {
-        reg_data[[col]] <- reg_data[[col]] * 100
+      if (is.numeric(rng) && max(abs(rng), na.rm = TRUE) > 1) {
+        # Likely percent, convert to decimal
+        reg_data[[col]] <- reg_data[[col]] / 100
       }
     }
   }
@@ -108,7 +131,7 @@ calc_alpha <- function(factor_file, scenario_name) {
   # CAPM
   capm <- lm(factor ~ mkt_rf, data = reg_data)
   capm_nw <- coeftest(capm, vcov = NeweyWest(capm, lag = nw_lags))
-  capm_alpha <- coef(capm)["(Intercept)"] * 12  # Annualized
+  capm_alpha <- coef(capm)["(Intercept)"] * 12 
   capm_tstat <- capm_nw["(Intercept)", "t value"]
 
   # FF3
@@ -116,12 +139,21 @@ calc_alpha <- function(factor_file, scenario_name) {
   ff3_nw <- coeftest(ff3, vcov = NeweyWest(ff3, lag = nw_lags))
   ff3_alpha <- coef(ff3)["(Intercept)"] * 12
   ff3_tstat <- ff3_nw["(Intercept)", "t value"]
+  
+  # SR
+  m <- mean(reg_data$factor)
+  s <- sd(reg_data$factor)
+  sr <- if(s>0) m/s*sqrt(12) else NA
 
-  cat(sprintf("  CAPM Alpha: %.2f%% (t=%.2f)\n", capm_alpha, capm_tstat))
-  cat(sprintf("  FF3 Alpha:  %.2f%% (t=%.2f)\n\n", ff3_alpha, ff3_tstat))
+  cat(sprintf("  Mean: %.2f%% | SD: %.2f%% | SR: %.2f\n", m*100, s*100, sr))
+  cat(sprintf("  CAPM Alpha: %.2f%% (t=%.2f)\n", capm_alpha*100, capm_tstat))
+  cat(sprintf("  FF3 Alpha:  %.2f%% (t=%.2f)\n\n", ff3_alpha*100, ff3_tstat))
 
   data.table(
-    scenario = scenario_name,
+    scenario = name,
+    sharpe = sr,
+    mean_ann = m*12,
+    sd_ann = s*sqrt(12),
     capm_alpha = capm_alpha,
     capm_tstat = capm_tstat,
     ff3_alpha = ff3_alpha,
@@ -130,48 +162,39 @@ calc_alpha <- function(factor_file, scenario_name) {
   )
 }
 
-scenarios <- list(
-  list(name = "A: Full Sample (Single)",  file = file.path(models_dir, "scenario_a_single_factor.csv")),
-  list(name = "A: Full Sample (Boosted)", file = file.path(models_dir, "scenario_a_boosted_factor.csv")),
-  list(name = "B: Time-Split (Single)",   file = file.path(models_dir, "scenario_b_single_test_factor.csv")),
-  list(name = "B: Time-Split (Boosted)",  file = file.path(models_dir, "scenario_b_boosted_test_factor.csv")),
-  list(name = "C: Reverse Split (Single)",file = file.path(models_dir, "scenario_c_single_test_factor.csv")),
-  list(name = "C: Reverse Split (Boosted)",file = file.path(models_dir, "scenario_c_boosted_test_factor.csv"))
-)
+# Main Evaluation Loop
+files <- list.files(models_dir, pattern = "_20_factors.csv", full.names = TRUE)
 
-alpha_list <- list()
-for (sc in scenarios) {
+results_list <- list()
+
+for (fpath in files) {
+  fname <- basename(fpath)
+  scenario <- sub("_20_factors.csv", "", fname)
+  
   cat("\n╔════════════════════════════════════════════════╗\n")
-  cat(sprintf("║   %s\n", sc$name))
+  cat(sprintf("║   EVALUATING: %s\n", scenario))
   cat("╚════════════════════════════════════════════════╝\n\n")
-  a <- calc_alpha(sc$file, sc$name)
-  if (!is.null(a)) alpha_list[[length(alpha_list)+1]] <- a
+  
+  dt_factors <- fread(fpath)
+  date_col <- dt_factors$date
+  factors_mat <- as.matrix(dt_factors[, -1]) # Exclude date
+  
+  # 1. Construct MVE
+  cat("Constructing MVE portfolio from 20 factors...\n")
+  mve <- construct_mve(factors_mat)
+  
+  # 2. Evaluate MVE
+  mve_dt <- data.table(date = date_col, factor = mve$ret)
+  res <- calc_alpha(mve_dt, paste0(scenario, " (MVE)"))
+  
+  if (!is.null(res)) results_list[[length(results_list)+1]] <- res
+  
+  # 3. Save MVE series
+  fwrite(mve_dt, file.path(out_dir, paste0(scenario, "_mve_factor.csv")))
 }
 
-# Combine with summary
-summary <- fread(file.path(models_dir, "all_scenarios_summary.csv"))
-summary_keep <- summary[scenario %in% sapply(scenarios, `[[`, "name")]
-
-results <- rbindlist(alpha_list, fill = TRUE)
-
-final <- merge(summary_keep[, .(scenario, sharpe, return_pct, leaves)],
-               results, by = "scenario", all = TRUE)
-
-cat("\n╔════════════════════════════════════════════════╗\n")
-cat("║   FINAL RESULTS TABLE                         ║\n")
-cat("╚════════════════════════════════════════════════╝\n\n")
-
+final <- rbindlist(results_list)
 print(final)
-
-fwrite(results, file.path(out_dir, "benchmark_regressions.csv"))
-fwrite(final, file.path(out_dir, "final_results_table.csv"))
-
-# Also export LaTeX tables for thesis/appendix use
-write_tex_table(results, file.path(out_dir, "benchmark_regressions.tex"),
-                caption = "CAPM and FF3 regressions (Newey–West)",
-                label = "tab:benchmark-regs")
-write_tex_table(final, file.path(out_dir, "final_results_table.tex"),
-                caption = "Performance and alpha benchmarks (Newey–West)",
-                label = "tab:final-results")
+fwrite(final, file.path(out_dir, "final_mve_results.csv"))
 
 cat(sprintf("\n✓ Results saved to: %s\n\n", out_dir))

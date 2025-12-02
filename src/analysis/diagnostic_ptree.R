@@ -26,7 +26,22 @@ cat(sprintf("Subset data: %d rows, %d months\n", nrow(dt_sub), length(unique(dt_
 
 # Helper to build data
 build_data <- function(dt, scale_percent=TRUE) {
-  X <- as.matrix(dt[, ..inp$char_cols])
+  # Debug column types
+  cat("Checking column types in dt...\n")
+  non_num_cols <- names(dt)[sapply(dt, function(c) !is.numeric(c))]
+  cat("Non-numeric columns in dt:", paste(non_num_cols, collapse=", "), "\n")
+  
+  cat("Char cols:", paste(inp$char_cols, collapse=", "), "\n")
+  X <- as.matrix(dt[, .SD, .SDcols = inp$char_cols])
+  
+  if (!is.numeric(X)) {
+    cat("X is NOT numeric. Checking columns...\n")
+    for (j in 1:ncol(X)) {
+      if (!is.numeric(X[,j])) {
+        cat(sprintf("  Col %s is %s\n", colnames(X)[j], class(X[,j])))
+      }
+    }
+  }
   R <- as.vector(dt$ret_next)
   if (scale_percent) R <- R * 100
   Y <- R
@@ -157,11 +172,15 @@ run_test <- function(name, scale_percent, eta, min_leaf_size, lambda_cov=0) {
 }
 
 # 1. Baseline (Percent, Eta=0.1, Leaf=100)
-run_test("1. Baseline (Percent, Leaf=100)", scale_percent=TRUE, eta=0.1, min_leaf_size=100)
+# 1. Baseline (Percent, Eta=0.1, Leaf=100)
+# run_test("1. Baseline (Percent, Leaf=100)", scale_percent=TRUE, eta=0.1, min_leaf_size=100)
 
 # 2. Small Leaf + Regularization
 run_test("2. Small Leaf + Reg (Percent, Leaf=20, L=1e-2)", scale_percent=TRUE, eta=0.1, min_leaf_size=20, lambda_cov=1e-2)
 
 # 3. Decimal + Small Leaf + Regularization
 run_test("3. Decimal + Reg (Decimal, Leaf=20, L=1e-2)", scale_percent=FALSE, eta=0.1, min_leaf_size=20, lambda_cov=1e-2)
+
+# 4. Heavy Regularization
+run_test("4. Heavy Reg (Percent, Leaf=20, L=1.0)", scale_percent=TRUE, eta=0.1, min_leaf_size=20, lambda_cov=1.0)
 

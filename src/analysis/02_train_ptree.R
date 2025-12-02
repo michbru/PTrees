@@ -33,10 +33,12 @@ inp <- readRDS(in_rds)
 
 # Helper function to build training data from filtered dataset
 build_train_data <- function(dt_sub, keep_chars, instr) {
-  X <- as.matrix(dt_sub[, ..keep_chars])
-  R <- as.vector(dt_sub$ret_next) * 100  # Scale to percent
+  # Use .SDcols for safe extraction
+  X <- as.matrix(dt_sub[, .SD, .SDcols = keep_chars])
+  R <- as.vector(dt_sub$ret_next) # Decimal returns (no * 100)
   Y <- R
-  Z <- cbind(Intercept = 1, if (length(instr)>0) as.matrix(dt_sub[, ..instr]) else NULL)
+  Z_instr <- if (length(instr)>0) as.matrix(dt_sub[, .SD, .SDcols = instr]) else NULL
+  Z <- cbind(Intercept = 1, Z_instr)
 
   months <- as.integer(as.factor(dt_sub$date)) - 1L
   stocks <- as.integer(as.factor(dt_sub$isin)) - 1L
@@ -48,75 +50,92 @@ build_train_data <- function(dt_sub, keep_chars, instr) {
        pw=pw, lw=lw)
 }
 
-# Helper function to train P-Tree with configurable params
-train_ptree <- function(train_data, scenario_name,
-                        num_iter=1, eta=0.10,
-                        min_leaf_size=100, max_depth=3, num_cutpoints=50,
-                        equal_weight=TRUE, weighted_loss=FALSE,
-                        lambda_ridge=0,
-                        abs_normalize=TRUE) {
+# Helper function to train P-Tree with 20-factor boosting loop
+train_ptree_factors <- function(train_data, scenario_name,
+                                num_factors=20,
+                                num_iter=9, eta=1.0, # Original paper defaults
+                                min_leaf_size=100, max_depth=3, num_cutpoints=50,
+                                equal_weight=TRUE, weighted_loss=FALSE,
+                                lambda_cov=0,       # Added lambda_cov
+                                lambda_ridge=1e-4, # Added ridge for stability
+                                abs_normalize=TRUE) {
   cat(sprintf("\n╔════════════════════════════════════════════════╗\n"))
-  cat(sprintf("║   %s\n", scenario_name))
+  cat(sprintf("║   %s (Extracting %d Factors)\n", scenario_name, num_factors))
   cat(sprintf("╚════════════════════════════════════════════════╝\n\n"))
 
   cat(sprintf("  Obs: %d | Months: %d | Stocks: %d\n",
               nrow(train_data$dt), train_data$num_months, train_data$num_stocks))
-  cat(sprintf("  Date range: %s to %s\n",
-              as.character(min(train_data$dt$date)), as.character(max(train_data$dt$date))))
-  cat(sprintf("  Parameters: num_iter=%d, eta=%.2f, min_leaf=%d, depth=%d, cuts=%d\n",
-              num_iter, eta, min_leaf_size, max_depth, num_cutpoints))
+  cat(sprintf("  Parameters: iter/factor=%d, eta=%.2f, min_leaf=%d, depth=%d, lambda_cov=%.1e\n",
+              num_iter, eta, min_leaf_size, max_depth, lambda_cov))
 
-  suppressWarnings({
-    fit <- PTree::PTree(
-      train_data$R, train_data$Y, train_data$X, train_data$Z,
-      H = rep(0, train_data$num_months),
-      train_data$pw, train_data$lw,
-      train_data$stocks, train_data$months,
-      seq(0L, ncol(train_data$X)-1L), seq(0L, ncol(train_data$X)-1L),
-      train_data$num_stocks, train_data$num_months,
-      min_leaf_size = min_leaf_size,
-      max_depth = max_depth,
-      num_iter = num_iter,
-      num_cutpoints = num_cutpoints,
-      eta = eta,
-      equal_weight = equal_weight,
-      no_H = TRUE,
-      abs_normalize = abs_normalize,
-      weighted_loss = weighted_loss,
-      lambda_mean = 0,
-      lambda_cov = 0,
-      lambda_mean_factor = 0,
-      lambda_cov_factor = 0,
-      early_stop = FALSE,
-      stop_threshold = 0.999,
-      lambda_ridge = lambda_ridge,
-      a1 = 0, a2 = 0,
-      list_K = matrix(rep(0, 3), nrow = 3, ncol = 1),
-      random_split = FALSE
-    )
-  })
+  # Initialize
+  H_train <- rep(0, train_data$num_months) # Current prediction (accumulated factors)
+  factors_list <- list()
+  models_list <- list()
+  
+  # Boosting Loop
+  for (k in 1:num_factors) {
+    cat(sprintf("  Training Factor %d/%d...", k, num_factors))
+    
+    t_start <- proc.time()
+    suppressWarnings({
+      fit <- PTree::PTree(
+        train_data$R, train_data$Y, train_data$X, train_data$Z,
+        H = H_train,
+        train_data$pw, train_data$lw,
+        train_data$stocks, train_data$months,
+        seq(0L, ncol(train_data$X)-1L), seq(0L, ncol(train_data$X)-1L),
+        train_data$num_stocks, train_data$num_months,
+        min_leaf_size = min_leaf_size,
+        max_depth = max_depth,
+        num_iter = num_iter,
+        num_cutpoints = num_cutpoints,
+        eta = eta,
+        equal_weight = equal_weight,
+        no_H = FALSE, # We use H for boosting
+        abs_normalize = abs_normalize,
+        weighted_loss = weighted_loss,
+        lambda_mean = 0,
+        lambda_cov = lambda_cov, # Pass lambda_cov here
+        lambda_mean_factor = 0,
+        lambda_cov_factor = 0,
+        early_stop = FALSE,
+        stop_threshold = 1.0,
+        lambda_ridge = lambda_ridge,
+        a1 = 0, a2 = 0,
+        list_K = matrix(rep(0, 3), nrow = 3, ncol = 1),
+        random_split = FALSE
+      )
+    })
+    dur <- (proc.time() - t_start)[3]
+    
+    # Extract factor
+    ft <- as.numeric(fit$ft)
+    factors_list[[k]] <- ft
+    models_list[[k]] <- fit
+    
+    # Update H (prediction)
+    # Note: PTree returns the NEW factor. We add it to H.
+    H_train <- H_train + ft
+    
+    cat(sprintf(" Done (%.2fs). Mean: %.4f | SD: %.4f\n", dur, mean(ft), sd(ft)))
+  }
 
-  ft <- as.numeric(fit$ft)
-  mean_m <- mean(ft, na.rm=TRUE)
-  std_m <- sd(ft, na.rm=TRUE)
+  # Combine factors into a matrix (Months x Factors)
+  factors_mat <- do.call(cbind, factors_list)
+  colnames(factors_mat) <- paste0("F", 1:num_factors)
+  
+  # Calculate stats for the *ensemble* (H_train)
+  mean_m <- mean(H_train, na.rm=TRUE)
+  std_m <- sd(H_train, na.rm=TRUE)
   sharpe <- if (std_m > 0) mean_m / std_m * sqrt(12) else NA_real_
   annualized_return <- mean_m * 12
 
-  # Extract leaf portfolios
-  leaf_portfolios <- as.data.table(fit$portfolio)
-  num_leaves <- ncol(leaf_portfolios)
+  cat(sprintf("\n  ✓ RESULTS (Ensemble):\n"))
+  cat(sprintf("    Sharpe: %.2f | Mean: %.2f%% | SD: %.2f%%\n", sharpe, mean_m*100, std_m*100))
 
-  # Parse tree structure to count actual depth
-  tree_str <- as.character(fit$tree)
-
-  cat(sprintf("\n  ✓ RESULTS:\n"))
-  cat(sprintf("    Leaves: %d | Tree Depth: %d nodes\n", num_leaves, length(tree_str)))
-  cat(sprintf("    Sharpe: %.2f | Mean: %.2f%% | SD: %.2f%%\n", sharpe, mean_m, std_m))
-  cat(sprintf("    Annualized Return: %.2f%%\n", annualized_return))
-
-  list(fit=fit, ft=ft, mean=mean_m, sd=std_m, sharpe=sharpe,
-       tree=tree_str, leaf_portfolios=leaf_portfolios, num_leaves=num_leaves,
-       annualized_return=annualized_return)
+  list(models=models_list, factors=factors_mat, H=H_train, 
+       mean=mean_m, sd=std_m, sharpe=sharpe, annualized_return=annualized_return)
 }
 
 # Helper to evaluate factor on test data
@@ -312,142 +331,47 @@ tune_params_cv <- function(dt_for_tuning, keep_chars, instr, model_type = c("sin
 }
 
 # ============================================================================
-# MAIN TRAINING LOOP
+# MAIN TRAINING LOOP (20-Factor Extraction)
 # ============================================================================
 
 dt <- copy(inp$dt)
-split_date <- as.IDate("2010-01-01")
-val_split_date <- as.IDate("2007-01-01")
 
-cat("Data availability:\n")
-cat(sprintf("  Full range: %s to %s (%d months)\n",
-            min(dt$date), max(dt$date), length(unique(dt$date))))
-cat(sprintf("  Split date: %s\n", split_date))
-cat(sprintf("  Validation split (within train): %s\n", val_split_date))
-
-dt_period1 <- dt[date < split_date]
-dt_period2 <- dt[date >= split_date]
-
-cat(sprintf("  Period 1 (train B): %s to %s (%d months)\n",
-            min(dt_period1$date), max(dt_period1$date), length(unique(dt_period1$date))))
-cat(sprintf("  Period 2 (train C): %s to %s (%d months)\n\n",
-            min(dt_period2$date), max(dt_period2$date), length(unique(dt_period2$date))))
-
-# ============================================================================
-# TUNING
-# ============================================================================
-
-cat("\n\n╔════════════════════════════════════════════════╗\n")
-cat("║                HYPERPARAMETER TUNING          ║\n")
-cat("╚════════════════════════════════════════════════╝\n\n")
-
-best_single  <- tune_params_cv(dt_period1, inp$char_cols, inp$instr_cols, model_type = "single",
-                               val_window_months = 24L, num_folds = 3L, min_train_months = 60L)
-best_boosted <- tune_params_cv(dt_period1, inp$char_cols, inp$instr_cols, model_type = "boosted",
-                               val_window_months = 24L, num_folds = 3L, min_train_months = 60L)
-
-# ============================================================================
-# SCENARIO A: FULL SAMPLE (re-estimate for reference)
-# ============================================================================
-
+# SCENARIO A: FULL SAMPLE
+cat("\n\n--- SCENARIO A: FULL SAMPLE ---\n")
 train_a <- build_train_data(dt, inp$char_cols, inp$instr_cols)
-model_a_single <- train_ptree(train_a, "SCENARIO A: FULL SAMPLE (SINGLE)",
-                              num_iter = best_single$num_iter, eta = best_single$eta,
-                              min_leaf_size = best_single$min_leaf_size,
-                              max_depth = best_single$max_depth,
-                              num_cutpoints = best_single$num_cutpoints)
-save_scenario_results(model_a_single, NULL, "scenario_a_single", train_a, is_test=FALSE, params=best_single)
 
-model_a_boosted <- train_ptree(train_a, "SCENARIO A: FULL SAMPLE (BOOSTED)",
-                               num_iter = best_boosted$num_iter, eta = best_boosted$eta,
-                               min_leaf_size = best_boosted$min_leaf_size,
-                               max_depth = best_boosted$max_depth,
-                               num_cutpoints = best_boosted$num_cutpoints)
-save_scenario_results(model_a_boosted, NULL, "scenario_a_boosted", train_a, is_test=FALSE, params=best_boosted)
+# Train 20 factors
+# Original paper uses num_iter=9, eta=1.0 (implied)
+# Adjusted parameters based on diagnostic: min_leaf=20, lambda_cov=1e-2
+model_a <- train_ptree_factors(train_a, "SCENARIO A", 
+                               num_factors = 20,
+                               num_iter = 9, 
+                               eta = 1.0, 
+                               min_leaf_size = 20, 
+                               lambda_cov = 1e-2,
+                               lambda_ridge = 1e-4)
 
-# ============================================================================
-# SCENARIO B: TIME-SPLIT (train on past, test on future)
-# ============================================================================
-
-train_b <- build_train_data(dt_period1, inp$char_cols, inp$instr_cols)
-test_b  <- build_train_data(dt_period2, inp$char_cols, inp$instr_cols)
-
-# Single
-model_b_single <- train_ptree(train_b, "SCENARIO B (SINGLE): PAST→FUTURE (Train)",
-                              num_iter = best_single$num_iter, eta = best_single$eta,
-                              min_leaf_size = best_single$min_leaf_size,
-                              max_depth = best_single$max_depth,
-                              num_cutpoints = best_single$num_cutpoints)
-eval_b_single <- evaluate_on_test(model_b_single, test_b, "Scenario B (Single)")
-save_scenario_results(model_b_single, list(ft=eval_b_single$ft, sharpe=eval_b_single$sharpe,
-                                           mean=eval_b_single$mean, sd=eval_b_single$sd, annualized_return=eval_b_single$annualized_return),
-                      "scenario_b_single", train_b, test_b, is_test=TRUE, params=best_single)
-
-# Boosted
-model_b_boosted <- train_ptree(train_b, "SCENARIO B (BOOSTED): PAST→FUTURE (Train)",
-                               num_iter = best_boosted$num_iter, eta = best_boosted$eta,
-                               min_leaf_size = best_boosted$min_leaf_size,
-                               max_depth = best_boosted$max_depth,
-                               num_cutpoints = best_boosted$num_cutpoints)
-eval_b_boosted <- evaluate_on_test(model_b_boosted, test_b, "Scenario B (Boosted)")
-save_scenario_results(model_b_boosted, list(ft=eval_b_boosted$ft, sharpe=eval_b_boosted$sharpe,
-                                            mean=eval_b_boosted$mean, sd=eval_b_boosted$sd, annualized_return=eval_b_boosted$annualized_return),
-                      "scenario_b_boosted", train_b, test_b, is_test=TRUE, params=best_boosted)
-
-# ============================================================================
-# SCENARIO C: REVERSE SPLIT (train on future, test on past)
-# ============================================================================
-
-train_c <- build_train_data(dt_period2, inp$char_cols, inp$instr_cols)
-test_c  <- build_train_data(dt_period1, inp$char_cols, inp$instr_cols)
-
-# Single
-model_c_single <- train_ptree(train_c, "SCENARIO C (SINGLE): FUTURE→PAST (Train)",
-                              num_iter = best_single$num_iter, eta = best_single$eta,
-                              min_leaf_size = best_single$min_leaf_size,
-                              max_depth = best_single$max_depth,
-                              num_cutpoints = best_single$num_cutpoints)
-eval_c_single <- evaluate_on_test(model_c_single, test_c, "Scenario C (Single)")
-save_scenario_results(model_c_single, list(ft=eval_c_single$ft, sharpe=eval_c_single$sharpe,
-                                           mean=eval_c_single$mean, sd=eval_c_single$sd, annualized_return=eval_c_single$annualized_return),
-                      "scenario_c_single", train_c, test_c, is_test=TRUE, params=best_single)
-
-# Boosted
-model_c_boosted <- train_ptree(train_c, "SCENARIO C (BOOSTED): FUTURE→PAST (Train)",
-                               num_iter = best_boosted$num_iter, eta = best_boosted$eta,
-                               min_leaf_size = best_boosted$min_leaf_size,
-                               max_depth = best_boosted$max_depth,
-                               num_cutpoints = best_boosted$num_cutpoints)
-eval_c_boosted <- evaluate_on_test(model_c_boosted, test_c, "Scenario C (Boosted)")
-save_scenario_results(model_c_boosted, list(ft=eval_c_boosted$ft, sharpe=eval_c_boosted$sharpe,
-                                            mean=eval_c_boosted$mean, sd=eval_c_boosted$sd, annualized_return=eval_c_boosted$annualized_return),
-                      "scenario_c_boosted", train_c, test_c, is_test=TRUE, params=best_boosted)
-
-# ============================================================================
-# SUMMARY TABLE
-# ============================================================================
-
-cat("\n\n╔════════════════════════════════════════════════╗\n")
-cat("║         FINAL SUMMARY (ALL SCENARIOS)         ║\n")
-cat("╚════════════════════════════════════════════════╝\n\n")
-
-summary_all <- rbind(
-  data.table(scenario="A: Full Sample (Single)", period="Train", sharpe=model_a_single$sharpe,
-             return_pct=model_a_single$annualized_return, leaves=model_a_single$num_leaves),
-  data.table(scenario="A: Full Sample (Boosted)", period="Train", sharpe=model_a_boosted$sharpe,
-             return_pct=model_a_boosted$annualized_return, leaves=model_a_boosted$num_leaves),
-  data.table(scenario="B: Time-Split (Single)", period="Test (OOS)", sharpe=eval_b_single$sharpe,
-             return_pct=eval_b_single$annualized_return, leaves=model_b_single$num_leaves),
-  data.table(scenario="B: Time-Split (Boosted)", period="Test (OOS)", sharpe=eval_b_boosted$sharpe,
-             return_pct=eval_b_boosted$annualized_return, leaves=model_b_boosted$num_leaves),
-  data.table(scenario="C: Reverse Split (Single)", period="Test (OOS)", sharpe=eval_c_single$sharpe,
-             return_pct=eval_c_single$annualized_return, leaves=model_c_single$num_leaves),
-  data.table(scenario="C: Reverse Split (Boosted)", period="Test (OOS)", sharpe=eval_c_boosted$sharpe,
-             return_pct=eval_c_boosted$annualized_return, leaves=model_c_boosted$num_leaves)
+# Save Factors
+factors_dt <- data.table(
+  date = unique(train_a$dt$date),
+  model_a$factors
 )
+fwrite(factors_dt, file.path(out_dir, "scenario_a_20_factors.csv"))
 
-print(summary_all)
-fwrite(summary_all, file.path(out_dir, "all_scenarios_summary.csv"))
+# Save Ensemble
+ensemble_dt <- data.table(
+  date = unique(train_a$dt$date),
+  factor_ensemble = model_a$H
+)
+fwrite(ensemble_dt, file.path(out_dir, "scenario_a_ensemble.csv"))
 
-cat(sprintf("\n✓ All results saved to: %s\n", normalizePath(out_dir)))
-cat("\n✓ A2 complete - P-TREE MODELS (single + boosted) with auto tuning.\n\n")
+# Save Tree Structures
+sink(file.path(out_dir, "scenario_a_trees.txt"))
+for (k in 1:length(model_a$models)) {
+  cat(sprintf("\n--- Factor %d ---\n", k))
+  print(model_a$models[[k]]$tree)
+}
+sink()
+
+cat(sprintf("\n✓ Results saved to: %s\n", normalizePath(out_dir)))
+cat("\n✓ A2 complete - 20 Factors Extracted.\n\n")
