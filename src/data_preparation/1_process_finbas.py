@@ -1,10 +1,11 @@
 """
-Step 1: Process Finbas Daily Data
-=================================
+Step 1: Process Finbas Data to Monthly
+=======================================
 Input:  data/raw/finbas/raw_finbas_daily.csv
-Output: data/intermediate/finbas/finbas_daily_clean.csv
+Output: data/intermediate/finbas/finbas_monthly_clean.csv
 
-Note: Market cap only available at month-end, forward-filled to daily.
+Note: Aggregates to monthly (month-end) to align with P-Tree methodology.
+      Market cap is taken at month-end (no forward-filling needed).
 """
 
 import pandas as pd
@@ -13,7 +14,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 RAW_PATH = PROJECT_ROOT / 'data' / 'raw' / 'finbas' / 'raw_finbas_daily.csv'
-OUTPUT_PATH = PROJECT_ROOT / 'data' / 'intermediate' / 'finbas' / 'finbas_daily_clean.csv'
+OUTPUT_PATH = PROJECT_ROOT / 'data' / 'intermediate' / 'finbas' / 'finbas_monthly_clean.csv'
 
 
 def main():
@@ -35,11 +36,20 @@ def main():
     
     print(f"  After SE/SEK filters: {len(df):,} rows, {df['isin'].nunique():,} ISINs")
     
+    # 2. Exclude off-exchange and OTC data (unreliable, mostly redundant)
+    # INOFF = unofficial/off-exchange, NOROTC = Nordic OTC
+    # Analysis shows 72%+ of these ISINs already appear on proper exchanges
+    if 'marketname' in df.columns:
+        before_otc = len(df)
+        df = df[~df['marketname'].isin(['INOFF', 'NOROTC'])].copy()
+        print(f"  After excluding INOFF/NOROTC: {len(df):,} rows ({before_otc - len(df):,} removed)")
+    
     # Standardize identifiers early
     if 'isin' in df.columns:
         df['isin'] = df['isin'].astype(str).str.upper().str.strip()
 
     # Rename columns
+    # Note: Use totalmarketvalue (company-level) instead of marketvalue (share-class level)
     df = df.rename(columns={
         'marketname': 'exchange',
         'day': 'date',
@@ -51,8 +61,7 @@ def main():
         'oabad': 'turnover_sek',
         'oatad': 'volume',
         'bookvalue': 'book_value',
-        'marketvalue': 'market_cap',
-        'totalmarketvalue': 'total_market_cap',
+        'totalmarketvalue': 'market_cap',  # Use total company market cap
     })
     
     # Parse dates
@@ -74,18 +83,57 @@ def main():
 
     # 3. Deterministic de-duplication per ISIN/Date
     # Prefer rows with higher turnover/volume and primary exchanges
-    # Define a light-weight exchange preference (lower is better)
+    # Map observed exchange codes/variants to a small preference rank (lower is better)
     exchange_pref = {
+        # Nasdaq Stockholm / main market (common codes/variants)
+        'SSE': 1,
         'NASDAQ STOCKHOLM': 1,
+        'NASDAQ OMX STOCKHOLM': 1,
+        'NASDAQ': 1,
+
+        # First North (alternative market)
+        'SSEFN': 2,
         'FIRST NORTH STOCKHOLM': 2,
+        'NASDAQ FIRST NORTH': 2,
+        'FIRST NORTH': 2,
+
+        # Nordic Growth Market
+        'NGM': 3,
         'NGM EQUITY': 3,
+
+        # Spotlight / AktieTorget
+        'ATORG': 4,
+        'SPOTLIGHT': 4,
         'SPOTLIGHT STOCK MARKET': 4,
+        'AKTIETORGET': 4,
     }
+
     if 'exchange' in df.columns:
-        df['exchange_norm'] = df['exchange'].astype(str).str.upper().str.strip()
-        df['exchange_rank'] = df['exchange_norm'].map(exchange_pref).fillna(99)
+        # normalize and clean common variants
+        df['exchange_norm'] = (
+            df['exchange'].astype(str)
+            .str.upper()
+            .str.strip()
+        )
+
+        # map normalized values to our preference mapping; unknown -> 99 (low priority)
+        df['exchange_rank'] = df['exchange_norm'].map(exchange_pref).fillna(99).astype('Int64')
+
+        # Diagnostic: print coverage of the most common exchange codes (first run; cheap)
+        try:
+            top_ex = df['exchange_norm'].value_counts().head(20)
+            print('  Exchange coverage (top values):')
+            for exch, ct in top_ex.items():
+                print(f"    {exch}: {ct:,}")
+            unknowns = [v for v in df['exchange_norm'].unique() if v not in exchange_pref]
+            if unknowns:
+                sample_unknowns = unknowns[:20]
+                print(f"  Unknown exchange_norm values (sample up to 20): {sample_unknowns}")
+        except Exception:
+            # diagnostics must not break the pipeline
+            pass
     else:
-        df['exchange_rank'] = 99
+        df['exchange_rank'] = pd.Series(99, index=df.index, dtype='Int64')
 
     # Sort for deduplication tie-breakers:
     #  - date ascending (so time order preserved later)
@@ -107,30 +155,35 @@ def main():
     if before_dups != after_dups:
         print(f"  De-duplicated {before_dups - after_dups:,} rows on (isin, date) with liquidity/venue preference")
 
-    # 4. Forward-fill market cap (Option 2: Simple & Robust)
-    # We use simple forward-fill because:
-    # 1. It's standard academic practice when daily shares aren't available.
-    # 2. It avoids complex split-adjustment issues with "implied shares".
-    # 3. Most characteristics use month-end market cap anyway.
-    df['market_cap_filled'] = df.groupby('isin')['market_cap'].ffill()
+    # 4. Aggregate to monthly (month-end)
+    # Take last trading day of each month for all variables
+    print(f"  Aggregating to monthly (month-end)...")
+    df['year_month'] = df['date'].dt.to_period('M')
     
-    # 5. Calculate returns
-    # Handle potential 0 prices to avoid inf
-    df['close'] = df['close'].replace(0, np.nan)
-    df['ret'] = df.groupby('isin')['close'].pct_change(fill_method=None)
+    # Take last trading day of each month
+    df_monthly = df.sort_values(['isin', 'date']).groupby(['isin', 'year_month']).last().reset_index()
+    
+    # Align all dates to actual month-end for consistency
+    df_monthly['date'] = df_monthly['date'] + pd.offsets.MonthEnd(0)
+    
+    print(f"  Monthly observations: {len(df_monthly):,}")
+    
+    # 5. Calculate monthly returns
+    df_monthly = df_monthly.sort_values(['isin', 'date'])
+    df_monthly['ret_monthly'] = df_monthly.groupby('isin')['close'].pct_change(fill_method=None)
     
     # Select output columns
     output_cols = [
         'isin', 'ticker', 'name', 'exchange', 'date', 'year', 'month',
         'close', 'high', 'low', 'bid', 'ask',
         'turnover_sek', 'volume', 'book_value',
-        'market_cap', 'market_cap_filled', 'total_market_cap',
-        'ret',
+        'market_cap',  # Month-end market cap (no forward-fill needed)
+        'ret_monthly',
     ]
     
     # Ensure all columns exist
-    available_cols = [c for c in output_cols if c in df.columns]
-    df_out = df[available_cols].copy()
+    available_cols = [c for c in output_cols if c in df_monthly.columns]
+    df_out = df_monthly[available_cols].copy()
     
     # Sanity checks
     # Ensure uniqueness of (isin, date)
@@ -148,8 +201,8 @@ def main():
     print(f"  Date range: {df_out['date'].min().date()} to {df_out['date'].max().date()}")
     
     # Coverage stats
-    print(f"  Coverage:")
-    for col in ['close', 'market_cap', 'market_cap_filled', 'ret']:
+    print(f"  Coverage:") 
+    for col in ['close', 'market_cap', 'ret_monthly']:
         if col in df_out.columns:
             print(f"    {col}: {df_out[col].notna().mean()*100:.1f}%")
     

@@ -1,0 +1,21 @@
+
+\begin{table}[htbp]
+\centering
+\caption{Data Source Summary and Coverage Statistics}
+\label{tab:data_source_summary}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Data Source} & \textbf{Observations} & \textbf{Unique Entities} & \textbf{Time Period} & \textbf{Coverage} \\
+\midrule
+Finbas (Market) & 104,715 & 1,123 ISINs & 1997-01 -- 2021-12 & 100.0\% Swedish \\
+Serrano (Accounting) & 2,500,000,000 & 2,720 ORGNRs & 1997 -- 2024 & 0.0\% with ISIN \\
+Final Dataset & 68,550 & 719 Firms & 1997-12 -- 2021-11 & 288 Months \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}
+\small
+\item Note: Swedish market data filtered to SE ISINs with SEK currency. 
+Accounting data includes both public and private firms, with ISIN mapping coverage shown for public firms.
+Final dataset represents the merged and processed data used for P-Tree analysis.
+\end{tablenotes}
+\end{table}

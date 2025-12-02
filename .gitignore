@@ -30,7 +30,7 @@ data/processed/ptrees_final_dataset.csv
 !analysis_dataset/**/ptree_factors.csv
 
 #PTree files
-PTree-2501
+PTree/
 
 # Serrano database files (large)
 serrano/

@@ -1,2 +1,0 @@
-Root Node
-|-- Split on rank_svar (Threshold: -0.88)

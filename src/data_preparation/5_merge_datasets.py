@@ -1,7 +1,7 @@
 """
 Step 5: Merge Datasets (Simple Merge - No Lagging)
 ===================================================
-This script merges the daily Finbas market data with the annual Serrano accounting data.
+This script merges the monthly Finbas market data with the annual Serrano accounting data.
 
 Strategy:
 ---------
@@ -12,7 +12,7 @@ based on fiscal_year_end <= date.
 Lagging will be applied in a separate step after verifying this merge works correctly.
 
 Logic:
-1. Load Finbas (Daily) and Serrano (Annual).
+1. Load Finbas (Monthly) and Serrano (Annual).
 2. Load ISIN-ORGNR Mapping.
 3. Filter Serrano to only include public companies (ORGNRs in mapping).
    - Serrano contains both public and private companies
@@ -25,12 +25,12 @@ Logic:
 6. Save merged dataset.
 
 Input:
-  - data/intermediate/finbas/finbas_daily_clean.csv
+  - data/intermediate/finbas/finbas_monthly_clean.csv
   - data/intermediate/serrano/serrano_accounting.csv
   - data/mappings/isin_orgnr_final.csv
 
 Output:
-  - data/intermediate/merged_data_daily.csv
+  - data/processed/merged_data_monthly.csv
 """
 
 import pandas as pd
@@ -38,10 +38,10 @@ import numpy as np
 from pathlib import Path
 
 # Config
-FINBAS_PATH = Path('data/intermediate/finbas/finbas_daily_clean.csv')
+FINBAS_PATH = Path('data/intermediate/finbas/finbas_monthly_clean.csv')
 SERRANO_PATH = Path('data/intermediate/serrano/serrano_accounting.csv')
 MAPPING_PATH = Path('data/mappings/isin_orgnr_final.csv')
-OUTPUT_PATH = Path('data/processed/merged_data_daily.csv')
+OUTPUT_PATH = Path('data/processed/merged_data_monthly.csv')
 
 def clean_orgnr(orgnr_series):
     """

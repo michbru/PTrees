@@ -21,7 +21,7 @@ out_dir  <- file.path(repo_root, "results", "inputs")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 out_rds  <- file.path(out_dir, "ptree_inputs.rds")
 
-min_date <- as.IDate("1999-06-01")   # start date used in analysis
+min_date <- as.IDate("1997-10-01")   # start date used in analysis
 max_date <- as.IDate("2019-12-31")   # end date (match FF factor coverage)
 cov_thr  <- 0.30                      # 30% non-zero coverage threshold
 use_excess <- tolower(Sys.getenv("PTREE_USE_EXCESS")) %in% c("1","true","yes","y")
