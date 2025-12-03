@@ -218,6 +218,66 @@ sink()
 cat("  ✓ table_univariate_r2.tex\n\n")
 
 ################################################################################
+# OUTPUT 2b: Variable Coverage and Distribution (LaTeX table)
+################################################################################
+
+cat("Creating Output 2b: Variable coverage/mean/SD table...\n")
+
+# Helper: map abbreviations to readable names (fallback to abbrev if unknown)
+pretty_name_map <- c(
+  BM = "Book-to-Market", EP = "Earnings-to-Price", SP = "Sales-to-Price",
+  CFP = "Cash-Flow-to-Price", CASH = "Cash to Assets", CASHDEBT = "Cash to Debt",
+  LEV = "Leverage", SGR = "Sales Growth", MOM1M = "1-Month Momentum",
+  MOM6M = "6–2 Month Momentum", MOM12M = "12–2 Month Momentum",
+  MOM36M = "36–13 Month Momentum", MOM60M = "60–13 Month Momentum",
+  SEAS1A = "Seasonality (1Y ago)", CHTX = "Change in Tax Expense",
+  DEPR = "Depreciation/PPE", AGR = "Asset Growth", GMA = "Gross Profitability",
+  LGR = "Long-term Debt Growth", ACC = "Operating Accruals",
+  CHCSHO = "Change in Shares Outstanding", NI = "Net Equity Issuance",
+  NOA = "Net Operating Assets", PCTACC = "Percent Accruals",
+  CINVEST = "Corporate Investment", GRLTNOA = "Growth in LT NOA",
+  ROA = "Return on Assets", ROE = "Return on Equity", ATO = "Asset Turnover",
+  PM = "Profit Margin", CHPM = "Change in Profit Margin",
+  OP = "Operating Profitability", RNA = "Return on NOA", HIRE = "Employee Growth",
+  ME = "Market Equity"
+)
+
+# Compute coverage, mean, and sd for each ranked characteristic
+var_stats <- rbindlist(lapply(char_cols, function(col) {
+  x <- dt[[col]]
+  nz_mask <- !is.na(x) & x != 0
+  coverage <- mean(nz_mask) * 100
+  mean_val <- if (any(nz_mask)) mean(x[nz_mask]) else NA_real_
+  sd_val <- if (any(nz_mask)) sd(x[nz_mask]) else NA_real_
+  abbrev <- toupper(gsub("^rank_", "", col))
+  pretty <- if (!is.na(pretty_name_map[abbrev])) as.character(pretty_name_map[abbrev]) else abbrev
+  data.table(
+    Variable = pretty,
+    Abbrev = abbrev,
+    Coverage = sprintf("%.1f", coverage),
+    Mean = sprintf("%.4f", mean_val),
+    SD = sprintf("%.4f", sd_val)
+  )
+}))
+
+setorder(var_stats, Abbrev)
+
+latex_varstats <- xtable(
+  var_stats,
+  caption = "Variable coverage, mean, and standard deviation (ranked characteristics; computed on non-zero observations)",
+  label = "tab:variable_stats"
+)
+
+sink(file.path(OUTPUT_DIR, "table_variable_stats.tex"))
+print(latex_varstats,
+      include.rownames = FALSE,
+      caption.placement = "top",
+      sanitize.text.function = function(x) x)
+sink()
+
+cat("  ✓ table_variable_stats.tex\n\n")
+
+################################################################################
 # OUTPUT 3: Sample Attrition Table
 ################################################################################
 
@@ -279,8 +339,6 @@ cat("Creating Output 4: Temporal Coverage Figure...\n")
 
 p_temporal <- ggplot(firms_per_month, aes(x = as.Date(date), y = n_firms)) +
   geom_line(color = "#2E86C1", linewidth = 1.2) +
-  geom_smooth(method = "loess", se = TRUE, color = "#E74C3C", 
-              fill = "#E74C3C", alpha = 0.15, linewidth = 0.8) +
   geom_hline(yintercept = avg_firms_month,
              linetype = "dashed", color = "#27AE60", linewidth = 1) +
   annotate("text", x = as.Date("2002-01-01"), y = avg_firms_month + 15,
@@ -426,6 +484,7 @@ cat("OUTPUTS CREATED (6 total):\n\n")
 cat("Tables (LaTeX):\n")
 cat("  1. table_data_summary.tex        - Dataset summary statistics\n")
 cat("  2. table_univariate_r2.tex       - Top/bottom characteristics by R²\n")
+cat("  2b. table_variable_stats.tex     - Variables: name, abbrev, coverage, mean, SD\n")
 cat("  3. table_sample_attrition.tex    - Data filtering pipeline\n\n")
 
 cat("Figures (PNG, 300 DPI):\n")

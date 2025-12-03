@@ -183,40 +183,40 @@ if (!file.exists(perf_file)) {
 
 cat("Generating Table 3: Tree Structure...\n")
 
-# Parse tree files to extract number of splits/leaves
+# Parse tree files to extract splits and characteristics
 tree_summary <- list()
 
 for (scenario in c("a", "b", "c")) {
   tree_file <- file.path(MODELS_DIR, sprintf("scenario_%s_trees.txt", scenario))
   
   if (file.exists(tree_file)) {
-    tree_lines <- readLines(tree_file)
+    tree_text <- readLines(tree_file)[1]
     
-    # Count splits (lines with numeric split variable)
+    # Parse tree text - split by \n
+    lines <- strsplit(tree_text, "\\\\n")[[1]]
+    
+    split_char <- ""
+    split_threshold <- NA
     num_splits <- 0
-    split_vars <- character()
     
-    for (line in tree_lines) {
-      if (grepl("^\\[1\\]", line)) {
-        tree_str <- gsub('\\[1\\] "|"', '', line)
-        parts <- strsplit(tree_str, "\\\\n")[[1]]
+    if (length(lines) >= 2) {
+      # Parse split line: "node char_idx threshold left_child right_child"
+      split_parts <- strsplit(lines[2], " ")[[1]]
+      split_parts <- split_parts[split_parts != ""]
+      
+      if (length(split_parts) >= 3) {
+        char_idx <- as.numeric(split_parts[2])
+        split_threshold <- as.numeric(split_parts[3])
         
-        # Count non-leaf nodes (split variable != 0)
-        for (part in parts) {
-          node <- strsplit(trimws(part), "\\s+")[[1]]
-          if (length(node) >= 2 && node[2] != "0") {
-            num_splits <- num_splits + 1
-            var_idx <- as.integer(node[2])
-            if (!is.na(var_idx)) {
-              split_vars <- c(split_vars, inp$char_cols[var_idx + 1])
-            }
-          }
+        if (!is.na(char_idx) && char_idx > 0 && char_idx <= length(inp$char_cols)) {
+          num_splits <- 1
+          # Remove "rank_" prefix for display
+          split_char <- gsub("^rank_", "", inp$char_cols[char_idx])
         }
       }
     }
     
     num_leaves <- num_splits + 1
-    unique_vars <- length(unique(split_vars))
     
     scenario_name <- switch(scenario,
                            "a" = "A: Full Sample",
@@ -227,7 +227,8 @@ for (scenario in c("a", "b", "c")) {
       Scenario = scenario_name,
       Num_Splits = num_splits,
       Num_Leaves = num_leaves,
-      Unique_Vars = unique_vars
+      Split_Char = split_char,
+      Split_Threshold = split_threshold
     )
   }
 }
@@ -241,17 +242,24 @@ if (length(tree_summary) > 0) {
   cat("\\centering\n", file = tex_file, append = TRUE)
   cat("\\caption{P-Tree Structure by Scenario}\n", file = tex_file, append = TRUE)
   cat("\\label{tab:tree_structure}\n", file = tex_file, append = TRUE)
-  cat("\\begin{tabular}{l c c c}\n", file = tex_file, append = TRUE)
+  cat("\\begin{tabular}{l c c l c}\n", file = tex_file, append = TRUE)
   cat("\\hline\n", file = tex_file, append = TRUE)
-  cat("Scenario & Splits & Leaves & Unique Characteristics \\\\\n", file = tex_file, append = TRUE)
+  cat("Scenario & Splits & Leaves & Split Variable & Threshold \\\\\n", file = tex_file, append = TRUE)
   cat("\\hline\n", file = tex_file, append = TRUE)
   
   for (i in 1:nrow(tree_table)) {
-    cat(sprintf("%s & %d & %d & %d \\\\\n",
+    threshold_str <- if (!is.na(tree_table[i, Split_Threshold])) {
+      sprintf("%.2f", tree_table[i, Split_Threshold])
+    } else {
+      "--"
+    }
+    
+    cat(sprintf("%s & %d & %d & %s & %s \\\\\n",
                 tree_table[i, Scenario],
                 tree_table[i, Num_Splits],
                 tree_table[i, Num_Leaves],
-                tree_table[i, Unique_Vars]),
+                tree_table[i, Split_Char],
+                threshold_str),
         file = tex_file, append = TRUE)
   }
   
