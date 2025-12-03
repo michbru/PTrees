@@ -6,9 +6,14 @@
 \hline
 Scenario & Sharpe & Mean (%) & Std (%) & CAPM Alpha (%) & CAPM t-stat & FF3 Alpha (%) & FF3 t-stat & N Months
 \\\hline
-scenario_a (Ensemble) & 0.763 & 0.14 & 0.18 & 0.13 & 2.53 & 0.12 & 2.51 & 258
-scenario_b_test (Ensemble) & 1.113 & 0.15 & 0.14 & 0.13 & 3.88 & 0.13 & 3.77 & 119
-scenario_c_test (Ensemble) & 0.389 & 0.09 & 0.24 & 0.09 & 1.05 & 0.08 & 1.07 & 139
+scenario_a (Ensemble) & 0.763$^{***}$ & 0.14$^{***}$ & 0.18 & 0.13$^{**}$ & 2.53 & 0.12$^{**}$ & 2.51 & 258
+scenario_b_test (Ensemble) & 1.113$^{***}$ & 0.15$^{***}$ & 0.14 & 0.13$^{***}$ & 3.88 & 0.13$^{***}$ & 3.77 & 119
+scenario_c_test (Ensemble) & 0.389$^{***}$ & 0.09$^{***}$ & 0.24 & 0.09 & 1.05 & 0.08 & 1.07 & 139
 \\\hline
 \end{tabular}
+\\[1em]
+\begin{minipage}{0.9\textwidth}
+\small
+\textit{Note:} Significance levels: $^{***}$ p$<$0.01, $^{**}$ p$<$0.05, $^{*}$ p$<$0.1. T-statistics calculated using Newey-West standard errors with 12 lags for alphas. Sharpe ratio significance uses asymptotic distribution. Mean significance uses standard t-test.
+\end{minipage}
 \end{table}

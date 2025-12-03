@@ -92,29 +92,94 @@ cat("  Saved: table1_data_summary.tex\n")
 # ==============================================================================
 cat("Generating Table 2: Model Performance...\n")
 
+# Helper function to add significance stars
+add_stars <- function(value, tstat) {
+  abs_t <- abs(tstat)
+  stars <- ifelse(abs_t >= 2.576, "***",  # 1% level
+                 ifelse(abs_t >= 1.96, "**",   # 5% level
+                       ifelse(abs_t >= 1.645, "*", "")))  # 10% level
+
+  # Format value with stars
+  if (is.na(value)) return("")
+  formatted <- sprintf("%.2f", value)
+  if (stars != "") {
+    formatted <- paste0(formatted, "$^{", stars, "}$")
+  }
+  return(formatted)
+}
+
 perf_file <- file.path(eval_dir, "final_ensemble_results.csv")
 if (file.exists(perf_file)) {
   perf <- fread(perf_file)
-  
-  # Format for thesis
-  # Note: mean_ann and sd_ann are already annualized, just need *100 for percentage
-  # capm_alpha and ff3_alpha are already annualized, just need *100 for percentage
+
+  # Calculate t-statistics for Sharpe ratio and mean using standard formulas
+  # Sharpe ratio t-stat: SR * sqrt(n_months)
+  perf[, sharpe_tstat := sharpe * sqrt(n_months)]
+
+  # Mean t-stat: (mean / se), where se = sd / sqrt(n_months)
+  perf[, mean_tstat := (mean_ann / (sd_ann / sqrt(n_months)))]
+
+  # Format for thesis with significance stars
   perf_table <- data.table(
     Scenario = perf$scenario,
-    Sharpe = round(perf$sharpe, 3),
-    `Mean (%)` = round(perf$mean_ann * 100, 2),
+    Sharpe = sapply(1:nrow(perf), function(i) {
+      val <- round(perf$sharpe[i], 3)
+      tstat <- perf$sharpe_tstat[i]
+      abs_t <- abs(tstat)
+      stars <- ifelse(abs_t >= 2.576, "***",
+                     ifelse(abs_t >= 1.96, "**",
+                           ifelse(abs_t >= 1.645, "*", "")))
+      if (stars != "") paste0(val, "$^{", stars, "}$") else as.character(val)
+    }),
+    `Mean (%)` = sapply(1:nrow(perf), function(i) {
+      add_stars(perf$mean_ann[i] * 100, perf$mean_tstat[i])
+    }),
     `Std (%)` = round(perf$sd_ann * 100, 2),
-    `CAPM Alpha (%)` = round(perf$capm_alpha * 100, 2),
+    `CAPM Alpha (%)` = sapply(1:nrow(perf), function(i) {
+      add_stars(perf$capm_alpha[i] * 100, perf$capm_tstat[i])
+    }),
     `CAPM t-stat` = round(perf$capm_tstat, 2),
-    `FF3 Alpha (%)` = round(perf$ff3_alpha * 100, 2),
+    `FF3 Alpha (%)` = sapply(1:nrow(perf), function(i) {
+      add_stars(perf$ff3_alpha[i] * 100, perf$ff3_tstat[i])
+    }),
     `FF3 t-stat` = round(perf$ff3_tstat, 2),
     `N Months` = perf$n_months
   )
-  
-  write_tex_table(perf_table, file.path(out_dir, "table2_model_performance.tex"),
-                  caption = "P-Tree Ensemble Performance (All Scenarios)",
-                  label = "tab:performance")
+
+  # Write table with custom footer for significance notes
+  tex_file <- file.path(out_dir, "table2_model_performance.tex")
+  con <- file(tex_file, open = "wt")
+  on.exit(close(con))
+
+  writeLines("\\begin{table}[!ht]", con)
+  writeLines("\\centering", con)
+  writeLines("\\caption{P-Tree Ensemble Performance (All Scenarios)}", con)
+  writeLines("\\label{tab:performance}", con)
+
+  # Build column specification
+  cols <- names(perf_table)
+  writeLines(paste0("\\begin{tabular}{", paste(rep("l", length(cols)), collapse = "|"), "}"), con)
+  writeLines("\\hline", con)
+  writeLines(paste(cols, collapse = " & "), con)
+  writeLines("\\\\\\hline", con)
+
+  # Write data rows
+  for (i in 1:nrow(perf_table)) {
+    row_data <- as.character(perf_table[i, ])
+    writeLines(paste(row_data, collapse = " & "), con)
+  }
+
+  writeLines("\\\\\\hline", con)
+  writeLines("\\end{tabular}", con)
+  writeLines("\\\\[1em]", con)
+  writeLines("\\begin{minipage}{0.9\\textwidth}", con)
+  writeLines("\\small", con)
+  writeLines("\\textit{Note:} Significance levels: $^{***}$ p$<$0.01, $^{**}$ p$<$0.05, $^{*}$ p$<$0.1. T-statistics calculated using Newey-West standard errors with 12 lags for alphas. Sharpe ratio significance uses asymptotic distribution. Mean significance uses standard t-test.", con)
+  writeLines("\\end{minipage}", con)
+  writeLines("\\end{table}", con)
+
   cat("  Saved: table2_model_performance.tex\n")
+  cat("  Note: *** p<0.01, ** p<0.05, * p<0.1\n")
 } else {
   cat("  Warning: final_ensemble_results.csv not found. Skipping Table 2.\n")
 }
