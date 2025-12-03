@@ -119,11 +119,16 @@ if (file.exists(perf_file)) {
   # Mean t-stat: (mean / se), where se = sd / sqrt(n_months)
   perf[, mean_tstat := (mean_ann / (sd_ann / sqrt(n_months)))]
 
-  # Format for thesis with significance stars
+  # Simplify scenario names for the table
+  perf[, scenario_short := gsub("_test", "", scenario)]
+  perf[, scenario_short := gsub(" \\(Ensemble\\)", "", scenario_short)]
+  perf[, scenario_short := toupper(gsub("scenario_", "Scenario ", scenario_short))]
+
+  # Format for thesis with significance stars - COMPACT VERSION
   perf_table <- data.table(
-    Scenario = perf$scenario,
+    Scenario = perf$scenario_short,
     Sharpe = sapply(1:nrow(perf), function(i) {
-      val <- round(perf$sharpe[i], 3)
+      val <- round(perf$sharpe[i], 2)  # Reduced precision
       tstat <- perf$sharpe_tstat[i]
       abs_t <- abs(tstat)
       stars <- ifelse(abs_t >= 2.576, "***",
@@ -131,19 +136,43 @@ if (file.exists(perf_file)) {
                            ifelse(abs_t >= 1.645, "*", "")))
       if (stars != "") paste0(val, "$^{", stars, "}$") else as.character(val)
     }),
-    `Mean (%)` = sapply(1:nrow(perf), function(i) {
-      add_stars(perf$mean_ann[i] * 100, perf$mean_tstat[i])
+    `Mean` = sapply(1:nrow(perf), function(i) {
+      val <- round(perf$mean_ann[i] * 100, 2)
+      tstat <- perf$mean_tstat[i]
+      abs_t <- abs(tstat)
+      stars <- ifelse(abs_t >= 2.576, "***",
+                     ifelse(abs_t >= 1.96, "**",
+                           ifelse(abs_t >= 1.645, "*", "")))
+      if (stars != "") paste0(val, "$^{", stars, "}$") else as.character(val)
     }),
-    `Std (%)` = round(perf$sd_ann * 100, 2),
-    `CAPM Alpha (%)` = sapply(1:nrow(perf), function(i) {
-      add_stars(perf$capm_alpha[i] * 100, perf$capm_tstat[i])
+    `Std` = round(perf$sd_ann * 100, 2),
+    `CAPM $\\alpha$` = sapply(1:nrow(perf), function(i) {
+      val <- round(perf$capm_alpha[i] * 100, 2)
+      tstat <- perf$capm_tstat[i]
+      abs_t <- abs(tstat)
+      stars <- ifelse(abs_t >= 2.576, "***",
+                     ifelse(abs_t >= 1.96, "**",
+                           ifelse(abs_t >= 1.645, "*", "")))
+      if (stars != "") {
+        paste0(val, "$^{", stars, "}$ (", round(tstat, 1), ")")
+      } else {
+        paste0(val, " (", round(tstat, 1), ")")
+      }
     }),
-    `CAPM t-stat` = round(perf$capm_tstat, 2),
-    `FF3 Alpha (%)` = sapply(1:nrow(perf), function(i) {
-      add_stars(perf$ff3_alpha[i] * 100, perf$ff3_tstat[i])
+    `FF3 $\\alpha$` = sapply(1:nrow(perf), function(i) {
+      val <- round(perf$ff3_alpha[i] * 100, 2)
+      tstat <- perf$ff3_tstat[i]
+      abs_t <- abs(tstat)
+      stars <- ifelse(abs_t >= 2.576, "***",
+                     ifelse(abs_t >= 1.96, "**",
+                           ifelse(abs_t >= 1.645, "*", "")))
+      if (stars != "") {
+        paste0(val, "$^{", stars, "}$ (", round(tstat, 1), ")")
+      } else {
+        paste0(val, " (", round(tstat, 1), ")")
+      }
     }),
-    `FF3 t-stat` = round(perf$ff3_tstat, 2),
-    `N Months` = perf$n_months
+    N = perf$n_months
   )
 
   # Write table with custom footer for significance notes
@@ -153,28 +182,28 @@ if (file.exists(perf_file)) {
 
   writeLines("\\begin{table}[!ht]", con)
   writeLines("\\centering", con)
-  writeLines("\\caption{P-Tree Ensemble Performance (All Scenarios)}", con)
+  writeLines("\\caption{P-Tree Ensemble Performance}", con)
   writeLines("\\label{tab:performance}", con)
+  writeLines("\\small", con)  # Make entire table smaller
 
-  # Build column specification
-  cols <- names(perf_table)
-  writeLines(paste0("\\begin{tabular}{", paste(rep("l", length(cols)), collapse = "|"), "}"), con)
+  # Build column specification - use different alignment
+  writeLines("\\begin{tabular}{l r r r r r r}", con)
   writeLines("\\hline", con)
-  writeLines(paste(cols, collapse = " & "), con)
-  writeLines("\\\\\\hline", con)
+  writeLines("Scenario & Sharpe & Mean (\\%) & Std (\\%) & CAPM $\\alpha$ (\\%) & FF3 $\\alpha$ (\\%) & N \\\\", con)
+  writeLines("\\hline", con)
 
-  # Write data rows
+  # Write data rows with proper line endings
   for (i in 1:nrow(perf_table)) {
     row_data <- as.character(perf_table[i, ])
-    writeLines(paste(row_data, collapse = " & "), con)
+    writeLines(paste0(paste(row_data, collapse = " & "), " \\\\"), con)
   }
 
-  writeLines("\\\\\\hline", con)
+  writeLines("\\hline", con)
   writeLines("\\end{tabular}", con)
-  writeLines("\\\\[1em]", con)
-  writeLines("\\begin{minipage}{0.9\\textwidth}", con)
-  writeLines("\\small", con)
-  writeLines("\\textit{Note:} Significance levels: $^{***}$ p$<$0.01, $^{**}$ p$<$0.05, $^{*}$ p$<$0.1. T-statistics calculated using Newey-West standard errors with 12 lags for alphas. Sharpe ratio significance uses asymptotic distribution. Mean significance uses standard t-test.", con)
+  writeLines("\\\\[0.5em]", con)
+  writeLines("\\begin{minipage}{0.95\\textwidth}", con)
+  writeLines("\\footnotesize", con)
+  writeLines("\\textit{Note:} Mean and Std are annualized (\\%). Alphas are annualized (\\%) with t-statistics in parentheses. $^{***}$ p$<$0.01, $^{**}$ p$<$0.05, $^{*}$ p$<$0.1. T-stats use Newey-West SE (12 lags).", con)
   writeLines("\\end{minipage}", con)
   writeLines("\\end{table}", con)
 
