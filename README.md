@@ -51,7 +51,7 @@ num_iter = 9           # Internal boosting iterations per tree
 eta = 1.0              # Learning rate
 min_leaf_size = 20     # Minimum observations per leaf
 max_depth = 3          # Maximum tree depth
-num_cutpoints = 50     # Number of candidate split points
+num_cutpoints = 4      # Number of candidate split points (paper uses 4)
 lambda_cov = 1e-2      # Covariance regularization
 lambda_ridge = 1e-4    # Ridge regularization
 equal_weight = TRUE    # Equal weighting in leaf portfolios
@@ -62,18 +62,38 @@ abs_normalize = TRUE   # Absolute value normalization
 ## Key Results
 
 ### Scenario A: Full Sample (1998-2019)
-- **Sharpe Ratio**: 0.68
-- **Annualized Return**: 1.50%
-- **Alpha (CAPM)**: 0.11% (t=2.31)
-- **Tree Structure**: Simple 2-level tree with 5 leaf portfolios.
+- **Sharpe Ratio**: 0.76
+- **Annualized Return**: 1.36% (monthly mean: 0.11%)
+- **Monthly Volatility**: 5.14%
+- **Alpha (CAPM)**: 0.13% monthly (t=2.53, annualized: 1.50%)
+- **Alpha (FF3)**: 0.12% monthly (t=2.51, annualized: 1.45%)
+- **Sample**: 258 months
+- **Tree Structure**: 2 splits, 3 leaf portfolios
+  - Split 1: Market Equity (rank_me) at 0.6
+  - Split 2: Operating Profitability (rank_op) at -0.6
 
 ### Scenario B: Time-Split (Train 1998-2009 / Test 2010-2019)
-- **Test Sharpe Ratio**: 0.92
-- **Test Annualized Return**: 1.54%
+- **Test Sharpe Ratio**: 1.11
+- **Test Annualized Return**: 1.81% (monthly mean: 0.15%)
+- **Test Monthly Volatility**: 4.04%
+- **Test Alpha (CAPM)**: 0.13% monthly (t=3.88, annualized: 1.53%)
+- **Test Alpha (FF3)**: 0.13% monthly (t=3.77, annualized: 1.56%)
+- **Test Sample**: 119 months (2010-2019)
+- **Tree Structure**: 3 splits, 4 leaf portfolios
+  - Split 1: Gross Profitability (rank_gma) at 0.2
+  - Split 2: Market Equity (rank_me) at 0.6
+  - Split 3: Market Equity (rank_me) at -0.2
 
 ### Scenario C: Reverse Split (Train 2010-2019 / Test 1998-2009)
-- **Test Sharpe Ratio**: 0.56
-- **Test Annualized Return**: 0.99%
+- **Test Sharpe Ratio**: 0.39
+- **Test Annualized Return**: 1.12% (monthly mean: 0.09%)
+- **Test Monthly Volatility**: 7.09%
+- **Test Alpha (CAPM)**: 0.09% monthly (t=1.05, annualized: 1.04%)
+- **Test Alpha (FF3)**: 0.08% monthly (t=1.07, annualized: 1.01%)
+- **Test Sample**: 139 months (1998-2009)
+- **Tree Structure**: 2 splits, 3 leaf portfolios
+  - Split 1: Market Equity (rank_me) at 0.6
+  - Split 2: Operating Profitability (rank_op) at 0.2
 
 ## Discussion
 

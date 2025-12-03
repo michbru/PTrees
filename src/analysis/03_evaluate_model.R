@@ -193,10 +193,10 @@ for (fpath in ensemble_files) {
   
   ensemble_dt <- fread(fpath)
   ensemble_dt[, date := as.IDate(date)]
-  
+
   # Evaluate ensemble factor directly
   cat("Evaluating ensemble factor...\n")
-  res <- calc_alpha(ensemble_dt[, .(date, factor = factor_ensemble)], paste0(scenario, " (Ensemble)"))
+  res <- calc_alpha(ensemble_dt[, .(date, factor)], paste0(scenario, " (Ensemble)"))
   
   if (!is.null(res)) results_list[[length(results_list)+1]] <- res
 }

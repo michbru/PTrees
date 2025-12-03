@@ -61,7 +61,7 @@ build_train_data <- function(dt_sub, keep_chars, instr) {
 train_ptree_factors <- function(train_data, scenario_name,
                                 num_factors=1,
                                 num_iter=9, eta=1.0, # Original paper defaults
-                                min_leaf_size=100, max_depth=3, num_cutpoints=50,
+                                min_leaf_size=100, max_depth=3, num_cutpoints=4,
                                 equal_weight=TRUE, weighted_loss=FALSE,
                                 lambda_cov=0,       # Added lambda_cov
                                 lambda_ridge=1e-4, # Added ridge for stability
@@ -348,12 +348,13 @@ cat("\n\n--- SCENARIO A: FULL SAMPLE ---\n")
 train_a <- build_train_data(dt, inp$char_cols, inp$instr_cols)
 
 # Train single-factor P-Tree model
-# Parameters: num_iter=9 (paper default), min_leaf=20, lambda_cov=1e-2
+# Parameters: num_iter=9 (paper default), min_leaf=20, lambda_cov=1e-2, num_cutpoints=4
 model_a <- train_ptree_factors(train_a, "SCENARIO A",
                                num_factors = 1,
                                num_iter = 9,
                                eta = 1.0,
                                min_leaf_size = 20,
+                               num_cutpoints = 4,
                                lambda_cov = 1e-2,
                                lambda_ridge = 1e-4)
 
@@ -434,6 +435,7 @@ model_b <- train_ptree_factors(train_b, "SCENARIO B (Train)",
                                num_iter = 9,
                                eta = 1.0,
                                min_leaf_size = 20,
+                               num_cutpoints = 4,
                                lambda_cov = 1e-2,
                                lambda_ridge = 1e-4)
 
@@ -487,6 +489,7 @@ model_c <- train_ptree_factors(train_c, "SCENARIO C (Train)",
                                num_iter = 9,
                                eta = 1.0,
                                min_leaf_size = 20,
+                               num_cutpoints = 4,
                                lambda_cov = 1e-2,
                                lambda_ridge = 1e-4)
 

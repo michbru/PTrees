@@ -258,7 +258,7 @@ if (length(ensemble_files) > 0) {
     
     if (strat_name != "Unknown") {
       ens[, Strategy := strat_name]
-      ens[, Return := factor_ensemble]  # Already in decimal form
+      ens[, Return := factor]  # Already in decimal form
       plot_data_list[[length(plot_data_list)+1]] <- ens[, .(date, Return, Strategy)]
     }
   }
@@ -320,7 +320,7 @@ cat("Generating Figure 3: Monthly Returns Distribution...\n")
 if (exists("ensemble_files") && length(ensemble_files) > 0) {
   # Use Scenario A ensemble
   ens_a <- fread(ensemble_files[grepl("scenario_a", ensemble_files)][1])
-  ens_a[, Return := factor_ensemble]  # Already in decimal form
+  ens_a[, Return := factor]  # Already in decimal form
 
   p3 <- ggplot(ens_a, aes(x = Return * 100)) +
     geom_histogram(bins = 30, fill = "#2E86AB", color = "white", alpha = 0.8) +
@@ -433,7 +433,7 @@ if (exists("ensemble_files") && length(ensemble_files) > 0) {
 
   for (f in ensemble_files) {
     ens <- fread(f)
-    ens[, Return := factor_ensemble]  # Already in decimal form
+    ens[, Return := factor]  # Already in decimal form
 
     fname <- basename(f)
     scenario <- "Unknown"
