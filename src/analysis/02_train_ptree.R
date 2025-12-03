@@ -1,11 +1,10 @@
 #!/usr/bin/env Rscript
 
-# A2: Train P-Tree Models (Single + Boosted) with Auto Tuning
-# ------------------------------------------------------------
-# - Trains both single-tree (num_iter=1) and boosted (num_iter>1) variants
-# - Performs parameter tuning on a validation split (pre-2010 only)
-# - Saves outputs: factor returns, leaf portfolios, tree text, summaries,
-#   parameter choices, and descriptive statistics for table building
+# A2: Train P-Tree Models
+# ------------------------
+# - Trains single-factor P-Tree models with fixed hyperparameters
+# - Uses num_iter=9 internal boosting iterations per tree (following original paper)
+# - Saves outputs: factor returns, tree structure, and summary statistics
 
 suppressPackageStartupMessages({
   library(data.table)
@@ -33,7 +32,7 @@ if (length(old_files) > 0) {
 }
 
 cat("\n╔════════════════════════════════════════════════╗\n")
-cat("║   A2: TRAIN P-TREE MODELS (SINGLE + BOOSTED)  ║\n")
+cat("║   A2: TRAIN P-TREE MODELS (SINGLE FACTOR)     ║\n")
 cat("╚════════════════════════════════════════════════╝\n\n")
 
 if (!file.exists(in_rds)) stop(sprintf("Inputs RDS not found: %s\nRun A1 first.", in_rds))
@@ -58,9 +57,9 @@ build_train_data <- function(dt_sub, keep_chars, instr) {
        pw=pw, lw=lw)
 }
 
-# Helper function to train P-Tree with 20-factor boosting loop
+# Helper function to train P-Tree (supports single or multiple factors)
 train_ptree_factors <- function(train_data, scenario_name,
-                                num_factors=20,
+                                num_factors=1,
                                 num_iter=9, eta=1.0, # Original paper defaults
                                 min_leaf_size=100, max_depth=3, num_cutpoints=50,
                                 equal_weight=TRUE, weighted_loss=FALSE,
@@ -77,11 +76,11 @@ train_ptree_factors <- function(train_data, scenario_name,
               num_iter, eta, min_leaf_size, max_depth, lambda_cov))
 
   # Initialize
-  H_train <- rep(0, train_data$num_months) # Current prediction (accumulated factors)
+  H_train <- rep(0, train_data$num_months) # Current prediction (accumulated if num_factors > 1)
   factors_list <- list()
   models_list <- list()
   
-  # Boosting Loop
+  # Factor extraction loop (typically num_factors=1)
   for (k in 1:num_factors) {
     cat(sprintf("  Training Factor %d/%d...", k, num_factors))
     
@@ -100,7 +99,7 @@ train_ptree_factors <- function(train_data, scenario_name,
         num_cutpoints = num_cutpoints,
         eta = eta,
         equal_weight = equal_weight,
-        no_H = FALSE, # We use H for boosting
+        no_H = FALSE, # Use H for multi-factor accumulation (if num_factors > 1)
         abs_normalize = abs_normalize,
         weighted_loss = weighted_loss,
         lambda_mean = 0,
@@ -122,7 +121,7 @@ train_ptree_factors <- function(train_data, scenario_name,
     factors_list[[k]] <- ft
     models_list[[k]] <- fit
     
-    # Update H (prediction)
+    # Update H (prediction accumulator for multi-factor scenarios)
     # Note: PTree returns the NEW factor. We add it to H.
     H_train <- H_train + ft
     
@@ -133,13 +132,13 @@ train_ptree_factors <- function(train_data, scenario_name,
   factors_mat <- do.call(cbind, factors_list)
   colnames(factors_mat) <- paste0("F", 1:num_factors)
   
-  # Calculate stats for the *ensemble* (H_train)
+  # Calculate stats (if num_factors=1, H_train equals the single factor)
   mean_m <- mean(H_train, na.rm=TRUE)
   std_m <- sd(H_train, na.rm=TRUE)
   sharpe <- if (std_m > 0) mean_m / std_m * sqrt(12) else NA_real_
   annualized_return <- mean_m * 12
 
-  cat(sprintf("\n  ✓ RESULTS (Ensemble):\n"))
+  cat(sprintf("\n  ✓ RESULTS:\n"))
   cat(sprintf("    Sharpe: %.2f | Mean: %.2f%% | SD: %.2f%%\n", sharpe, mean_m*100, std_m*100))
 
   list(models=models_list, factors=factors_mat, H=H_train, 
@@ -339,7 +338,7 @@ tune_params_cv <- function(dt_for_tuning, keep_chars, instr, model_type = c("sin
 }
 
 # ============================================================================
-# MAIN TRAINING LOOP (20-Factor Extraction)
+# MAIN TRAINING LOOP (Single-Factor Models)
 # ============================================================================
 
 dt <- copy(inp$dt)
@@ -348,12 +347,10 @@ dt <- copy(inp$dt)
 cat("\n\n--- SCENARIO A: FULL SAMPLE ---\n")
 train_a <- build_train_data(dt, inp$char_cols, inp$instr_cols)
 
-# Train single factor (20-factor ensemble produces identical copies)
-# Original paper uses num_iter=9, eta=1.0 (implied)
-# Adjusted parameters based on diagnostic: min_leaf=20, lambda_cov=1e-2
-# NOTE: All 20 factors were identical due to degenerate splitting (only rank_me used)
+# Train single-factor P-Tree model
+# Parameters: num_iter=9 (paper default), min_leaf=20, lambda_cov=1e-2
 model_a <- train_ptree_factors(train_a, "SCENARIO A",
-                               num_factors = 1,  # Single factor for cleaner table
+                               num_factors = 1,
                                num_iter = 9,
                                eta = 1.0,
                                min_leaf_size = 20,
@@ -370,12 +367,12 @@ fwrite(factors_dt, file.path(out_dir, sprintf("scenario_a_%d_factor%s.csv",
                                                num_factors_actual,
                                                ifelse(num_factors_actual > 1, "s", ""))))
 
-# Save Ensemble
-ensemble_dt <- data.table(
+# Save factor returns (H equals single factor when num_factors=1)
+factor_returns_dt <- data.table(
   date = unique(train_a$dt$date),
-  factor_ensemble = model_a$H
+  factor = model_a$H
 )
-fwrite(ensemble_dt, file.path(out_dir, "scenario_a_ensemble.csv"))
+fwrite(factor_returns_dt, file.path(out_dir, "scenario_a_ensemble.csv"))
 
 # Save Tree Structures
 sink(file.path(out_dir, "scenario_a_trees.txt"))
@@ -433,7 +430,7 @@ cat(sprintf("Test period: %s to %s (%d obs)\n",
 # Train on early period
 train_b <- build_train_data(dt_train_b, inp$char_cols, inp$instr_cols)
 model_b <- train_ptree_factors(train_b, "SCENARIO B (Train)",
-                               num_factors = 1,  # Single factor for cleaner table
+                               num_factors = 1,
                                num_iter = 9,
                                eta = 1.0,
                                min_leaf_size = 20,
@@ -454,11 +451,11 @@ fwrite(factors_b_test, file.path(out_dir, sprintf("scenario_b_test_%d_factor%s.c
                                                    num_factors_b,
                                                    ifelse(num_factors_b > 1, "s", ""))))
 
-ensemble_b_test <- data.table(
+factor_returns_b_test <- data.table(
   date = unique(test_b$dt$date),
-  factor_ensemble = pred_b$H
+  factor = pred_b$H
 )
-fwrite(ensemble_b_test, file.path(out_dir, "scenario_b_test_ensemble.csv"))
+fwrite(factor_returns_b_test, file.path(out_dir, "scenario_b_test_ensemble.csv"))
 
 # Save Tree Structures for B
 sink(file.path(out_dir, "scenario_b_trees.txt"))
@@ -486,7 +483,7 @@ cat(sprintf("Test period: %s to %s (%d obs)\n",
 # Train on late period
 train_c <- build_train_data(dt_train_c, inp$char_cols, inp$instr_cols)
 model_c <- train_ptree_factors(train_c, "SCENARIO C (Train)",
-                               num_factors = 1,  # Single factor for cleaner table
+                               num_factors = 1,
                                num_iter = 9,
                                eta = 1.0,
                                min_leaf_size = 20,
@@ -507,11 +504,11 @@ fwrite(factors_c_test, file.path(out_dir, sprintf("scenario_c_test_%d_factor%s.c
                                                    num_factors_c,
                                                    ifelse(num_factors_c > 1, "s", ""))))
 
-ensemble_c_test <- data.table(
+factor_returns_c_test <- data.table(
   date = unique(test_c$dt$date),
-  factor_ensemble = pred_c$H
+  factor = pred_c$H
 )
-fwrite(ensemble_c_test, file.path(out_dir, "scenario_c_test_ensemble.csv"))
+fwrite(factor_returns_c_test, file.path(out_dir, "scenario_c_test_ensemble.csv"))
 
 # Save Tree Structures for C
 sink(file.path(out_dir, "scenario_c_trees.txt"))

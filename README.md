@@ -1,243 +1,89 @@
-# P-Trees: Prediction Trees for Swedish Market Factor Construction
-
-This repository implements the P-Tree (Prediction Tree) methodology for constructing factor portfolios in the Swedish equity market. The analysis builds on the framework introduced by Bryzgalova et al. (2023) and applies it to Swedish stocks using combined market and accounting data.
+# P-Trees on Swedish Stock Market: Empirical Analysis
 
 ## Overview
 
-P-Trees are decision trees that construct tradeable factors by:
-1. Splitting stocks based on firm characteristics
-2. Creating long-short portfolios from leaf nodes
-3. Optimizing splits to maximize Sharpe ratio of resulting factors
+This project implements P-Trees (Prediction Trees) from Cong et al. (2023) on Swedish stock market data. P-Trees are an interpretable machine learning method for factor discovery in asset pricing that combines tree-based models with portfolio optimization.
 
-This implementation uses 28 firm characteristics spanning momentum, value, investment, profitability, intangibles, and frictions to analyze Swedish market data from the Stockholm Stock Exchange.
+## Data Sources & Sample
 
-## Project Structure
+Data from stocks in the Swedish stock market were used.
+- **Market Data**: Finbas (daily prices, volume, market cap)
+- **Fundamentals**: Serrano (annual accounting data)
+- **Mapping**: LSEG (used to map ISIN to Organization Number)
+- **Risk Factors**: Swedish House of Finance (Fama-French factors)
+- **Inflation**: Official Statistics of Sweden (inflation rate)
 
-```
-PTrees/
-├── src/                              # Source code
-│   ├── data_preparation/            # Data processing pipeline
-│   │   ├── 1_process_finbas.py     # Process market data
-│   │   ├── 2_process_serrano_accounting.py  # Process accounting data
-│   │   ├── 3_build_isin_orgnr_mapping_LSEG.py  # Build ISIN-ORGNR mapping
-│   │   ├── 4_merge_mappings.py     # Merge mapping sources
-│   │   ├── 5_merge_datasets.py     # Merge market + accounting data
-│   │   ├── 6_prepare_ptree_dataset.py  # Final dataset preparation
-│   │   └── CHARACTERISTICS.md       # Complete characteristic definitions
-│   ├── analysis/                    # P-Tree model training & evaluation
-│   │   ├── 01_prepare_inputs.R     # Prepare inputs for P-Tree
-│   │   ├── 02_train_ptree.R        # Train P-Tree models
-│   │   ├── 03_evaluate_model.R     # Evaluate model performance
-│   │   ├── 04_visualize_results.R  # Generate visualizations
-│   │   ├── 05_validation_analysis.R # Validation analysis for thesis
-│   │   └── validation/              # Additional validation scripts
-│   │       ├── data_coverage_analysis.py
-│   │       └── decode_tree_structures.R
-├── data/                            # Data directory (large files gitignored)
-│   ├── raw/                         # Raw data sources
-│   │   ├── finbas/                 # Finbas market data
-│   │   └── serrano/                # Serrano accounting data
-│   ├── intermediate/                # Intermediate processing outputs
-│   ├── processed/                   # Final processed datasets
-│   └── mappings/                    # ISIN-ORGNR mappings
-├── results/                         # Analysis results
-│   ├── inputs/                      # P-Tree input matrices
-│   ├── models/                      # Trained models & summaries
-│   ├── evaluation/                  # Performance metrics
-│   └── visualizations/              # Figures and tables
-├── notebooks/                       # Jupyter notebooks for exploration
-├── docs/                            # Documentation
-└── archive/                         # Archived experimental work
+**Sample Characteristics (Post-Filtering):**
+- **Time Period**: January 1998 - December 2019
+- **Total Firms**: ~675
+- **Average Firms per Month**: ~230
+- **Total Observations**: ~59,314 firm-months
 
+## Methodology
+
+The main bulk of the work for obtaining the results was data preparation. The main steps were to clean the datasets, merge them, and create new variables from existing characteristics.
+
+### 1. Data Cleaning & Filtering
+Cleaning included filtering out data points outside the study time frame, handling missing values, and removing unnecessary variables.
+- **Time Window**: Chosen to match the availability of Fama-French factors and Finbas data.
+- **Share Class Filtering**: Multiple stock types from the same firm were filtered to ensure one set of predictors corresponds to one dependent variable value. If two stock classes from the same firm were included with different returns, explanatory variables would lose predictive power. We prioritized the most liquid share class.
+- **Foreign Stocks**: Stocks of firms based in other countries (e.g., Finnish firms in Finbas) were filtered out.
+- **Exchanges**: Only stocks of public firms listed on prominent Stockholm-based exchanges were included.
+- **Variable Selection**: Only variables replicating `\textcite{PTree}` were kept. Variables with extremely low coverage (e.g., dividend yield) were excluded to maintain model robustness.
+
+### 2. Merging Datasets
+A mapping table was created to merge Finbas (ISIN identifier) and Serrano (Organization Number identifier).
+- **Mapping**: LSEG data provided both ISIN and tax-ids. Swedish tax-ids were converted to organization numbers (stripping "SE" and "01") to create an ISIN-to-OrgNr dictionary.
+- **Frequency Mismatch**: Finbas is monthly, Serrano is annual. We merged by aligning the most recent available annual report to each month. This "forward-filling" approach reflects investor knowledge, as decisions are based on the latest known financial statements.
+- **New Characteristics**: Post-merge, we calculated ratios like Return on Assets (ROA), Book-to-Market (BM), Earnings-to-Price (EP), Sales-to-Price (SP), and Cashflow-to-Price (CFP).
+
+### 3. Lag Implementation
+To prevent look-ahead bias, lags were applied to all predictor variables.
+- **Market Data**: Lagged by 1 month.
+- **Accounting Data**: Lagged by 6 months to ensure financial reports were public information at the time of prediction.
+
+## Model Configuration
+
+The P-Tree model was trained with the following hyperparameters (Scenario A, B, and C):
+
+```r
+num_iter = 9           # Internal boosting iterations per tree
+eta = 1.0              # Learning rate
+min_leaf_size = 20     # Minimum observations per leaf
+max_depth = 3          # Maximum tree depth
+num_cutpoints = 50     # Number of candidate split points
+lambda_cov = 1e-2      # Covariance regularization
+lambda_ridge = 1e-4    # Ridge regularization
+equal_weight = TRUE    # Equal weighting in leaf portfolios
+weighted_loss = FALSE  # Standard loss function
+abs_normalize = TRUE   # Absolute value normalization
 ```
 
 ## Key Results
 
-The analysis evaluates three scenarios:
+### Scenario A: Full Sample (1998-2019)
+- **Sharpe Ratio**: 0.68
+- **Annualized Return**: 1.50%
+- **Alpha (CAPM)**: 0.11% (t=2.31)
+- **Tree Structure**: Simple 2-level tree with 5 leaf portfolios.
 
-| Scenario | Description | Test Sharpe Ratio | Annualized Return |
-|----------|-------------|-------------------|-------------------|
-| **A: Full Sample** | Single model on entire period | 1.82 | 10.07% |
-| **B: Time-Split** | Train: early, Test: late | 0.27 | 1.35% |
-| **C: Reverse Split** | Train: late, Test: early | 0.24 | 2.98% |
+### Scenario B: Time-Split (Train 1998-2009 / Test 2010-2019)
+- **Test Sharpe Ratio**: 0.92
+- **Test Annualized Return**: 1.54%
 
-**Key Finding:** Scenario A demonstrates strong in-sample performance, while out-of-sample scenarios (B & C) show the challenges of predicting factor performance across different time periods in the Swedish market.
+### Scenario C: Reverse Split (Train 2010-2019 / Test 1998-2009)
+- **Test Sharpe Ratio**: 0.56
+- **Test Annualized Return**: 0.99%
 
-## Installation
+## Discussion
 
-### Prerequisites
+The P-Trees exhibit limited splitting behavior (1-2 splits) compared to US studies. This is attributed to:
+1. **Small Cross-Section**: ~230 firms/month vs ~8,000 in the US.
+2. **Data Sparsity**: High proportion of missing/zero values in characteristics.
+3. **Weak Signals**: Median univariate R² is extremely low (0.000053).
 
-- **Python 3.11+** with packages:
-  - pandas, numpy, scipy
-  - jupyter (for notebooks)
-- **R 4.0+** with packages:
-  - data.table
-  - PTree (custom package for P-Tree methodology)
-- **Git** for version control
-
-### Setup
-
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd PTrees
-```
-
-2. Set up Python environment:
-```bash
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install pandas numpy scipy jupyter
-```
-
-3. Install R dependencies:
-```R
-install.packages("data.table")
-# Install PTree package (instructions depend on package source)
-```
-
-## Usage
-
-### Data Preparation Pipeline
-
-The data preparation pipeline processes raw market and accounting data:
-
-```bash
-# Step 1: Process Finbas market data
-python src/data_preparation/1_process_finbas.py
-
-# Step 2: Process Serrano accounting data
-python src/data_preparation/2_process_serrano_accounting.py
-
-# Step 3: Build ISIN-ORGNR mapping
-python src/data_preparation/3_build_isin_orgnr_mapping_LSEG.py
-
-# Step 4: Merge mappings
-python src/data_preparation/4_merge_mappings.py
-
-# Step 5: Merge datasets
-python src/data_preparation/5_merge_datasets.py
-
-# Step 6: Prepare final P-Tree dataset
-python src/data_preparation/6_prepare_ptree_dataset.py
-
-# Optional: Validate pipeline
-python src/validation/validate_pipeline.py
-```
-
-### P-Tree Analysis
-
-Run the complete P-Tree analysis pipeline:
-
-```bash
-# Step 1: Prepare inputs
-Rscript src/analysis/01_prepare_inputs.R
-
-# Step 2: Train P-Tree models (Scenarios A, B, C)
-Rscript src/analysis/02_train_ptree.R
-
-# Step 3: Evaluate model performance
-Rscript src/analysis/03_evaluate_model.R
-
-# Step 4: Generate visualizations
-Rscript src/analysis/04_visualize_results.R
-
-# Step 5: Generate validation analysis for thesis defense
-Rscript src/analysis/05_validation_analysis.R
-```
-
-### Validation Analysis Outputs
-
-Step 5 produces statistical evidence for thesis defense:
-
-**LaTeX Tables** (in `results/validation/`):
-- `table_sparsity.tex` - Data sparsity by characteristic (proportion zeros/missing)
-- `table_r2.tex` - Univariate predictive power (R²) rankings
-- `table_comparison.tex` - Swedish vs US market data quality comparison
-
-**Figures** (in `results/validation/`):
-- `figure_sparsity.png` - Characteristic sparsity visualization
-- `figure_r2.png` - Predictive power visualization
-- `figure_coverage_time.png` - Data coverage evolution over time
-
-These outputs demonstrate that limited P-Tree splits are due to:
-- Weak predictive signals (median R² = 0.0001 vs ~0.05-0.15 in US)
-- Small sample size (~104 firms/month vs ~8,000 in US)
-- Data sparsity (~84% coverage vs >90% in US)
-```
-
-Results will be saved in the `results/` directory.
-
-## Data Sources
-
-1. **Finbas**: Daily market data for Swedish stocks (prices, volume, market cap)
-   - Filtered to SEK-quoted stocks with SE ISINs
-   - Single deterministic row per (ISIN, date)
-
-2. **Serrano**: Annual accounting data from Swedish company reports
-   - Balance sheet and income statement items
-   - Financial ratios (nyckeltal)
-   - Merged via ORGNR (Swedish company registration number)
-
-3. **LSEG**: London Stock Exchange Group data for ISIN-ORGNR mapping
-
-## Firm Characteristics
-
-The analysis uses 44 firm characteristics across six categories:
-
-- **Momentum** (8): MOM1M, MOM6M, MOM12M, MOM36M, MOM60M, SEAS1A, CHTX, DEPR
-- **Value** (8): BM, EP, SP, CFP, CASH, CASHDEBT, LEV, SGR
-- **Investment** (10): AGR, GMA, LGR, ACC, PCTACC, NOA, CINVEST, GRLTNOA, CHCSHO, NI, CHPM
-- **Profitability** (6): ROA, ROE, ATO, PM, OP, RNA
-- **Intangibles** (1): HIRE
-- **Frictions** (11): ZEROTRADE, BASPREAD, DOLVOL, ILL, MAXRET, SVAR, STD_DOLVOL, TURN, STD_TURN, ME
-
-Complete definitions and construction logic are documented in `src/data_preparation/CHARACTERISTICS.md`.
-
-**Note:** BETA and RVAR_CAPM are implemented but currently excluded from the analysis as they are placeholders (not yet computed with market model regression).
-
-## Key Features
-
-- **Publication Lag**: 6-month lag applied to accounting variables to ensure data availability
-- **As-of Joins**: Proper temporal alignment between market and accounting data
-- **Cross-sectional Ranking**: Characteristics normalized to [-1, 1] within each month
-- **Value Weighting**: Portfolios weighted by lagged market capitalization
-- **Safe Division**: Robust handling of missing values and extreme ratios
-
-## Validation
-
-The pipeline includes comprehensive validation:
-- As-of join integrity verification
-- Monthly aggregation correctness
-- Publication lag logic validation
-- Final dataset integrity checks
-
-Run validation with:
-```bash
-python src/validation/validate_pipeline.py
-```
-
-## Results Files
-
-Key output files in `results/`:
-
-- `models/all_scenarios_summary.csv`: Summary statistics for all scenarios
-- `models/scenario_*_summary.csv`: Individual scenario results
-- `models/scenario_*_tree.txt`: Tree structure for each model
-- `models/scenario_*_factor.csv`: Factor returns over time
-- `models/scenario_*_leaf_portfolios.csv`: Leaf node portfolio compositions
-- `visualizations/`: Figures and tables for publication
-
-## Known Limitations
-
-- Beta and idiosyncratic variance (CAPM/FF3) are currently placeholders (not computed)
-- ZEROTRADE has low coverage due to high trading activity in Swedish market
-- Share counts approximated via market_cap/price where explicit data unavailable
-- No winsorization applied; extreme values handled via ranking
+Despite these constraints, the model successfully extracts a factor with positive risk-adjusted returns and significant alpha, demonstrating the methodology's viability even in smaller markets.
 
 ## References
 
-Bryzgalova, S., Huang, J., & Julliard, C. (2023). Bayesian solutions for the factor zoo: We just ran two quadrillion models. *Journal of Finance*, 78(1), 487-557.
-
-
-**Last Updated:** December 2025
+Cong, L. W., Tang, K., Wang, J., & Zhang, Y. (2023). Interpretable Machine Learning for Asset Pricing. *Management Science*, forthcoming.
