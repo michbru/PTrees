@@ -115,13 +115,15 @@ if (!file.exists(perf_file)) {
 } else {
   perf <- fread(perf_file)
   
-  # Helper function to add significance stars
+  # Helper function to add significance stars (vectorized)
   add_stars <- function(tstat) {
-    abs_t <- abs(tstat)
-    if (abs_t >= 2.576) return("***")      # 1% significance
-    if (abs_t >= 1.96) return("**")        # 5% significance
-    if (abs_t >= 1.645) return("*")        # 10% significance
-    return("")
+    sapply(tstat, function(t) {
+      abs_t <- abs(t)
+      if (abs_t >= 2.576) return("***")      # 1% significance
+      if (abs_t >= 1.96) return("**")        # 5% significance
+      if (abs_t >= 1.645) return("*")        # 10% significance
+      return("")
+    })
   }
 
   # Format table with significance stars
