@@ -15,7 +15,7 @@ import json
 import time
 import re
 
-FINBAS_PATH = Path('data/intermediate/finbas/finbas_daily_clean.csv')
+FINBAS_PATH = Path('data/intermediate/finbas/finbas_monthly_clean.csv')
 SERRANO_RAW_DIR = Path('data/raw/serrano/Stata_2025')
 OUTPUT_AUTO = Path('data/mappings/automated/isin_orgnr_automated.csv')
 

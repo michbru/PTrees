@@ -1,525 +1,445 @@
 #!/usr/bin/env Rscript
 
-# A2: Train P-Tree Models
-# ------------------------
-# - Trains single-factor P-Tree models with fixed hyperparameters
-# - Uses num_iter=9 internal boosting iterations per tree (following original paper)
-# - Saves outputs: factor returns, tree structure, and summary statistics
+################################################################################
+# Step 2: Train P-Tree Models
+################################################################################
+#
+# Purpose: Train single P-Tree for each scenario following Cong et al. (2024)
+#
+# Model: ONE P-Tree per scenario (not boosted ensemble, just one tree)
+# - The tree grows by iteratively splitting the cross-section
+# - Optimizes Sharpe ratio at each split
+# - Output: Factor time series (monthly returns of tangency portfolio)
+#
+# Scenarios:
+#   A: Full sample (1998-2019) - In-sample performance
+#   B: Train 1998-2009, Test 2010-2019 - Out-of-sample forward
+#   C: Train 2010-2019, Test 1998-2009 - Out-of-sample reverse
+#
+################################################################################
 
 suppressPackageStartupMessages({
   library(data.table)
 })
 
 if (!requireNamespace("PTree", quietly = TRUE)) {
-  stop("The 'PTree' package is required. Install it before running.")
+  stop("PTree package required. Install from: devtools::install_github('bpf_ptree/PTree')")
 }
 
+# Set seed for reproducibility
+set.seed(42)
+
+# Paths
 args <- commandArgs(trailingOnly = FALSE)
 file_arg <- sub("^--file=", "", args[grep("^--file=", args)])
-script_dir <- tryCatch(dirname(normalizePath(file_arg)), error = function(e) getwd())
-repo_root <- normalizePath(file.path(script_dir, "..", ".."), mustWork = FALSE)
+script_dir <- if (length(file_arg) > 0) dirname(normalizePath(file_arg)) else getwd()
+repo_root <- normalizePath(file.path(script_dir, "..", ".."))
+setwd(repo_root)
 
-in_rds <- file.path(repo_root, "results", "inputs", "ptree_inputs.rds")
-out_dir <- file.path(repo_root, "results", "models")
-dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+INPUT_RDS <- "results/inputs/ptree_inputs.rds"
+OUTPUT_DIR <- "results/models"
 
-# Clean up old results
-cat("\nCleaning up old model results...\n")
-old_files <- list.files(out_dir, pattern = "\\.(csv|txt)$", full.names = TRUE)
-if (length(old_files) > 0) {
-  file.remove(old_files)
-  cat(sprintf("  Removed %d old file(s)\n", length(old_files)))
+# Clear output directory - start fresh
+if (dir.exists(OUTPUT_DIR)) {
+  cat("Clearing previous model outputs...\n")
+  unlink(OUTPUT_DIR, recursive = TRUE)
+}
+dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
+
+cat("================================================================================\n")
+cat("STEP 2: TRAIN P-TREE MODELS\n")
+cat("================================================================================\n\n")
+
+if (!file.exists(INPUT_RDS)) {
+  stop("Input file not found. Run 01_prepare_inputs.R first.")
 }
 
-cat("\n╔════════════════════════════════════════════════╗\n")
-cat("║   A2: TRAIN P-TREE MODELS (SINGLE FACTOR)     ║\n")
-cat("╚════════════════════════════════════════════════╝\n\n")
-
-if (!file.exists(in_rds)) stop(sprintf("Inputs RDS not found: %s\nRun A1 first.", in_rds))
-inp <- readRDS(in_rds)
-
-# Helper function to build training data from filtered dataset
-build_train_data <- function(dt_sub, keep_chars, instr) {
-  # Use .SDcols for safe extraction
-  X <- as.matrix(dt_sub[, .SD, .SDcols = keep_chars])
-  R <- as.vector(dt_sub$ret_next) # Decimal returns (no * 100)
-  Y <- R
-  Z_instr <- if (length(instr)>0) as.matrix(dt_sub[, .SD, .SDcols = instr]) else NULL
-  Z <- cbind(Intercept = 1, Z_instr)
-
-  months <- as.integer(as.factor(dt_sub$date)) - 1L
-  stocks <- as.integer(as.factor(dt_sub$isin)) - 1L
-  pw <- as.vector(dt_sub$lag_me)
-  lw <- as.vector(dt_sub$lag_me)
-
-  list(dt=dt_sub, X=X, R=R, Y=Y, Z=Z, months=months, stocks=stocks,
-       num_months=length(unique(months)), num_stocks=length(unique(stocks)),
-       pw=pw, lw=lw)
-}
-
-# Helper function to train P-Tree (supports single or multiple factors)
-train_ptree_factors <- function(train_data, scenario_name,
-                                num_factors=1,
-                                num_iter=9, eta=1.0, # Original paper defaults
-                                min_leaf_size=100, max_depth=3, num_cutpoints=4,
-                                equal_weight=TRUE, weighted_loss=FALSE,
-                                lambda_cov=0,       # Added lambda_cov
-                                lambda_ridge=1e-4, # Added ridge for stability
-                                abs_normalize=TRUE) {
-  cat(sprintf("\n╔════════════════════════════════════════════════╗\n"))
-  cat(sprintf("║   %s (Extracting %d Factors)\n", scenario_name, num_factors))
-  cat(sprintf("╚════════════════════════════════════════════════╝\n\n"))
-
-  cat(sprintf("  Obs: %d | Months: %d | Stocks: %d\n",
-              nrow(train_data$dt), train_data$num_months, train_data$num_stocks))
-  cat(sprintf("  Parameters: iter/factor=%d, eta=%.2f, min_leaf=%d, depth=%d, lambda_cov=%.1e\n",
-              num_iter, eta, min_leaf_size, max_depth, lambda_cov))
-
-  # Initialize
-  H_train <- rep(0, train_data$num_months) # Current prediction (accumulated if num_factors > 1)
-  factors_list <- list()
-  models_list <- list()
-  
-  # Factor extraction loop (typically num_factors=1)
-  for (k in 1:num_factors) {
-    cat(sprintf("  Training Factor %d/%d...", k, num_factors))
-    
-    t_start <- proc.time()
-    suppressWarnings({
-      fit <- PTree::PTree(
-        train_data$R, train_data$Y, train_data$X, train_data$Z,
-        H = H_train,
-        train_data$pw, train_data$lw,
-        train_data$stocks, train_data$months,
-        seq(0L, ncol(train_data$X)-1L), seq(0L, ncol(train_data$X)-1L),
-        train_data$num_stocks, train_data$num_months,
-        min_leaf_size = min_leaf_size,
-        max_depth = max_depth,
-        num_iter = num_iter,
-        num_cutpoints = num_cutpoints,
-        eta = eta,
-        equal_weight = equal_weight,
-        no_H = FALSE, # Use H for multi-factor accumulation (if num_factors > 1)
-        abs_normalize = abs_normalize,
-        weighted_loss = weighted_loss,
-        lambda_mean = 0,
-        lambda_cov = lambda_cov, # Pass lambda_cov here
-        lambda_mean_factor = 0,
-        lambda_cov_factor = 0,
-        early_stop = FALSE,
-        stop_threshold = 1.0,
-        lambda_ridge = lambda_ridge,
-        a1 = 0, a2 = 0,
-        list_K = matrix(rep(0, 3), nrow = 3, ncol = 1),
-        random_split = FALSE
-      )
-    })
-    dur <- (proc.time() - t_start)[3]
-    
-    # Extract factor
-    ft <- as.numeric(fit$ft)
-    factors_list[[k]] <- ft
-    models_list[[k]] <- fit
-    
-    # Update H (prediction accumulator for multi-factor scenarios)
-    # Note: PTree returns the NEW factor. We add it to H.
-    H_train <- H_train + ft
-    
-    cat(sprintf(" Done (%.2fs). Mean: %.4f | SD: %.4f\n", dur, mean(ft), sd(ft)))
-  }
-
-  # Combine factors into a matrix (Months x Factors)
-  factors_mat <- do.call(cbind, factors_list)
-  colnames(factors_mat) <- paste0("F", 1:num_factors)
-  
-  # Calculate stats (if num_factors=1, H_train equals the single factor)
-  mean_m <- mean(H_train, na.rm=TRUE)
-  std_m <- sd(H_train, na.rm=TRUE)
-  sharpe <- if (std_m > 0) mean_m / std_m * sqrt(12) else NA_real_
-  annualized_return <- mean_m * 12
-
-  cat(sprintf("\n  ✓ RESULTS:\n"))
-  cat(sprintf("    Sharpe: %.2f | Mean: %.2f%% | SD: %.2f%%\n", sharpe, mean_m*100, std_m*100))
-
-  list(models=models_list, factors=factors_mat, H=H_train, 
-       mean=mean_m, sd=std_m, sharpe=sharpe, annualized_return=annualized_return)
-}
-
-# Helper to evaluate factor on test data
-evaluate_on_test <- function(train_model, test_data, scenario_name) {
-  cat(sprintf("\n--- OUT-OF-SAMPLE Evaluation: %s ---\n", scenario_name))
-  cat(sprintf("  Test obs: %d | Months: %d | Stocks: %d\n",
-              nrow(test_data$dt), test_data$num_months, test_data$num_stocks))
-
-  pred <- predict(train_model$fit, test_data$X, test_data$R, test_data$months, test_data$pw)
-
-  ft <- as.numeric(pred$ft)
-  mean_m <- mean(ft, na.rm=TRUE)
-  std_m <- sd(ft, na.rm=TRUE)
-  sharpe <- if (std_m > 0) mean_m / std_m * sqrt(12) else NA_real_
-  annualized_return <- mean_m * 12
-
-  cat(sprintf("  ✓ OUT-OF-SAMPLE Sharpe: %.2f | Mean: %.2f%% | SD: %.2f%%\n",
-              sharpe, mean_m, std_m))
-  cat(sprintf("  Annualized Return: %.2f%%\n", annualized_return))
-
-  list(ft=ft, mean=mean_m, sd=std_m, sharpe=sharpe, annualized_return=annualized_return)
-}
-
-# Helper to compute descriptive statistics for factor time series
-factor_descriptives <- function(ft) {
-  x <- as.numeric(ft)
-  x <- x[is.finite(x)]
-  if (!length(x)) return(data.table())
-  ann <- 12
-  m <- mean(x)
-  s <- sd(x)
-  data.table(
-    mean_monthly = m,
-    sd_monthly = s,
-    sharpe = ifelse(s > 0, m/s*sqrt(ann), NA_real_),
-    ann_return = m*ann,
-    min = min(x),
-    p05 = as.numeric(quantile(x, 0.05)),
-    median = median(x),
-    p95 = as.numeric(quantile(x, 0.95)),
-    max = max(x)
-  )
-}
-
-# Helper to save results
-save_scenario_results <- function(model, eval_results, scenario_name, train_data, test_data=NULL, is_test=FALSE, params=list()) {
-  suffix <- if (is_test) "_test" else ""
-
-  # Factor returns
-  factor_dt <- data.table(
-    date = if (is_test) unique(test_data$dt$date) else unique(train_data$dt$date),
-    factor = if (is_test) eval_results$ft else model$ft
-  )
-  fwrite(factor_dt, file.path(out_dir, sprintf("%s%s_factor.csv", scenario_name, suffix)))
-
-  # Leaf portfolios
-  fwrite(model$leaf_portfolios, file.path(out_dir, sprintf("%s%s_leaf_portfolios.csv", scenario_name, suffix)))
-
-  # Tree structure
-  writeLines(model$tree, file.path(out_dir, sprintf("%s%s_tree.txt", scenario_name, suffix)))
-
-  # Summary stats
-  summary <- data.table(
-    scenario = scenario_name,
-    test = is_test,
-    sharpe_ratio = if (is_test) eval_results$sharpe else model$sharpe,
-    mean_monthly_pct = if (is_test) eval_results$mean else model$mean,
-    std_monthly_pct = if (is_test) eval_results$sd else model$sd,
-    annualized_return_pct = if (is_test) eval_results$annualized_return else model$annualized_return,
-    num_leaves = model$num_leaves
-  )
-  fwrite(summary, file.path(out_dir, sprintf("%s%s_summary.csv", scenario_name, suffix)))
-
-  # Descriptive statistics for factor series
-  desc <- factor_descriptives(factor_dt$factor)
-  fwrite(desc, file.path(out_dir, sprintf("%s%s_descriptives.csv", scenario_name, suffix)))
-
-  # Parameter snapshot (for reproducibility)
-  if (length(params)) {
-    params_dt <- as.data.table(params)
-    fwrite(params_dt, file.path(out_dir, sprintf("%s_params%s.csv", scenario_name, suffix)))
-  }
-
-  # Save trained model object (RDS) for downstream evaluation/visualization
-  # Only save once per base scenario (without _test suffix)
-  model_rds <- file.path(out_dir, sprintf("%s_model.rds", scenario_name))
-  if (!file.exists(model_rds)) {
-    saveRDS(model$fit, model_rds)
-  }
-}
-
-# Build time-based CV folds within a dataset (pre-2010)
-make_time_folds <- function(dt_sub, val_window_months = 24L, num_folds = 3L, min_train_months = 60L) {
-  months <- sort(unique(dt_sub$date))
-  n_months <- length(months)
-  folds <- list()
-  for (k in seq_len(num_folds)) {
-    val_end_idx <- n_months - (num_folds - k) * val_window_months
-    val_start_idx <- val_end_idx - val_window_months + 1
-    if (val_start_idx <= 1) next
-    train_end_idx <- val_start_idx - 1
-    if (train_end_idx < min_train_months) next
-    tr_start <- months[1]
-    tr_end   <- months[train_end_idx]
-    va_start <- months[val_start_idx]
-    va_end   <- months[val_end_idx]
-    folds[[length(folds) + 1]] <- list(
-      name = sprintf("Fold %d: %s..%s | %s..%s", k, as.character(tr_start), as.character(tr_end), as.character(va_start), as.character(va_end)),
-      train = dt_sub[date >= tr_start & date <= tr_end],
-      val   = dt_sub[date >= va_start & date <= va_end]
-    )
-  }
-  folds
-}
-
-# Time-based CV tuner: averages OOS Sharpe across folds
-tune_params_cv <- function(dt_for_tuning, keep_chars, instr, model_type = c("single","boosted"),
-                           val_window_months = 24L, num_folds = 3L, min_train_months = 60L) {
-  model_type <- match.arg(model_type)
-  grid <- list()
-  if (model_type == "single") {
-    grid <- CJ(
-      num_iter = 1L,
-      eta = 0.10,
-      min_leaf_size = c(50L, 100L),
-      max_depth = c(2L, 3L),
-      num_cutpoints = 50L
-    )
-  } else {
-    grid <- CJ(
-      num_iter = c(25L, 50L),
-      eta = c(0.05, 0.10),
-      min_leaf_size = c(10L, 25L),
-      max_depth = c(4L, 6L),
-      num_cutpoints = 50L
-    )
-  }
-
-  folds <- make_time_folds(dt_for_tuning, val_window_months, num_folds, min_train_months)
-  cat(sprintf("\nUsing %d time-based CV folds (val window %d months)\n", length(folds), val_window_months))
-  for (f in folds) cat("  ", f$name, "\n")
-
-  res_rows <- list()
-  best <- NULL
-  best_sharpe <- -Inf
-
-  for (i in seq_len(nrow(grid))) {
-    g <- grid[i]
-    cat(sprintf("\n[TUNE %s] %d/%d: iter=%d eta=%.2f min_leaf=%d depth=%d cuts=%d\n",
-                toupper(model_type), i, nrow(grid), g$num_iter, g$eta,
-                g$min_leaf_size, g$max_depth, g$num_cutpoints))
-    fold_sharpes <- c()
-    for (fi in seq_along(folds)) {
-      fdef <- folds[[fi]]
-      tr <- build_train_data(fdef$train, keep_chars, instr)
-      va <- build_train_data(fdef$val, keep_chars, instr)
-      fit <- train_ptree(
-        tr, sprintf("TUNE %s | %s", toupper(model_type), fdef$name),
-        num_iter = g$num_iter,
-        eta = g$eta,
-        min_leaf_size = g$min_leaf_size,
-        max_depth = g$max_depth,
-        num_cutpoints = g$num_cutpoints
-      )
-      ev <- evaluate_on_test(fit, va, sprintf("Val %s", model_type))
-      fold_sharpes <- c(fold_sharpes, ev$sharpe)
-    }
-    mean_sharpe <- mean(fold_sharpes, na.rm = TRUE)
-    res_rows[[length(res_rows) + 1]] <- data.table(
-      num_iter = g$num_iter, eta = g$eta, min_leaf_size = g$min_leaf_size,
-      max_depth = g$max_depth, num_cutpoints = g$num_cutpoints,
-      mean_val_sharpe = mean_sharpe
-    )
-    if (is.finite(mean_sharpe) && mean_sharpe > best_sharpe) {
-      best_sharpe <- mean_sharpe
-      best <- list(
-        num_iter = g$num_iter,
-        eta = g$eta,
-        min_leaf_size = g$min_leaf_size,
-        max_depth = g$max_depth,
-        num_cutpoints = g$num_cutpoints,
-        val_sharpe = mean_sharpe
-      )
-    }
-  }
-
-  res_dt <- rbindlist(res_rows)
-  out_name <- file.path(out_dir, sprintf("tuning_%s_cv.csv", model_type))
-  fwrite(res_dt, out_name)
-  cat(sprintf("\nBest %s params by mean CV Sharpe: %s\n",
-              model_type, paste(names(best), unlist(best), sep='=', collapse=', ')))
-  best
-}
-
-# ============================================================================
-# MAIN TRAINING LOOP (Single-Factor Models)
-# ============================================================================
-
+inp <- readRDS(INPUT_RDS)
 dt <- copy(inp$dt)
+char_cols <- inp$char_cols
+instr_cols <- inp$instr_cols
 
-# SCENARIO A: FULL SAMPLE
-cat("\n\n--- SCENARIO A: FULL SAMPLE ---\n")
-train_a <- build_train_data(dt, inp$char_cols, inp$instr_cols)
+cat(sprintf("Dataset loaded: %s obs, %s firms, %s months, %d characteristics\n\n",
+            format(nrow(dt), big.mark=","),
+            format(length(unique(dt$isin)), big.mark=","),
+            format(length(unique(dt$date)), big.mark=","),
+            length(char_cols)))
 
-# Train single-factor P-Tree model
-# Parameters: num_iter=9 (paper default), min_leaf=20, lambda_cov=1e-2, num_cutpoints=4
-model_a <- train_ptree_factors(train_a, "SCENARIO A",
-                               num_factors = 1,
-                               num_iter = 9,
-                               eta = 1.0,
-                               min_leaf_size = 20,
-                               num_cutpoints = 4,
-                               lambda_cov = 1e-2,
-                               lambda_ridge = 1e-4)
+################################################################################
+# Hyperparameters (Following Cong et al. 2024, adjusted for Swedish market)
+################################################################################
 
-# Save Factor(s)
-factors_dt <- data.table(
-  date = unique(train_a$dt$date),
-  model_a$factors
+PARAMS <- list(
+  # Tree structure
+  max_depth = 10,           # Maximum tree depth (paper: 10)
+  min_leaf_size = 3,        # Min stocks per leaf (paper: 3, scaled for market size)
+  num_cutpoints = 4,        # Split thresholds: {-0.6, -0.2, 0.2, 0.6} -> quintiles
+  
+  # Regularization
+  gamma = 1e-4,             # Covariance shrinkage (paper: 1e-4)
+  lambda = 1e-5,            # Factor covariance shrinkage (paper: 1e-5)
+  
+  # Weighting
+  equal_weight = TRUE,      # Equal-weighted leaf portfolios (paper default)
+  abs_normalize = TRUE      # Normalize by absolute values (paper default)
 )
-num_factors_actual <- ncol(model_a$factors)
-fwrite(factors_dt, file.path(out_dir, sprintf("scenario_a_%d_factor%s.csv",
-                                               num_factors_actual,
-                                               ifelse(num_factors_actual > 1, "s", ""))))
 
-# Save factor returns (H equals single factor when num_factors=1)
-factor_returns_dt <- data.table(
-  date = unique(train_a$dt$date),
-  factor = model_a$H
-)
-fwrite(factor_returns_dt, file.path(out_dir, "scenario_a_ensemble.csv"))
-
-# Save Tree Structures
-sink(file.path(out_dir, "scenario_a_trees.txt"))
-for (k in 1:length(model_a$models)) {
-  cat(sprintf("\n--- Factor %d ---\n", k))
-  print(model_a$models[[k]]$tree)
+cat("Hyperparameters:\n")
+for (name in names(PARAMS)) {
+  cat(sprintf("  %s: %s\n", name, PARAMS[[name]]))
 }
-sink()
+cat("\n")
 
-cat(sprintf("\n✓ Scenario A results saved to: %s\n", normalizePath(out_dir)))
 
-# Helper to predict ensemble on test data
-predict_ensemble <- function(models_list, test_data) {
-  num_factors <- length(models_list)
-  num_months <- test_data$num_months
+################################################################################
+# Helper: Prepare Training Data
+################################################################################
+
+prepare_data <- function(dt_subset, char_cols, instr_cols) {
+  # Characteristics matrix (cross-sectionally ranked, already done in step 1)
+  X <- as.matrix(dt_subset[, .SD, .SDcols = char_cols])
   
-  # Initialize H (prediction accumulator) for test set
-  H_test <- rep(0, num_months)
-  factors_list <- list()
+  # Returns (decimal, not percentage)
+  R <- as.vector(dt_subset$ret_next)
+  Y <- R  # Target returns (same as R for P-Tree)
   
-  for (k in 1:num_factors) {
-    # PTree predict returns the factor for this tree
-    # Note: predict() signature depends on PTree package version. 
-    # Based on evaluate_on_test usage: predict(fit, X, R, months, pw)
-    pred <- predict(models_list[[k]], test_data$X, test_data$R, test_data$months, test_data$pw)
-    
-    ft <- as.numeric(pred$ft)
-    factors_list[[k]] <- ft
-    
-    # Update H (accumulate factors)
-    H_test <- H_test + ft
+  # Instruments (for portfolio optimization, paper uses intercept only)
+  Z <- matrix(1, nrow = nrow(dt_subset), ncol = 1)
+  colnames(Z) <- "Intercept"
+  
+  # Time and firm indices (0-indexed for C++ backend)
+  months <- as.integer(as.factor(dt_subset$date)) - 1L
+  stocks <- as.integer(as.factor(dt_subset$isin)) - 1L
+  
+  # Weights (market cap)
+  pw <- as.vector(dt_subset$lag_me)  # Portfolio weights
+  lw <- as.vector(dt_subset$lag_me)  # Leaf weights
+  
+  list(
+    dt = dt_subset,
+    X = X,
+    R = R,
+    Y = Y,
+    Z = Z,
+    months = months,
+    stocks = stocks,
+    num_months = length(unique(months)),
+    num_stocks = length(unique(stocks)),
+    pw = pw,
+    lw = lw
+  )
+}
+
+################################################################################
+# Helper: Train Single P-Tree
+################################################################################
+
+train_single_ptree <- function(train_data, scenario_name, params = PARAMS) {
+  cat(sprintf("\n--- Training: %s ---\n", scenario_name))
+  cat(sprintf("  Observations: %s\n", format(nrow(train_data$dt), big.mark=",")))
+  cat(sprintf("  Time periods: %d months\n", train_data$num_months))
+  cat(sprintf("  Firms: %d\n", train_data$num_stocks))
+  cat(sprintf("  Characteristics: %d\n", ncol(train_data$X)))
+  
+  t_start <- Sys.time()
+  
+  # Train P-Tree (single tree, not boosted)
+  suppressWarnings({
+    fit <- PTree::PTree(
+      # Data
+      R = train_data$R,                    # Returns
+      Y = train_data$Y,                    # Target (same as R)
+      X = train_data$X,                    # Characteristics
+      Z = train_data$Z,                    # Instruments (intercept)
+      H = rep(0, train_data$num_months),  # No pre-existing factors
+      portfolio_weight = train_data$pw,    # Portfolio weights
+      loss_weight = train_data$lw,         # Loss weights
+      stocks = train_data$stocks,          # Stock indices
+      months = train_data$months,          # Month indices
+
+      # Split variables (all characteristics)
+      first_split_var = seq(0L, ncol(train_data$X) - 1L),
+      second_split_var = seq(0L, ncol(train_data$X) - 1L),
+
+      # Dimensions
+      num_stocks = train_data$num_stocks,
+      num_months = train_data$num_months,
+
+      # Tree structure parameters
+      min_leaf_size = params$min_leaf_size,
+      max_depth = params$max_depth,
+      num_cutpoints = params$num_cutpoints,
+      
+      # Training parameters
+      num_iter = 1,                        # Single tree (no boosting)
+      eta = 1.0,                           # Learning rate (not used for single tree)
+      equal_weight = params$equal_weight,
+      abs_normalize = params$abs_normalize,
+      
+      # Regularization
+      lambda_mean = 0,
+      lambda_cov = params$gamma,           # Covariance shrinkage
+      lambda_mean_factor = 0,
+      lambda_cov_factor = params$lambda,   # Factor covariance shrinkage
+      lambda_ridge = 1e-6,                 # Ridge for numerical stability
+      
+      # Other settings
+      no_H = TRUE,                         # Don't use H (no boosting)
+      weighted_loss = FALSE,               # Unweighted loss
+      early_stop = FALSE,                  # No early stopping
+      stop_threshold = 1.0,
+      random_split = FALSE,                # Deterministic splits
+      a1 = 0,
+      a2 = 0,
+      list_K = matrix(0, nrow = 3, ncol = 1)
+    )
+  })
+  
+  duration <- as.numeric(difftime(Sys.time(), t_start, units = "secs"))
+  
+  # Extract factor (tangency portfolio time series)
+  factor_returns <- as.numeric(fit$ft)
+  
+  # Calculate performance metrics
+  mean_monthly <- mean(factor_returns, na.rm = TRUE)
+  sd_monthly <- sd(factor_returns, na.rm = TRUE)
+  sharpe <- if (sd_monthly > 0) mean_monthly / sd_monthly * sqrt(12) else NA_real_
+  
+  cat(sprintf("\n  Training completed in %.1f seconds\n", duration))
+  cat(sprintf("  Factor performance:\n"))
+  cat(sprintf("    Mean monthly return: %.4f (%.2f%%)\n", mean_monthly, mean_monthly * 100))
+  cat(sprintf("    Monthly std dev: %.4f (%.2f%%)\n", sd_monthly, sd_monthly * 100))
+  cat(sprintf("    Annualized Sharpe: %.3f\n", sharpe))
+  
+  # Extract tree structure information
+  tree_str <- capture.output(print(fit$tree))
+  # Count leaves from tree structure (tree is a matrix where col 2 and 3 are children)
+  # Leaves have 0 in both child columns
+  tree_matrix <- fit$tree
+  if (is.matrix(tree_matrix)) {
+    num_leaves <- sum(tree_matrix[, 2] == 0 & tree_matrix[, 3] == 0)
+  } else {
+    num_leaves <- NA
+  }
+
+  if (!is.na(num_leaves)) {
+    cat(sprintf("    Number of leaves: %d\n", num_leaves))
   }
   
-  # Combine factors
-  factors_mat <- do.call(cbind, factors_list)
-  colnames(factors_mat) <- paste0("F", 1:num_factors)
-  
-  list(factors=factors_mat, H=H_test)
+  list(
+    fit = fit,
+    factor_returns = factor_returns,
+    mean = mean_monthly,
+    sd = sd_monthly,
+    sharpe = sharpe,
+    num_leaves = num_leaves,
+    tree_structure = tree_str,
+    duration_sec = duration
+  )
 }
 
-# ============================================================================
-# SCENARIO B: TIME-SPLIT (Train: 1998-2009, Test: 2010-2019)
-# ============================================================================
-cat("\n\n--- SCENARIO B: TIME-SPLIT ---\n")
-split_date <- as.IDate("2010-01-01")
+################################################################################
+# Helper: Predict on Test Data
+################################################################################
 
+predict_ptree <- function(model, test_data, scenario_name) {
+  cat(sprintf("\n--- Predicting: %s ---\n", scenario_name))
+  cat(sprintf("  Test observations: %s\n", format(nrow(test_data$dt), big.mark=",")))
+  cat(sprintf("  Test periods: %d months\n", test_data$num_months))
+  
+  # Predict using trained model
+  # Note: predict.PTree only takes (object, X, R, months) - no pw argument
+  pred <- predict(
+    model$fit,
+    X = test_data$X,
+    R = test_data$R,
+    months = test_data$months
+  )
+  
+  factor_returns <- as.numeric(pred$ft)
+  
+  # Calculate metrics
+  mean_monthly <- mean(factor_returns, na.rm = TRUE)
+  sd_monthly <- sd(factor_returns, na.rm = TRUE)
+  sharpe <- if (sd_monthly > 0) mean_monthly / sd_monthly * sqrt(12) else NA_real_
+  
+  cat(sprintf("  Test performance:\n"))
+  cat(sprintf("    Mean monthly return: %.4f (%.2f%%)\n", mean_monthly, mean_monthly * 100))
+  cat(sprintf("    Monthly std dev: %.4f (%.2f%%)\n", sd_monthly, sd_monthly * 100))
+  cat(sprintf("    Annualized Sharpe: %.3f\n", sharpe))
+  
+  list(
+    factor_returns = factor_returns,
+    mean = mean_monthly,
+    sd = sd_monthly,
+    sharpe = sharpe
+  )
+}
+
+################################################################################
+# Helper: Save Results
+################################################################################
+
+save_results <- function(model, test_results = NULL, scenario_name, train_data, test_data = NULL) {
+  # 1. Factor returns (train)
+  factor_dt <- data.table(
+    date = unique(train_data$dt$date),
+    factor_return = model$factor_returns
+  )
+  fwrite(factor_dt, file.path(OUTPUT_DIR, sprintf("scenario_%s_1_factor.csv", tolower(scenario_name))))
+  
+  # 2. Factor returns (test, if applicable)
+  if (!is.null(test_results) && !is.null(test_data)) {
+    factor_test_dt <- data.table(
+      date = unique(test_data$dt$date),
+      factor_return = test_results$factor_returns
+    )
+    fwrite(factor_test_dt, file.path(OUTPUT_DIR, sprintf("scenario_%s_test_1_factor.csv", tolower(scenario_name))))
+  }
+  
+  # 3. Tree structure
+  writeLines(model$tree_structure, file.path(OUTPUT_DIR, sprintf("scenario_%s_trees.txt", tolower(scenario_name))))
+  
+  # 4. Summary statistics
+  summary_dt <- data.table(
+    scenario = scenario_name,
+    dataset = c("train", if (!is.null(test_results)) "test" else NULL),
+    n_obs = c(nrow(train_data$dt), if (!is.null(test_data)) nrow(test_data$dt) else NULL),
+    n_months = c(train_data$num_months, if (!is.null(test_data)) test_data$num_months else NULL),
+    n_stocks = c(train_data$num_stocks, if (!is.null(test_data)) test_data$num_stocks else NULL),
+    mean_monthly = c(model$mean, if (!is.null(test_results)) test_results$mean else NULL),
+    sd_monthly = c(model$sd, if (!is.null(test_results)) test_results$sd else NULL),
+    sharpe_annual = c(model$sharpe, if (!is.null(test_results)) test_results$sharpe else NULL),
+    num_leaves = c(model$num_leaves, if (!is.null(test_results)) model$num_leaves else NULL),
+    train_duration_sec = c(model$duration_sec, NA)
+  )
+  fwrite(summary_dt, file.path(OUTPUT_DIR, sprintf("scenario_%s_summary.csv", tolower(scenario_name))))
+  
+  # 5. Model object (for later analysis)
+  saveRDS(model$fit, file.path(OUTPUT_DIR, sprintf("scenario_%s_model.rds", tolower(scenario_name))))
+  
+  cat(sprintf("\n  ✓ Results saved for scenario %s\n", scenario_name))
+}
+
+
+################################################################################
+# SCENARIO A: Full Sample (In-Sample)
+################################################################################
+
+cat("\n")
+cat("================================================================================\n")
+cat("SCENARIO A: FULL SAMPLE (1998-2019)\n")
+cat("================================================================================\n")
+
+train_a <- prepare_data(dt, char_cols, instr_cols)
+model_a <- train_single_ptree(train_a, "Scenario A", PARAMS)
+save_results(model_a, NULL, "a", train_a, NULL)
+
+################################################################################
+# SCENARIO B: Time Split (Train: 1998-2009, Test: 2010-2019)
+################################################################################
+
+cat("\n")
+cat("================================================================================\n")
+cat("SCENARIO B: TIME SPLIT (Past → Future)\n")
+cat("================================================================================\n")
+
+split_date <- as.IDate("2010-01-01")
 dt_train_b <- dt[date < split_date]
 dt_test_b <- dt[date >= split_date]
 
-cat(sprintf("Train period: %s to %s (%d obs)\n", 
+cat(sprintf("\nTrain: %s to %s (%d obs)\n", 
             min(dt_train_b$date), max(dt_train_b$date), nrow(dt_train_b)))
-cat(sprintf("Test period: %s to %s (%d obs)\n", 
+cat(sprintf("Test:  %s to %s (%d obs)\n", 
             min(dt_test_b$date), max(dt_test_b$date), nrow(dt_test_b)))
 
-# Train on early period
-train_b <- build_train_data(dt_train_b, inp$char_cols, inp$instr_cols)
-model_b <- train_ptree_factors(train_b, "SCENARIO B (Train)",
-                               num_factors = 1,
-                               num_iter = 9,
-                               eta = 1.0,
-                               min_leaf_size = 20,
-                               num_cutpoints = 4,
-                               lambda_cov = 1e-2,
-                               lambda_ridge = 1e-4)
+train_b <- prepare_data(dt_train_b, char_cols, instr_cols)
+test_b <- prepare_data(dt_test_b, char_cols, instr_cols)
 
-# Predict on late period (Test)
-test_b <- build_train_data(dt_test_b, inp$char_cols, inp$instr_cols)
-pred_b <- predict_ensemble(model_b$models, test_b)
+model_b <- train_single_ptree(train_b, "Scenario B (Train)", PARAMS)
+test_results_b <- predict_ptree(model_b, test_b, "Scenario B (Test)")
+save_results(model_b, test_results_b, "b", train_b, test_b)
 
-# Save TEST factors (for evaluation)
-factors_b_test <- data.table(
-  date = unique(test_b$dt$date),
-  pred_b$factors
-)
-num_factors_b <- ncol(pred_b$factors)
-fwrite(factors_b_test, file.path(out_dir, sprintf("scenario_b_test_%d_factor%s.csv",
-                                                   num_factors_b,
-                                                   ifelse(num_factors_b > 1, "s", ""))))
+################################################################################
+# SCENARIO C: Reverse Split (Train: 2010-2019, Test: 1998-2009)
+################################################################################
 
-factor_returns_b_test <- data.table(
-  date = unique(test_b$dt$date),
-  factor = pred_b$H
-)
-fwrite(factor_returns_b_test, file.path(out_dir, "scenario_b_test_ensemble.csv"))
-
-# Save Tree Structures for B
-sink(file.path(out_dir, "scenario_b_trees.txt"))
-for (k in 1:length(model_b$models)) {
-  cat(sprintf("\n--- Factor %d ---\n", k))
-  print(model_b$models[[k]]$tree)
-}
-sink()
-
-cat(sprintf("\n✓ Scenario B complete (Train + Test).\n"))
-
-# ============================================================================
-# SCENARIO C: REVERSE SPLIT (Train: 2010-2019, Test: 1998-2009)
-# ============================================================================
-cat("\n\n--- SCENARIO C: REVERSE SPLIT ---\n")
+cat("\n")
+cat("================================================================================\n")
+cat("SCENARIO C: REVERSE SPLIT (Future → Past)\n")
+cat("================================================================================\n")
 
 dt_train_c <- dt[date >= split_date]
 dt_test_c <- dt[date < split_date]
 
-cat(sprintf("Train period: %s to %s (%d obs)\n", 
+cat(sprintf("\nTrain: %s to %s (%d obs)\n", 
             min(dt_train_c$date), max(dt_train_c$date), nrow(dt_train_c)))
-cat(sprintf("Test period: %s to %s (%d obs)\n", 
+cat(sprintf("Test:  %s to %s (%d obs)\n", 
             min(dt_test_c$date), max(dt_test_c$date), nrow(dt_test_c)))
 
-# Train on late period
-train_c <- build_train_data(dt_train_c, inp$char_cols, inp$instr_cols)
-model_c <- train_ptree_factors(train_c, "SCENARIO C (Train)",
-                               num_factors = 1,
-                               num_iter = 9,
-                               eta = 1.0,
-                               min_leaf_size = 20,
-                               num_cutpoints = 4,
-                               lambda_cov = 1e-2,
-                               lambda_ridge = 1e-4)
+train_c <- prepare_data(dt_train_c, char_cols, instr_cols)
+test_c <- prepare_data(dt_test_c, char_cols, instr_cols)
 
-# Predict on early period (Test)
-test_c <- build_train_data(dt_test_c, inp$char_cols, inp$instr_cols)
-pred_c <- predict_ensemble(model_c$models, test_c)
+model_c <- train_single_ptree(train_c, "Scenario C (Train)", PARAMS)
+test_results_c <- predict_ptree(model_c, test_c, "Scenario C (Test)")
+save_results(model_c, test_results_c, "c", train_c, test_c)
 
-# Save TEST factors (for evaluation)
-factors_c_test <- data.table(
-  date = unique(test_c$dt$date),
-  pred_c$factors
+################################################################################
+# Final Summary
+################################################################################
+
+cat("\n")
+cat("================================================================================\n")
+cat("TRAINING COMPLETE\n")
+cat("================================================================================\n\n")
+
+cat("Results saved to:", normalizePath(OUTPUT_DIR), "\n\n")
+
+cat("Files per scenario:\n")
+cat("  - scenario_X_1_factor.csv       : Factor returns (train)\n")
+cat("  - scenario_X_ensemble.csv       : Same as above (compatibility)\n")
+cat("  - scenario_X_test_1_factor.csv  : Factor returns (test, B & C only)\n")
+cat("  - scenario_X_test_ensemble.csv  : Same as above (compatibility)\n")
+cat("  - scenario_X_trees.txt          : Tree structure\n")
+cat("  - scenario_X_summary.csv        : Performance metrics\n")
+cat("  - scenario_X_model.rds          : Trained model object\n\n")
+
+# Quick comparison table
+summary_comparison <- data.table(
+  Scenario = c("A (Full)", "B (Train)", "B (Test)", "C (Train)", "C (Test)"),
+  Sharpe = c(
+    model_a$sharpe,
+    model_b$sharpe,
+    test_results_b$sharpe,
+    model_c$sharpe,
+    test_results_c$sharpe
+  ),
+  Mean_Monthly = c(
+    model_a$mean,
+    model_b$mean,
+    test_results_b$mean,
+    model_c$mean,
+    test_results_c$mean
+  ),
+  SD_Monthly = c(
+    model_a$sd,
+    model_b$sd,
+    test_results_b$sd,
+    model_c$sd,
+    test_results_c$sd
+  ),
+  Num_Leaves = c(
+    model_a$num_leaves,
+    model_b$num_leaves,
+    NA,
+    model_c$num_leaves,
+    NA
+  )
 )
-num_factors_c <- ncol(pred_c$factors)
-fwrite(factors_c_test, file.path(out_dir, sprintf("scenario_c_test_%d_factor%s.csv",
-                                                   num_factors_c,
-                                                   ifelse(num_factors_c > 1, "s", ""))))
 
-factor_returns_c_test <- data.table(
-  date = unique(test_c$dt$date),
-  factor = pred_c$H
-)
-fwrite(factor_returns_c_test, file.path(out_dir, "scenario_c_test_ensemble.csv"))
+cat("Performance Summary:\n")
+print(summary_comparison, digits = 4)
 
-# Save Tree Structures for C
-sink(file.path(out_dir, "scenario_c_trees.txt"))
-for (k in 1:length(model_c$models)) {
-  cat(sprintf("\n--- Factor %d ---\n", k))
-  print(model_c$models[[k]]$tree)
-}
-sink()
+cat("\n")
+cat("================================================================================\n")
 
-cat(sprintf("\n✓ Scenario C complete (Train + Test).\n"))
-cat(sprintf("\n✓ A2 complete - All scenarios saved to: %s\n\n", normalizePath(out_dir)))

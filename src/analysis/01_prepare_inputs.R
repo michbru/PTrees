@@ -1,210 +1,257 @@
 #!/usr/bin/env Rscript
 
-# A1: Prepare Inputs for P-Tree Training (Swedish)
-# ------------------------------------------------
-# - Loads data/processed/ptree_dataset_monthly.csv
-# - Filters period and characteristics by coverage
-# - Builds matrices/vectors required by PTree
-# - Saves RDS to results/inputs/ptree_inputs.rds
+################################################################################
+# Step 1: Prepare Inputs for P-Tree Training
+################################################################################
+#
+# Purpose: Load and prepare data for P-Tree model training
+#
+# Input: data/processed/ptree_dataset_monthly.csv
+# Output: results/inputs/ptree_inputs.rds
+#
+# Key steps:
+#   1. Load monthly panel data
+#   2. Filter time period (1997-2019, matching FF factor availability)
+#   3. Select characteristics with sufficient coverage (>=30% non-zero)
+#   4. Create lead returns (predict t+1)
+#   5. Winsorize returns to handle outliers
+#   6. Prepare matrices for PTree package
+#
+################################################################################
 
 suppressPackageStartupMessages({
   library(data.table)
 })
 
+# Set seed for reproducibility
+set.seed(42)
+
+# Paths
 args <- commandArgs(trailingOnly = FALSE)
 file_arg <- sub("^--file=", "", args[grep("^--file=", args)])
-script_dir <- tryCatch(dirname(normalizePath(file_arg)), error = function(e) getwd())
-repo_root <- normalizePath(file.path(script_dir, "..", ".."), mustWork = FALSE)
+script_dir <- if (length(file_arg) > 0) dirname(normalizePath(file_arg)) else getwd()
+repo_root <- normalizePath(file.path(script_dir, "..", ".."))
+setwd(repo_root)
 
-in_path  <- file.path(repo_root, "data", "processed", "ptree_dataset_monthly.csv")
-out_dir  <- file.path(repo_root, "results", "inputs")
-dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+INPUT_CSV <- "data/processed/ptree_dataset_monthly.csv"
+OUTPUT_DIR <- "results/inputs"
+OUTPUT_RDS <- file.path(OUTPUT_DIR, "ptree_inputs.rds")
 
-# Clean up old results
-cat("\nCleaning up old results...\n")
-old_files <- list.files(out_dir, pattern = "\\.rds$", full.names = TRUE)
-if (length(old_files) > 0) {
-  file.remove(old_files)
-  cat(sprintf("  Removed %d old RDS file(s)\n", length(old_files)))
+# Clear output directory - start fresh
+if (dir.exists(OUTPUT_DIR)) {
+  cat("Clearing previous input preparation outputs...\n")
+  unlink(OUTPUT_DIR, recursive = TRUE)
+}
+dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
+
+cat("================================================================================\n")
+cat("STEP 1: PREPARE P-TREE INPUTS\n")
+cat("================================================================================\n\n")
+
+# Parameters
+MIN_DATE <- as.IDate("1997-10-01")  # Start date
+MAX_DATE <- as.IDate("2019-12-31")  # End date (match FF factor availability)
+COVERAGE_THRESHOLD <- 0.30          # Keep characteristics with >= 30% non-zero values
+
+if (!file.exists(INPUT_CSV)) {
+  stop("Input file not found: ", INPUT_CSV, "\nRun data preparation pipeline first.")
 }
 
-out_rds  <- file.path(out_dir, "ptree_inputs.rds")
-
-cat("\n=== A1: PREPARE P-TREE INPUTS ===\n")
-cat("Repo root:", repo_root, "\n")
-
-min_date <- as.IDate("1997-10-01")   # start date used in analysis
-max_date <- as.IDate("2019-12-31")   # end date (match FF factor coverage)
-cov_thr  <- 0.30                      # 30% non-zero coverage threshold
-use_excess <- tolower(Sys.getenv("PTREE_USE_EXCESS")) %in% c("1","true","yes","y")
-macro_path <- Sys.getenv("PTREE_MACRO_PATH")
-if (use_excess && !nzchar(macro_path)) {
-  # Default expected location if not overridden
-  macro_path <- file.path(repo_root, "data", "raw", "FamaFrench2020", "FF4F_monthly.csv")
-}
-
-cat("\n=== A1: PREPARE P-TREE INPUTS ===\n")
-cat("Repo root:", repo_root, "\n")
-
-if (!file.exists(in_path)) {
-  stop(sprintf("Input not found: %s\nRun Step 6 first to create the monthly dataset.", in_path))
-}
-
-dt <- fread(in_path)
-if (!"date" %in% names(dt)) stop("Column 'date' missing in monthly dataset")
+dt <- fread(INPUT_CSV)
 dt[, date := as.IDate(date)]
 
-cat("Loaded:", nrow(dt), "rows x", ncol(dt), "cols\n")
-
-# Filter sample period to match Fama-French factor coverage
-dt <- dt[date >= min_date & date <= max_date]
-cat("Filtered period:", as.character(min_date), "to", as.character(max_date), "->", nrow(dt), "rows\n")
-cat("  (Constrained by Fama-French factor availability through 2019-12)\n\n")
+cat(sprintf("Loaded dataset: %s rows, %s columns\n", 
+            format(nrow(dt), big.mark = ","), ncol(dt)))
 
 
-# Identify characteristics
+################################################################################
+# Filter Time Period
+################################################################################
+
+dt <- dt[date >= MIN_DATE & date <= MAX_DATE]
+
+cat(sprintf("Filtered to %s - %s: %s observations\n\n",
+            as.character(MIN_DATE), as.character(MAX_DATE),
+            format(nrow(dt), big.mark = ",")))
+
+
+################################################################################
+# Select and Validate Characteristics
+################################################################################
+
+cat("Processing characteristics...\n")
+
+# Identify all rank_ columns
 char_cols <- grep("^rank_", names(dt), value = TRUE)
 
-# Force numeric conversion for characteristics
-# This handles cases where "NA" strings or other issues caused character loading
-cat("Ensuring all characteristics are numeric...\n")
+# Force numeric conversion (handle any string/factor issues)
 for (col in char_cols) {
-  # Always force conversion to be safe
   if (!is.numeric(dt[[col]])) {
-    cat("  Converting", col, "to numeric...\n")
-    # Convert via character to handle factors/mixed types safely
-    val <- as.numeric(as.character(dt[[col]]))
-    set(dt, j=col, value=val)
+    cat(sprintf("  Converting %s to numeric\n", col))
+    set(dt, j = col, value = as.numeric(as.character(dt[[col]])))
   }
 }
 
-# Remove zero-variance characteristics (e.g. rank_zerotrade)
-# This prevents issues with models that expect variation
+# Remove zero-variance characteristics
 vars <- sapply(dt[, ..char_cols], function(x) var(x, na.rm = TRUE))
-drop_zero_var_chars <- names(vars)[vars == 0 | is.na(vars)]
-if (length(drop_zero_var_chars) > 0) {
-  cat("Dropping zero-variance characteristics:", paste(drop_zero_var_chars, collapse=", "), "\n")
-  char_cols <- setdiff(char_cols, drop_zero_var_chars)
+zero_var_chars <- names(vars)[vars == 0 | is.na(vars)]
+if (length(zero_var_chars) > 0) {
+  cat(sprintf("  Dropping %d zero-variance characteristics: %s\n",
+              length(zero_var_chars), paste(zero_var_chars, collapse = ", ")))
+  char_cols <- setdiff(char_cols, zero_var_chars)
 }
 
-# Characteristic coverage filter
+# Filter by coverage (>=30% non-zero)
 nonzero_share <- sapply(char_cols, function(c) mean(dt[[c]] != 0, na.rm = TRUE))
-keep_chars <- names(nonzero_share)[nonzero_share >= cov_thr]
-drop_low_coverage_chars <- setdiff(char_cols, keep_chars)
+keep_chars <- names(nonzero_share)[nonzero_share >= COVERAGE_THRESHOLD]
+drop_chars <- setdiff(char_cols, keep_chars)
 
-cat("All characteristics (after zero-variance filter):", length(char_cols), "\n")
-# Drop known collinear feature
-if ("rank_chcsho" %in% keep_chars && "rank_ni" %in% keep_chars) {
-  keep_chars <- setdiff(keep_chars, "rank_chcsho")
-  cat("Dropped collinear feature: rank_chcsho\n")
+if (length(drop_chars) > 0) {
+  cat(sprintf("  Dropping %d low-coverage characteristics (<%d%% non-zero)\n",
+              length(drop_chars), COVERAGE_THRESHOLD * 100))
 }
-cat("Kept (>=", cov_thr * 100, "%) :", length(keep_chars), "\n")
-if (length(drop_low_coverage_chars)) {
-  cat("Dropped (coverage <", cov_thr, "):", paste(drop_low_coverage_chars, collapse=", "), "\n")
-}
-cat("\n")
 
-# Instruments (subset of characteristics + intercept)
-cand_instr <- c("rank_me", "rank_bm", "rank_mom12m", "rank_roa", "rank_gma", "rank_op")
-instr <- intersect(cand_instr, keep_chars)
-cat("Instruments:", ifelse(length(instr)>0, paste(instr, collapse = ", "), "<none>"), "\n\n")
+cat(sprintf("  Final: %d characteristics\n\n", length(keep_chars)))
 
-# Build returns: excess or raw
+# Instrument variables (subset of characteristics for portfolio construction)
+candidate_instr <- c("rank_me", "rank_bm", "rank_mom12m", "rank_roa", "rank_gma", "rank_op")
+instr_cols <- intersect(candidate_instr, keep_chars)
+
+cat(sprintf("Instrument variables: %s\n\n", 
+            ifelse(length(instr_cols) > 0, paste(instr_cols, collapse = ", "), "none")))
+
+
+################################################################################
+# Create Target Variable (Lead Returns)
+################################################################################
+
+cat("Creating target variable (t+1 returns)...\n")
+
+# Use raw monthly returns (not excess returns)
 ret_col <- "ret_monthly"
-if (use_excess) {
-  if (!file.exists(macro_path)) stop(sprintf("PTREE_USE_EXCESS=TRUE but macro file not found: %s", macro_path))
-  macro <- fread(macro_path)
-  if (!"ym" %in% names(macro)) {
-    if ("date" %in% names(macro)) macro[, ym := format(as.IDate(date), "%Y-%m")] else stop("Macro file must have 'ym' or 'date'")
-  }
-  dt[, ym := format(date, "%Y-%m")]
-  if (!("RF" %in% names(macro) || "rf" %in% names(macro))) stop("Macro file must contain risk-free column 'RF' or 'rf'")
-  rfcol <- if ("RF" %in% names(macro)) "RF" else "rf"
-  rf <- macro[, .(ym, rf = get(rfcol))]
-  dt <- merge(dt, rf, by = "ym", all.x = TRUE)
-  if (dt$rf[1] > 1) dt[, rf := rf/100]  # handle percent format
-  dt[, xret := ret_monthly - rf]
-  ret_col <- "xret"
-  cat("Using EXCESS returns (xret) computed from risk-free in:", macro_path, "\n")
-}
 
-# Fix Look-Ahead Bias: Predict NEXT month's return
-cat("Creating lead returns (target = t+1)...\n")
+# Create lead returns (predict next month)
 setkey(dt, isin, date)
 dt[, ret_next := shift(get(ret_col), type = "lead"), by = isin]
 
-# Remove rows where target is NA (last month of each stock)
+# Remove rows where target is NA (last observation per stock)
+n_before <- nrow(dt)
 dt <- dt[!is.na(ret_next)]
-cat("Filtered NA targets ->", nrow(dt), "rows\n")
+n_after <- nrow(dt)
 
-# Winsorize returns at 1% and 99% (following PTrees paper methodology)
+cat(sprintf("  Removed %s observations with missing target\n", 
+            format(n_before - n_after, big.mark = ",")))
+cat(sprintf("  Final: %s observations\n\n", format(n_after, big.mark = ",")))
+
+
+################################################################################
+# Winsorize Returns
+################################################################################
+
 cat("Winsorizing returns at 1% and 99% percentiles...\n")
+
 q01 <- quantile(dt$ret_next, 0.01, na.rm = TRUE)
 q99 <- quantile(dt$ret_next, 0.99, na.rm = TRUE)
 n_winsorized <- sum(dt$ret_next < q01 | dt$ret_next > q99, na.rm = TRUE)
+
 dt[, ret_next := pmax(pmin(ret_next, q99), q01)]
-cat(sprintf("  Winsorized %d observations (%.2f%%) to [%.4f, %.4f]\n",
-            n_winsorized, n_winsorized/nrow(dt)*100, q01, q99))
 
-# Build objects for PTree
-# Use .SDcols to ensure correct extraction (avoiding potential .. syntax issues)
+cat(sprintf("  Winsorized %s observations (%.2f%%) to [%.4f, %.4f]\n\n",
+            format(n_winsorized, big.mark = ","),
+            n_winsorized / n_after * 100, q01, q99))
+
+
+################################################################################
+# Prepare Matrices for PTree Package
+################################################################################
+
+cat("Building matrices for PTree...\n")
+
+# Characteristics matrix (cross-sectionally ranked)
 X <- as.matrix(dt[, .SD, .SDcols = keep_chars])
-
-# Ensure X is numeric and handle NAs
 if (!is.numeric(X)) {
-  cat("Warning: X matrix is not numeric. Forcing conversion...\n")
+  cat("  Warning: Forcing X to numeric\n")
   mode(X) <- "numeric"
 }
 if (any(is.na(X))) {
-  cat(sprintf("Warning: X contains %d NAs. Filling with 0...\n", sum(is.na(X))))
+  n_na <- sum(is.na(X))
+  cat(sprintf("  Warning: Filling %s NAs in X with 0\n", format(n_na, big.mark = ",")))
   X[is.na(X)] <- 0
 }
 
-# Returns (Decimal)
-R <- as.vector(dt$ret_next) # No scaling (decimal)
-Y <- R
-Z_instr <- if (length(instr)>0) as.matrix(dt[, .SD, .SDcols = instr]) else NULL
+# Returns (target variable, in decimal form)
+R <- as.vector(dt$ret_next)
+Y <- R  # Y = R for standard P-Tree
+
+# Instruments matrix (with intercept)
+if (length(instr_cols) > 0) {
+  Z_instr <- as.matrix(dt[, .SD, .SDcols = instr_cols])
+} else {
+  Z_instr <- NULL
+}
 Z <- cbind(Intercept = 1, Z_instr)
 
-# Ensure Z is numeric and handle NAs
 if (!is.numeric(Z)) {
-  cat("Warning: Z matrix is not numeric. Forcing conversion...\n")
+  cat("  Warning: Forcing Z to numeric\n")
   mode(Z) <- "numeric"
 }
 if (any(is.na(Z))) {
-  cat(sprintf("Warning: Z contains %d NAs. Filling with 0...\n", sum(is.na(Z))))
+  n_na <- sum(is.na(Z))
+  cat(sprintf("  Warning: Filling %s NAs in Z with 0\n", format(n_na, big.mark = ",")))
   Z[is.na(Z)] <- 0
 }
 
-# Indices (0-indexed)
+# Indices (0-indexed for PTree package)
 months <- as.integer(as.factor(dt$date)) - 1L
 stocks <- as.integer(as.factor(dt$isin)) - 1L
 num_months <- length(unique(months))
 num_stocks <- length(unique(stocks))
 
-# Weights
-if (!"lag_me" %in% names(dt)) stop("Column 'lag_me' missing in monthly dataset")
-portfolio_weight <- as.vector(dt$lag_me)
-loss_weight      <- as.vector(dt$lag_me)
+# Weights (market equity)
+if (!"lag_me" %in% names(dt)) stop("Column 'lag_me' missing in dataset")
+pw <- as.vector(dt$lag_me)  # Portfolio weights
+lw <- as.vector(dt$lag_me)  # Loss weights
 
-# Split variable indices (0-indexed)
-first_split_var  <- seq(0L, ncol(X) - 1L)
-second_split_var <- seq(0L, ncol(X) - 1L)
+cat(sprintf("  X: %s x %d (characteristics)\n", format(nrow(X), big.mark = ","), ncol(X)))
+cat(sprintf("  R: %s (returns)\n", format(length(R), big.mark = ",")))
+cat(sprintf("  Z: %s x %d (instruments + intercept)\n", format(nrow(Z), big.mark = ","), ncol(Z)))
+cat(sprintf("  Time periods: %d months\n", num_months))
+cat(sprintf("  Cross-section: %d firms\n\n", num_stocks))
+
+
+################################################################################
+# Save Results
+################################################################################
 
 inputs <- list(
   dt = dt,
   char_cols = keep_chars,
-  instr_cols = instr,
-  X = X, R = R, Y = Y, Z = Z,
-  months = months, stocks = stocks,
-  num_months = num_months, num_stocks = num_stocks,
-  portfolio_weight = portfolio_weight,
-  loss_weight = loss_weight,
-  first_split_var = first_split_var,
-  second_split_var = second_split_var
+  instr_cols = instr_cols,
+  X = X,
+  R = R,
+  Y = Y,
+  Z = Z,
+  months = months,
+  stocks = stocks,
+  num_months = num_months,
+  num_stocks = num_stocks,
+  pw = pw,
+  lw = lw
 )
 
-saveRDS(inputs, out_rds)
-cat("Saved:", normalizePath(out_rds, mustWork = FALSE), "\n")
-cat("Observations:", nrow(dt), "| Months:", num_months, "| Stocks:", num_stocks, "\n")
-cat("Target: next-month return (lead of", ret_col, ") scaled to percent\n\n")
+saveRDS(inputs, OUTPUT_RDS)
+
+cat("================================================================================\n")
+cat("INPUT PREPARATION COMPLETE\n")
+cat("================================================================================\n\n")
+
+cat(sprintf("Saved to: %s\n\n", normalizePath(OUTPUT_RDS)))
+
+cat("Summary:\n")
+cat(sprintf("  Observations: %s\n", format(nrow(dt), big.mark = ",")))
+cat(sprintf("  Firms: %s\n", format(num_stocks, big.mark = ",")))
+cat(sprintf("  Months: %d\n", num_months))
+cat(sprintf("  Characteristics: %d\n", length(keep_chars)))
+cat(sprintf("  Period: %s to %s\n\n", min(dt$date), max(dt$date)))
+
+cat("================================================================================\n")

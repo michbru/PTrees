@@ -126,11 +126,11 @@ def apply_publication_lag(df, pub_lag_months: int = 6):
     df['missing_count'] = df[pub_cols].isna().sum(axis=1)
 
     rows_before = len(df)
-    df = df[df['missing_count'] <= 6].copy()  # Allow up to 6 missing (was 3)
+    df = df[df['missing_count'] <= 4].copy()  # Allow up to 4 missing (balanced quality/quantity)
     rows_after = len(df)
     rows_dropped = rows_before - rows_after
 
-    print(f"    Dropped {rows_dropped:,} rows with >6 missing accounting variables ({rows_dropped/rows_before*100:.1f}%)")
+    print(f"    Dropped {rows_dropped:,} rows with >4 missing accounting variables ({rows_dropped/rows_before*100:.1f}%)")
     print(f"    Remaining: {rows_after:,} rows")
 
     # Drop the helper column

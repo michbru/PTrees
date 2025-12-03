@@ -1,9 +1,20 @@
 #!/usr/bin/env Rscript
 
-# A3: Benchmark P-Tree Models (Single + Boosted)
-# ----------------------------------------------
-# Computes CAPM and FF3 alphas for factor series generated in Step 2
-# Uses Fama-French factors from data/raw (scaled to percent to match)
+################################################################################
+# Step 3: Evaluate P-Tree Models
+################################################################################
+#
+# Purpose: Compute CAPM and FF3 alphas for P-Tree factor returns from Step 2
+#
+# Input: results/models/scenario_X_1_factor.csv (train + test)
+# Output: results/evaluation/performance_metrics.csv + LaTeX table
+#
+# Benchmark: Fama-French factors from Swedish market (Shof et al. 2020)
+# - Market (Rm-Rf)
+# - Size (SMB)
+# - Value (HML)
+#
+################################################################################
 
 suppressPackageStartupMessages({
   library(data.table)
@@ -11,198 +22,287 @@ suppressPackageStartupMessages({
   library(lmtest)
 })
 
+# Set seed for reproducibility
+set.seed(42)
+
+# Paths
 args <- commandArgs(trailingOnly = FALSE)
 file_arg <- sub("^--file=", "", args[grep("^--file=", args)])
-script_dir <- tryCatch(dirname(normalizePath(file_arg)), error = function(e) getwd())
-repo_root <- normalizePath(file.path(script_dir, "..", ".."), mustWork = FALSE)
+script_dir <- if (length(file_arg) > 0) dirname(normalizePath(file_arg)) else getwd()
+repo_root <- normalizePath(file.path(script_dir, "..", ".."))
+setwd(repo_root)
 
-models_dir <- file.path(repo_root, "results", "models")
-out_dir <- file.path(repo_root, "results", "evaluation")
-dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+MODELS_DIR <- "results/models"
+OUTPUT_DIR <- "results/evaluation"
 
-# Clean up old results
-cat("\nCleaning up old evaluation results...\n")
-old_files <- list.files(out_dir, pattern = "\\.(csv|tex)$", full.names = TRUE)
-if (length(old_files) > 0) {
-  file.remove(old_files)
-  cat(sprintf("  Removed %d old file(s)\n", length(old_files)))
+# Clear output directory - start fresh
+if (dir.exists(OUTPUT_DIR)) {
+  cat("Clearing previous evaluation outputs...\n")
+  unlink(OUTPUT_DIR, recursive = TRUE)
+}
+dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
+
+cat("================================================================================\n")
+cat("STEP 3: EVALUATE P-TREE MODELS\n")
+cat("================================================================================\n\n")
+
+# Load Fama-French factors (Swedish market)
+FF_PATH <- "data/raw/macro/raw_macro_factors.csv"
+if (!file.exists(FF_PATH)) {
+  stop("Fama-French factors not found. Expected: ", FF_PATH)
 }
 
-cat("\n╔════════════════════════════════════════════════╗\n")
-cat("║   A3: EVALUATE P-TREE MODELS                  ║\n")
-cat("╚════════════════════════════════════════════════╝\n\n")
+ff <- fread(FF_PATH)
+cat(sprintf("Loaded Fama-French factors: %d months\n", nrow(ff)))
+cat(sprintf("Date range: %s to %s\n\n", min(ff$date), max(ff$date)))
 
-# Minimal LaTeX table writer (for benchmarking tables)
-write_tex_table <- function(dt, file, caption = NULL, label = NULL, digits = 3) {
-  if (!inherits(dt, "data.table")) dt <- as.data.table(dt)
-  for (cn in names(dt)) if (is.numeric(dt[[cn]])) dt[[cn]] <- round(dt[[cn]], digits)
-  cols <- names(dt)
-  con <- file(file, open = "wt"); on.exit(close(con))
-  writeLines("\\begin{table}[!ht]", con)
-  writeLines("\\centering", con)
-  if (!is.null(caption)) writeLines(paste0("\\caption{", caption, "}"), con)
-  if (!is.null(label)) writeLines(paste0("\\label{", label, "}"), con)
-  writeLines(paste0("\\begin{tabular}{", paste(rep("l", length(cols)), collapse = "|"), "}"), con)
-  writeLines("\\hline", con)
-  writeLines(paste(cols, collapse = " & "), con)
-  writeLines("\\\\\\hline", con)
-  apply(dt, 1, function(row) writeLines(paste(row, collapse = " & "), con))
-  writeLines("\\\\\\hline", con)
-  writeLines("\\end{tabular}", con)
-  writeLines("\\end{table}", con)
-}
 
-ff_path <- Sys.getenv("PTREE_FF_CSV")
-if (!nzchar(ff_path)) {
-  shof_default <- file.path(repo_root, "data", "raw", "macro", "raw_macro_factors.csv")
-  if (file.exists(shof_default)) {
-    ff_path <- shof_default
-  } else {
-    ff_path <- file.path(repo_root, "data", "raw", "FamaFrench2020", "FF4F_monthly.csv")
+################################################################################
+# Helper: Calculate Alpha and T-Statistics
+################################################################################
+
+calc_alpha <- function(factor_dt, ff_data, scenario_name, nw_lags = 12) {
+  cat(sprintf("\n--- Evaluating: %s ---\n", scenario_name))
+  
+  # Prepare factor data - ensure clean data.table
+  f <- as.data.table(factor_dt)
+  f[, date := as.IDate(date)]
+  f[, ym := format(date, "%Y-%m")]
+  
+  # Rename column to "factor" for consistency (handle both "factor" and "factor_return")
+  if ("factor_return" %in% names(f) && !"factor" %in% names(f)) {
+    setnames(f, "factor_return", "factor")
   }
-}
-
-nw_lags <- 12
-
-cat("\n╔════════════════════════════════════════════════╗\n")
-cat("║   A3: EVALUATE P-TREE MODELS                  ║\n")
-cat("╚════════════════════════════════════════════════╝\n\n")
-cat("Factor file:", ff_path, "\n")
-cat("Newey-West lags:", nw_lags, "\n\n")
-cat("Factor file:", ff_path, "\n")
-cat("Newey-West lags:", nw_lags, "\n\n")
-
-if (!file.exists(ff_path)) stop("Factor file not found")
-
-ff <- fread(ff_path)
-cat(sprintf("Loaded factor data: %d months\n\n", nrow(ff)))
-
-# Helper function to construct MVE portfolio
-construct_mve <- function(factors_mat, lambda_cov = 1e-4) {
-  # factors_mat: T x K matrix of factor returns
-  mu <- colMeans(factors_mat)
-  Sigma <- cov(factors_mat)
   
-  # Regularize covariance
-  Sigma_reg <- Sigma + diag(lambda_cov, ncol(Sigma))
+  # Keep only needed columns
+  f <- f[, .(ym, factor)]
   
-  # Solve for weights: w = Sigma^-1 * mu
-  w <- solve(Sigma_reg, mu)
-  
-  # Normalize to sum to 1 (optional, but standard for portfolio)
-  # Original paper does w = w / sum(w)
-  w <- w / sum(w)
-  
-  # Construct portfolio returns
-  mve_ret <- factors_mat %*% w
-  
-  list(ret = as.vector(mve_ret), weights = w)
-}
-
-# Helper function for alphas
-calc_alpha <- function(factor_dt, name) {
-  # factor_dt should have columns: date, factor
-  # NOTE: Ensemble factors are in PERCENTAGE format (e.g., 0.2 = 0.2% monthly)
-  # We need to convert to DECIMAL format (e.g., 0.002) for regression
-  f <- copy(factor_dt)
-  f[, factor := factor / 100]  # Convert from percentage to decimal
-  f[, ym := format(as.IDate(date), "%Y-%m")]
-
-  ff_sub <- copy(ff)
+  # Prepare FF data
+  ff_sub <- as.data.table(ff_data)
   if (!"ym" %in% names(ff_sub)) {
-    if ("date" %in% names(ff_sub)) ff_sub[, ym := format(as.IDate(date), "%Y-%m")]
-  }
-
-  reg_data <- merge(f, ff_sub, by = "ym", all.x = TRUE)
-
-  # Handle different column names (Swedish vs US data)
-  if ("rm_rf" %in% names(reg_data) && !"mkt_rf" %in% names(reg_data)) reg_data[, mkt_rf := rm_rf]
-  if ("smb_ew" %in% names(reg_data) && !"smb" %in% names(reg_data)) reg_data[, smb := smb_ew]
-  if ("hml_ew" %in% names(reg_data) && !"hml" %in% names(reg_data)) reg_data[, hml := hml_ew]
-
-  # Scale FF factors to decimal if they are in percent (heuristic)
-  # Our P-Tree factors are now DECIMAL (we removed *100).
-  # FF data is usually percent. We should convert FF to decimal.
-  for (col in c("mkt_rf","smb","hml")) {
-    if (col %in% names(reg_data)) {
-      rng <- reg_data[[col]]
-      if (is.numeric(rng) && max(abs(rng), na.rm = TRUE) > 1) {
-        # Likely percent, convert to decimal
-        reg_data[[col]] <- reg_data[[col]] / 100
-      }
+    if ("date" %in% names(ff_sub)) {
+      ff_sub[, date := as.IDate(date)]
+      ff_sub[, ym := format(date, "%Y-%m")]
+    } else {
+      stop("FF data must have 'date' or 'ym' column")
     }
   }
-
+  
+  # Handle column name variations (Swedish vs US data)
+  if ("rm_rf" %in% names(ff_sub) && !"mkt_rf" %in% names(ff_sub)) {
+    ff_sub[, mkt_rf := rm_rf]
+  }
+  if ("smb_ew" %in% names(ff_sub) && !"smb" %in% names(ff_sub)) {
+    ff_sub[, smb := smb_ew]
+  }
+  if ("hml_ew" %in% names(ff_sub) && !"hml" %in% names(ff_sub)) {
+    ff_sub[, hml := hml_ew]
+  }
+  
+  # Keep only needed FF columns
+  ff_sub <- ff_sub[, .(ym, mkt_rf, smb, hml)]
+  
+  # Merge
+  reg_data <- merge(f, ff_sub, by = "ym", all.x = TRUE)
+  
+  # Remove missing values
   reg_data <- reg_data[complete.cases(reg_data[, .(factor, mkt_rf, smb, hml)])]
-
+  
   if (nrow(reg_data) < 24) {
-    cat(sprintf("  ✗ Insufficient data: %d months\n", nrow(reg_data)))
+    cat(sprintf("  Warning: Only %d months available (< 24)\n", nrow(reg_data)))
     return(NULL)
   }
-
+  
   cat(sprintf("  Date range: %s to %s (%d months)\n",
               min(reg_data$ym), max(reg_data$ym), nrow(reg_data)))
-
-  # CAPM
-  capm <- lm(factor ~ mkt_rf, data = reg_data)
-  capm_nw <- coeftest(capm, vcov = NeweyWest(capm, lag = nw_lags))
-  capm_alpha <- coef(capm)["(Intercept)"] * 12 
-  capm_tstat <- capm_nw["(Intercept)", "t value"]
-
-  # FF3
-  ff3 <- lm(factor ~ mkt_rf + smb + hml, data = reg_data)
-  ff3_nw <- coeftest(ff3, vcov = NeweyWest(ff3, lag = nw_lags))
-  ff3_alpha <- coef(ff3)["(Intercept)"] * 12
-  ff3_tstat <- ff3_nw["(Intercept)", "t value"]
   
-  # SR
-  m <- mean(reg_data$factor)
-  s <- sd(reg_data$factor)
-  sr <- if(s>0) m/s*sqrt(12) else NA
-
-  cat(sprintf("  Mean: %.2f%% | SD: %.2f%% | SR: %.2f\n", m*100, s*100, sr))
-  cat(sprintf("  CAPM Alpha: %.2f%% (t=%.2f)\n", capm_alpha*100, capm_tstat))
-  cat(sprintf("  FF3 Alpha:  %.2f%% (t=%.2f)\n\n", ff3_alpha*100, ff3_tstat))
-
+  # Calculate basic statistics
+  mean_monthly <- mean(reg_data$factor, na.rm = TRUE)
+  sd_monthly <- sd(reg_data$factor, na.rm = TRUE)
+  sharpe <- if (sd_monthly > 0) mean_monthly / sd_monthly * sqrt(12) else NA_real_
+  
+  cat(sprintf("  Mean monthly: %.4f (%.2f%%)\n", mean_monthly, mean_monthly * 100))
+  cat(sprintf("  Monthly SD: %.4f (%.2f%%)\n", sd_monthly, sd_monthly * 100))
+  cat(sprintf("  Sharpe ratio: %.3f\n", sharpe))
+  
+  # CAPM regression: factor ~ mkt_rf
+  capm_model <- lm(factor ~ mkt_rf, data = reg_data)
+  capm_nw <- coeftest(capm_model, vcov = NeweyWest(capm_model, lag = nw_lags))
+  capm_alpha_monthly <- coef(capm_model)["(Intercept)"]
+  capm_alpha_annual <- capm_alpha_monthly * 12
+  capm_tstat <- capm_nw["(Intercept)", "t value"]
+  capm_r2 <- summary(capm_model)$r.squared
+  
+  cat(sprintf("  CAPM alpha: %.4f (%.2f%% annual, t=%.2f)\n",
+              capm_alpha_monthly, capm_alpha_annual * 100, capm_tstat))
+  
+  # FF3 regression: factor ~ mkt_rf + smb + hml
+  ff3_model <- lm(factor ~ mkt_rf + smb + hml, data = reg_data)
+  ff3_nw <- coeftest(ff3_model, vcov = NeweyWest(ff3_model, lag = nw_lags))
+  ff3_alpha_monthly <- coef(ff3_model)["(Intercept)"]
+  ff3_alpha_annual <- ff3_alpha_monthly * 12
+  ff3_tstat <- ff3_nw["(Intercept)", "t value"]
+  ff3_r2 <- summary(ff3_model)$r.squared
+  
+  cat(sprintf("  FF3 alpha: %.4f (%.2f%% annual, t=%.2f)\n",
+              ff3_alpha_monthly, ff3_alpha_annual * 100, ff3_tstat))
+  
+  # Return results
   data.table(
-    scenario = name,
-    sharpe = sr,
-    mean_ann = m*12,
-    sd_ann = s*sqrt(12),
-    capm_alpha = capm_alpha,
+    scenario = scenario_name,
+    n_months = nrow(reg_data),
+    mean_monthly = mean_monthly,
+    sd_monthly = sd_monthly,
+    sharpe_ratio = sharpe,
+    capm_alpha = capm_alpha_annual,
     capm_tstat = capm_tstat,
-    ff3_alpha = ff3_alpha,
+    capm_r2 = capm_r2,
+    ff3_alpha = ff3_alpha_annual,
     ff3_tstat = ff3_tstat,
-    n_months = nrow(reg_data)
+    ff3_r2 = ff3_r2
   )
 }
 
+
+################################################################################
 # Main Evaluation Loop
-# Note: We use ENSEMBLE factors directly, not MVE, because boosted factors are highly correlated
-ensemble_files <- list.files(models_dir, pattern = "_ensemble.csv", full.names = TRUE)
+################################################################################
 
 results_list <- list()
 
-for (fpath in ensemble_files) {
-  fname <- basename(fpath)
-  scenario <- sub("_ensemble.csv", "", fname)
-  
-  cat("\n╔════════════════════════════════════════════════╗\n")
-  cat(sprintf("║   EVALUATING: %s\n", scenario))
-  cat("╚════════════════════════════════════════════════╝\n\n")
-  
-  ensemble_dt <- fread(fpath)
-  ensemble_dt[, date := as.IDate(date)]
+# Scenario A: Full sample
+cat("\n")
+cat("================================================================================\n")
+cat("SCENARIO A: FULL SAMPLE\n")
+cat("================================================================================\n")
 
-  # Evaluate ensemble factor directly
-  cat("Evaluating ensemble factor...\n")
-  res <- calc_alpha(ensemble_dt[, .(date, factor)], paste0(scenario, " (Ensemble)"))
-  
-  if (!is.null(res)) results_list[[length(results_list)+1]] <- res
+file_a <- file.path(MODELS_DIR, "scenario_a_1_factor.csv")
+if (file.exists(file_a)) {
+  factor_a <- fread(file_a)
+  res_a <- calc_alpha(factor_a, ff, "Scenario A (Full Sample)")
+  if (!is.null(res_a)) results_list[[length(results_list) + 1]] <- res_a
+} else {
+  cat("  Warning: scenario_a_1_factor.csv not found\n")
 }
 
-final <- rbindlist(results_list)
-print(final)
-fwrite(final, file.path(out_dir, "final_ensemble_results.csv"))
+# Scenario B: Train (1998-2009)
+cat("\n")
+cat("================================================================================\n")
+cat("SCENARIO B: TIME SPLIT\n")
+cat("================================================================================\n")
 
-cat(sprintf("\n✓ Results saved to: %s\n\n", out_dir))
+file_b_train <- file.path(MODELS_DIR, "scenario_b_1_factor.csv")
+if (file.exists(file_b_train)) {
+  factor_b_train <- fread(file_b_train)
+  res_b_train <- calc_alpha(factor_b_train, ff, "Scenario B (Train 1998-2009)")
+  if (!is.null(res_b_train)) results_list[[length(results_list) + 1]] <- res_b_train
+} else {
+  cat("  Warning: scenario_b_1_factor.csv not found\n")
+}
+
+# Scenario B: Test (2010-2019)
+file_b_test <- file.path(MODELS_DIR, "scenario_b_test_1_factor.csv")
+if (file.exists(file_b_test)) {
+  factor_b_test <- fread(file_b_test)
+  res_b_test <- calc_alpha(factor_b_test, ff, "Scenario B (Test 2010-2019)")
+  if (!is.null(res_b_test)) results_list[[length(results_list) + 1]] <- res_b_test
+} else {
+  cat("  Warning: scenario_b_test_1_factor.csv not found\n")
+}
+
+# Scenario C: Train (2010-2019)
+cat("\n")
+cat("================================================================================\n")
+cat("SCENARIO C: REVERSE SPLIT\n")
+cat("================================================================================\n")
+
+file_c_train <- file.path(MODELS_DIR, "scenario_c_1_factor.csv")
+if (file.exists(file_c_train)) {
+  factor_c_train <- fread(file_c_train)
+  res_c_train <- calc_alpha(factor_c_train, ff, "Scenario C (Train 2010-2019)")
+  if (!is.null(res_c_train)) results_list[[length(results_list) + 1]] <- res_c_train
+} else {
+  cat("  Warning: scenario_c_1_factor.csv not found\n")
+}
+
+# Scenario C: Test (1998-2009)
+file_c_test <- file.path(MODELS_DIR, "scenario_c_test_1_factor.csv")
+if (file.exists(file_c_test)) {
+  factor_c_test <- fread(file_c_test)
+  res_c_test <- calc_alpha(factor_c_test, ff, "Scenario C (Test 1998-2009)")
+  if (!is.null(res_c_test)) results_list[[length(results_list) + 1]] <- res_c_test
+} else {
+  cat("  Warning: scenario_c_test_1_factor.csv not found\n")
+}
+
+
+################################################################################
+# Combine Results and Save
+################################################################################
+
+cat("\n")
+cat("================================================================================\n")
+cat("FINAL RESULTS\n")
+cat("================================================================================\n\n")
+
+if (length(results_list) == 0) {
+  stop("No results to save. Run 02_train_ptree.R first.")
+}
+
+final_results <- rbindlist(results_list)
+
+# Print summary table
+print(final_results, digits = 4)
+
+# Save CSV
+output_csv <- file.path(OUTPUT_DIR, "performance_metrics.csv")
+fwrite(final_results, output_csv)
+
+cat("\n")
+cat(sprintf("Results saved to: %s\n", normalizePath(OUTPUT_DIR)))
+cat(sprintf("  - performance_metrics.csv\n"))
+
+# Create LaTeX table
+output_tex <- file.path(OUTPUT_DIR, "table_performance_metrics.tex")
+
+# Format for LaTeX (round to appropriate decimal places)
+tex_dt <- copy(final_results)
+tex_dt[, scenario := gsub("_", "\\\\_", scenario)]
+tex_dt[, sharpe_ratio := sprintf("%.2f", sharpe_ratio)]
+tex_dt[, capm_alpha := sprintf("%.2f", capm_alpha * 100)]  # Convert to %
+tex_dt[, capm_tstat := sprintf("(%.2f)", capm_tstat)]
+tex_dt[, ff3_alpha := sprintf("%.2f", ff3_alpha * 100)]   # Convert to %
+tex_dt[, ff3_tstat := sprintf("(%.2f)", ff3_tstat)]
+
+# Select columns for table
+tex_dt <- tex_dt[, .(scenario, sharpe_ratio, capm_alpha, capm_tstat, ff3_alpha, ff3_tstat)]
+
+# Write LaTeX
+cat("\\begin{table}[!ht]\n", file = output_tex)
+cat("\\centering\n", file = output_tex, append = TRUE)
+cat("\\caption{P-Tree Model Performance}\n", file = output_tex, append = TRUE)
+cat("\\label{tab:performance}\n", file = output_tex, append = TRUE)
+cat("\\begin{tabular}{l c c c c c}\n", file = output_tex, append = TRUE)
+cat("\\hline\n", file = output_tex, append = TRUE)
+cat("Scenario & Sharpe & CAPM $\\alpha$ (\\%) & t-stat & FF3 $\\alpha$ (\\%) & t-stat \\\\\n",
+    file = output_tex, append = TRUE)
+cat("\\hline\n", file = output_tex, append = TRUE)
+
+for (i in 1:nrow(tex_dt)) {
+  cat(sprintf("%s & %s & %s & %s & %s & %s \\\\\n",
+              tex_dt[i, scenario],
+              tex_dt[i, sharpe_ratio],
+              tex_dt[i, capm_alpha],
+              tex_dt[i, capm_tstat],
+              tex_dt[i, ff3_alpha],
+              tex_dt[i, ff3_tstat]),
+      file = output_tex, append = TRUE)
+}
+
+cat("\\hline\n", file = output_tex, append = TRUE)
+cat("\\end{tabular}\n", file = output_tex, append = TRUE)
+cat("\\end{table}\n", file = output_tex, append = TRUE)
+
+cat(sprintf("  - table_performance_metrics.tex\n\n"))
+
+cat("================================================================================\n")
