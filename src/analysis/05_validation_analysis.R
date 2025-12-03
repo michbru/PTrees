@@ -242,29 +242,37 @@ pretty_name_map <- c(
   ME = "Market Equity"
 )
 
-# Compute coverage, mean, and sd for each ranked characteristic
+cat("Creating Output 2b: Variable coverage/SD table...\n")
+
+# Compute coverage and SD for each characteristic (ranked)
 var_stats <- rbindlist(lapply(char_cols, function(col) {
   x <- dt[[col]]
   nz_mask <- !is.na(x) & x != 0
   coverage <- mean(nz_mask) * 100
-  mean_val <- if (any(nz_mask)) mean(x[nz_mask]) else NA_real_
   sd_val <- if (any(nz_mask)) sd(x[nz_mask]) else NA_real_
   abbrev <- toupper(gsub("^rank_", "", col))
-  pretty <- if (!is.na(pretty_name_map[abbrev])) as.character(pretty_name_map[abbrev]) else abbrev
+  
+  # Get pretty name, or create one from abbreviation if not in map
+  if (!is.na(pretty_name_map[abbrev])) {
+    pretty <- as.character(pretty_name_map[abbrev])
+  } else {
+    # Fallback: capitalize abbreviation nicely
+    pretty <- abbrev
+  }
+  
   data.table(
     Variable = pretty,
     Abbrev = abbrev,
     Coverage = sprintf("%.1f", coverage),
-    Mean = sprintf("%.4f", mean_val),
     SD = sprintf("%.4f", sd_val)
   )
 }))
 
-setorder(var_stats, Abbrev)
+setorder(var_stats, Variable)
 
 latex_varstats <- xtable(
   var_stats,
-  caption = "Variable coverage, mean, and standard deviation (ranked characteristics; computed on non-zero observations)",
+  caption = "Variable coverage and standard deviation (ranked characteristics; non-zero observations)",
   label = "tab:variable_stats"
 )
 
@@ -272,6 +280,9 @@ sink(file.path(OUTPUT_DIR, "table_variable_stats.tex"))
 print(latex_varstats,
       include.rownames = FALSE,
       caption.placement = "top",
+      tabular.environment = "tabular",
+      floating.environment = "table",
+      hline.after = c(-1, 0, nrow(var_stats)),
       sanitize.text.function = function(x) x)
 sink()
 
@@ -484,7 +495,7 @@ cat("OUTPUTS CREATED (6 total):\n\n")
 cat("Tables (LaTeX):\n")
 cat("  1. table_data_summary.tex        - Dataset summary statistics\n")
 cat("  2. table_univariate_r2.tex       - Top/bottom characteristics by R²\n")
-cat("  2b. table_variable_stats.tex     - Variables: name, abbrev, coverage, mean, SD\n")
+cat("  2b. table_variable_stats.tex     - Variables: coverage and SD (ranked characteristics)\n")
 cat("  3. table_sample_attrition.tex    - Data filtering pipeline\n\n")
 
 cat("Figures (PNG, 300 DPI):\n")
