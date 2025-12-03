@@ -118,7 +118,7 @@ def apply_publication_lag(df, pub_lag_months: int = 6):
     rows_with_acct = df[[f'{v}_pub' for v in accounting_vars if f'{v}_pub' in df.columns]].notna().any(axis=1).sum()
     print(f"    Rows with publication-lagged accounting: {rows_with_acct:,} ({rows_with_acct/len(df)*100:.1f}%)")
     
-    # FILTER ROWS: Exclude rows with more than 5 missing accounting variables
+    # FILTER ROWS: Exclude rows with more than 6 missing accounting variables
     print("  Filtering rows with insufficient data...")
     pub_cols = [f'{v}_pub' for v in accounting_vars if f'{v}_pub' in df.columns]
 
@@ -126,11 +126,11 @@ def apply_publication_lag(df, pub_lag_months: int = 6):
     df['missing_count'] = df[pub_cols].isna().sum(axis=1)
 
     rows_before = len(df)
-    df = df[df['missing_count'] <= 5].copy()  # Allow up to 5 missing
+    df = df[df['missing_count'] <= 6].copy()  # Allow up to 6 missing
     rows_after = len(df)
     rows_dropped = rows_before - rows_after
 
-    print(f"    Dropped {rows_dropped:,} rows with >5 missing accounting variables ({rows_dropped/rows_before*100:.1f}%)")
+    print(f"    Dropped {rows_dropped:,} rows with >6 missing accounting variables ({rows_dropped/rows_before*100:.1f}%)")
     print(f"    Remaining: {rows_after:,} rows")
 
     # Drop the helper column
