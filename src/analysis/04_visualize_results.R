@@ -129,11 +129,11 @@ if (!file.exists(perf_file)) {
     Scenario = scenario,
     Sharpe = sprintf("%.2f", sharpe_ratio),
     CAPM_Alpha = sprintf("%.2f%s (%.2f)",
-                         capm_alpha * 100,
+                         capm_alpha * 12 * 100,  # Annualize and convert to percentage
                          add_stars(capm_tstat),
                          capm_tstat),
     FF3_Alpha = sprintf("%.2f%s (%.2f)",
-                        ff3_alpha * 100,
+                        ff3_alpha * 12 * 100,  # Annualize and convert to percentage
                         add_stars(ff3_tstat),
                         ff3_tstat),
     N = n_months

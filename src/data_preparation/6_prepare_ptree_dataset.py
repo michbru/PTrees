@@ -118,7 +118,7 @@ def apply_publication_lag(df, pub_lag_months: int = 6):
     rows_with_acct = df[[f'{v}_pub' for v in accounting_vars if f'{v}_pub' in df.columns]].notna().any(axis=1).sum()
     print(f"    Rows with publication-lagged accounting: {rows_with_acct:,} ({rows_with_acct/len(df)*100:.1f}%)")
     
-    # FILTER ROWS: Exclude rows with more than 6 missing accounting variables (less aggressive)
+    # FILTER ROWS: Exclude rows with more than 4 missing accounting variables (less aggressive)
     print("  Filtering rows with insufficient data...")
     pub_cols = [f'{v}_pub' for v in accounting_vars if f'{v}_pub' in df.columns]
 

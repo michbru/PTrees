@@ -147,17 +147,17 @@ calc_alpha <- function(factor_dt, ff_data, scenario_name, nw_lags = 12) {
   cat(sprintf("  FF3 alpha: %.4f (%.2f%% annual, t=%.2f)\n",
               ff3_alpha_monthly, ff3_alpha_annual * 100, ff3_tstat))
   
-  # Return results
+  # Return results (alphas stored as MONTHLY decimals, matching old format)
   data.table(
     scenario = scenario_name,
     n_months = nrow(reg_data),
     mean_monthly = mean_monthly,
     sd_monthly = sd_monthly,
     sharpe_ratio = sharpe,
-    capm_alpha = capm_alpha_annual,
+    capm_alpha = capm_alpha_monthly,  # Store monthly alpha
     capm_tstat = capm_tstat,
     capm_r2 = capm_r2,
-    ff3_alpha = ff3_alpha_annual,
+    ff3_alpha = ff3_alpha_monthly,  # Store monthly alpha
     ff3_tstat = ff3_tstat,
     ff3_r2 = ff3_r2
   )
