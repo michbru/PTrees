@@ -353,7 +353,7 @@ train_a <- build_train_data(dt, inp$char_cols, inp$instr_cols)
 # Adjusted parameters based on diagnostic: min_leaf=20, lambda_cov=1e-2
 # NOTE: All 20 factors were identical due to degenerate splitting (only rank_me used)
 model_a <- train_ptree_factors(train_a, "SCENARIO A",
-                               num_factors = 1,  # Changed from 20 - all factors identical
+                               num_factors = 1,  # Single factor for cleaner table
                                num_iter = 9,
                                eta = 1.0,
                                min_leaf_size = 20,
@@ -433,7 +433,7 @@ cat(sprintf("Test period: %s to %s (%d obs)\n",
 # Train on early period
 train_b <- build_train_data(dt_train_b, inp$char_cols, inp$instr_cols)
 model_b <- train_ptree_factors(train_b, "SCENARIO B (Train)",
-                               num_factors = 1,  # Changed from 20 - all factors identical
+                               num_factors = 1,  # Single factor for cleaner table
                                num_iter = 9,
                                eta = 1.0,
                                min_leaf_size = 20,
@@ -486,7 +486,7 @@ cat(sprintf("Test period: %s to %s (%d obs)\n",
 # Train on late period
 train_c <- build_train_data(dt_train_c, inp$char_cols, inp$instr_cols)
 model_c <- train_ptree_factors(train_c, "SCENARIO C (Train)",
-                               num_factors = 1,  # Changed from 20 - all factors identical
+                               num_factors = 1,  # Single factor for cleaner table
                                num_iter = 9,
                                eta = 1.0,
                                min_leaf_size = 20,
