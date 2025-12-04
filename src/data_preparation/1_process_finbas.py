@@ -1,7 +1,7 @@
 """
 Step 1: Process Finbas Data to Monthly
 =======================================
-Input:  data/raw/finbas/raw_finbas_daily.csv
+Input:  data/raw/finbas/raw_finbas_monthly.csv
 Output: data/intermediate/finbas/finbas_monthly_clean.csv
 
 Note: Aggregates to monthly (month-end) to align with P-Tree methodology.
@@ -13,12 +13,12 @@ import numpy as np
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-RAW_PATH = PROJECT_ROOT / 'data' / 'raw' / 'finbas' / 'raw_finbas_daily.csv'
+RAW_PATH = PROJECT_ROOT / 'data' / 'raw' / 'finbas' / 'raw_finbas_monthly.csv'
 OUTPUT_PATH = PROJECT_ROOT / 'data' / 'intermediate' / 'finbas' / 'finbas_monthly_clean.csv'
 
 
 def main():
-    print("Step 1: Processing Finbas daily data...")
+    print("Step 1: Processing Finbas monthly data...")
     
     # Load
     if not RAW_PATH.exists():

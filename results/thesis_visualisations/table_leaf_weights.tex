@@ -1,0 +1,22 @@
+\begin{table}[!ht]
+\centering
+\caption{Leaf Portfolio Weights (Tangency Portfolio)}
+\label{tab:leaf_weights}
+\begin{tabular}{l c l c c}
+\hline
+Scenario & Leaf & Description & Weight & Weight (\%) \\
+\hline
+A: Full Sample & 2 & Low ato (< -0.20) & 0.0671 & 6.71\% \\
+A: Full Sample & 3 & High ato ($\geq$ -0.20) & 0.9329 & 93.29\% \\
+B: Train (1998-2009) & 2 & Low ato (< -0.20) & -0.3468 & -34.68\% \\
+B: Train (1998-2009) & 3 & High ato ($\geq$ -0.20) & 0.6532 & 65.32\% \\
+C: Train (2010-2019) & 2 & Low cashdebt (< -0.60) & -0.3162 & -31.62\% \\
+C: Train (2010-2019) & 3 & High cashdebt ($\geq$ -0.60) & 0.6838 & 68.38\% \\
+\hline
+\end{tabular}
+\\[0.5em]
+\begin{minipage}{0.95\textwidth}
+\footnotesize
+\textit{Note:} Weights represent the tangency portfolio allocation across leaf portfolios, optimized to maximize the Sharpe ratio. Within each leaf, stocks are value-weighted by market capitalization.
+\end{minipage}
+\end{table}

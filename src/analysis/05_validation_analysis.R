@@ -6,13 +6,14 @@
 #
 # Purpose: Create ONLY the essential tables and figures needed for thesis
 #
-# Core Outputs (6 total):
+# Core Outputs (7 total):
 # 1. Table: Dataset Summary Statistics
 # 2. Table: Univariate R² Analysis (Top predictors)
 # 3. Table: Sample Attrition Pipeline
 # 4. Figure: Temporal Coverage (firms over time)
 # 5. Figure: Data Quality Comparison (Swedish vs US)
 # 6. Figure: Characteristic Predictive Power
+# 7. Figure: Macro Factors Time Series (Market, SMB, HML)
 #
 ################################################################################
 
@@ -31,6 +32,7 @@ setwd(repo_root)
 
 INPUT_RDS <- "results/inputs/ptree_inputs.rds"
 OUTPUT_DIR <- "results/validation"
+FF_PATH <- "data/raw/macro/raw_macro_factors.csv"
 
 # CLEAR OUTPUT DIRECTORY - Start fresh every time
 if (dir.exists(OUTPUT_DIR)) {
@@ -299,20 +301,18 @@ cat("Creating Output 3: Sample Attrition Table...\n")
 
 attrition_table <- data.frame(
   Step = c(
-    "1. Raw FinBas daily data",
+    "1. Raw FinBas monthly data",
     "2. Filter SE/SEK stocks only",
     "3. Remove OTC/off-exchange",
     "4. De-duplicate by ISIN-date",
-    "5. Aggregate to monthly",
-    "6. Merge with Serrano (accounting)",
-    "7. Apply lags and filters",
-    "8. Final dataset"
+    "5. Merge with Serrano (accounting)",
+    "6. Apply lags and filters",
+    "7. Final dataset"
   ),
   Records = c(
-    "$\\sim$2,500,000",
-    "$\\sim$1,850,000",
-    "$\\sim$1,200,000",
-    "$\\sim$1,000,000",
+    "$\\sim$112,000",
+    "$\\sim$105,000",
+    "$\\sim$95,000",
     "$\\sim$95,000",
     "$\\sim$67,000",
     "$\\sim$61,000",
@@ -323,7 +323,6 @@ attrition_table <- data.frame(
     "Swedish stocks in SEK",
     "Liquid exchange-traded only",
     "One record per firm-date",
-    "Month-end observations",
     "Inner join via ISIN-OrgNr",
     "Remove missing targets",
     "Ready for P-Tree"
@@ -373,6 +372,33 @@ ggsave(file.path(OUTPUT_DIR, "figure_temporal_coverage.png"), p_temporal,
        width = 11, height = 6, dpi = 300)
 
 cat("  ✓ figure_temporal_coverage.png\n\n")
+
+################################################################################
+# OUTPUT 4b: Firm Lifespan Distribution
+################################################################################
+
+cat("Creating Output 4b: Firm Lifespan Distribution Figure...\n")
+
+p_lifespan <- ggplot(firm_periods, aes(x = n_periods)) +
+  geom_histogram(binwidth = 12, fill = "#2E86C1", color = "white", alpha = 0.8) +
+  geom_vline(xintercept = avg_periods_firm,
+             linetype = "dashed", color = "#E74C3C", linewidth = 1) +
+  annotate("text", x = avg_periods_firm + 10, y = Inf,
+           label = sprintf("Mean = %.1f months", avg_periods_firm),
+           color = "#E74C3C", fontface = "bold", hjust = 0, vjust = 2) +
+  labs(
+    x = "Months in Sample",
+    y = "Number of Firms"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    panel.grid.minor = element_blank()
+  )
+
+ggsave(file.path(OUTPUT_DIR, "figure_firm_lifespans.png"), p_lifespan,
+       width = 10, height = 6, dpi = 300)
+
+cat("  ✓ figure_firm_lifespans.png\n\n")
 
 ################################################################################
 # OUTPUT 5: Swedish vs US Comparison Figure
@@ -452,6 +478,76 @@ ggsave(file.path(OUTPUT_DIR, "figure_predictive_power.png"), p_predictive,
        width = 10, height = 7, dpi = 300)
 
 ################################################################################
+# OUTPUT 7: Macro Factors Time Series (Market, SMB, HML)
+################################################################################
+
+cat("Creating Output 7: Macro Factors Time Series...\n")
+
+if (!file.exists(FF_PATH)) {
+  cat(sprintf("  Warning: Macro factors not found at %s. Skipping figure.\n\n", FF_PATH))
+} else {
+  ff <- fread(FF_PATH)
+
+  # Ensure a date column exists and standardize names
+  if (!"date" %in% names(ff) && "ym" %in% names(ff)) {
+    ff[, date := as.IDate(paste0(ym, "-01"))]
+  } else if ("date" %in% names(ff)) {
+    ff[, date := as.IDate(date)]
+  }
+
+  if (!"date" %in% names(ff)) {
+    cat("  Warning: No parsable date column in macro factors. Skipping figure.\n\n")
+  } else {
+    # Harmonize column names from Swedish FF
+    if ("rm_rf" %in% names(ff) && !"mkt_rf" %in% names(ff)) ff[, mkt_rf := rm_rf]
+    if ("smb_ew" %in% names(ff) && !"smb" %in% names(ff)) ff[, smb := smb_ew]
+    if ("hml_ew" %in% names(ff) && !"hml" %in% names(ff)) ff[, hml := hml_ew]
+
+    keep_cols <- intersect(c("date", "mkt_rf", "smb", "hml"), names(ff))
+    if (length(keep_cols) < 2) {
+      cat("  Warning: Macro factors missing expected columns (mkt_rf, smb, hml). Skipping.\n\n")
+    } else {
+      ff_sub <- ff[, ..keep_cols]
+      # Long format
+      long <- melt(ff_sub, id.vars = "date", variable.name = "Factor", value.name = "Return")
+      setorder(long, Factor, date)
+      # 12-month rolling mean for smoother view
+      long[, Roll12 := frollmean(Return, n = 12, align = "right", na.rm = TRUE), by = Factor]
+
+      # Display names (ensure levels/labels lengths match)
+      display_names <- c(mkt_rf = "Market (Rm-Rf)", smb = "SMB", hml = "HML")
+      lvls <- intersect(names(display_names), unique(as.character(long$Factor)))
+      long[, Factor := factor(Factor, levels = lvls, labels = display_names[lvls])]
+
+      p_macro <- ggplot(long, aes(x = date)) +
+        geom_line(aes(y = Return * 100), color = "#95A5A6", linewidth = 0.4, alpha = 0.7) +
+        geom_line(aes(y = Roll12 * 100, color = Factor), linewidth = 0.9) +
+        scale_color_manual(values = c(
+          "Market (Rm-Rf)" = "#2E86AB",
+          "SMB" = "#27AE60",
+          "HML" = "#8E44AD"
+        )) +
+        labs(
+          x = "Date",
+          y = "Monthly Return (%, level and 12m avg)",
+          color = "Factor"
+        ) +
+        facet_wrap(~ Factor, ncol = 1, scales = "free_y") +
+        theme_minimal(base_size = 12) +
+        theme(
+          legend.position = "none",
+          panel.grid.minor = element_blank()
+        )
+
+      ggsave(file.path(OUTPUT_DIR, "figure_macro_factors.png"), p_macro,
+             width = 10, height = 8, dpi = 300)
+
+      cat("  ✓ figure_macro_factors.png\n\n")
+    }
+  }
+}
+
+################################################################################
 # Save Summary Results
 ################################################################################
 
@@ -476,7 +572,7 @@ cat("===========================================================================
 cat("VALIDATION ANALYSIS COMPLETE\n")
 cat("================================================================================\n\n")
 
-cat("OUTPUTS CREATED (6 total):\n\n")
+cat("OUTPUTS CREATED (7 total):\n\n")
 cat("Tables (LaTeX):\n")
 cat("  1. table_data_summary.tex        - Dataset summary statistics\n")
 cat("  2. table_univariate_r2.tex       - Top/bottom characteristics by R²\n")
@@ -486,7 +582,8 @@ cat("  3. table_sample_attrition.tex    - Data filtering pipeline\n\n")
 cat("Figures (PNG, 300 DPI):\n")
 cat("  4. figure_temporal_coverage.png  - Firms over time\n")
 cat("  5. figure_market_comparison.png  - Swedish vs US comparison\n")
-cat("  6. figure_predictive_power.png   - Top characteristics by R²\n\n")
+cat("  6. figure_predictive_power.png   - Top characteristics by R²\n")
+cat("  7. figure_macro_factors.png     - Macro factors over time (Market, SMB, HML)\n\n")
 
 cat("Data:\n")
 cat("  - validation_summary.rds         - Summary statistics\n\n")

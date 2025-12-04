@@ -2,20 +2,21 @@
 \centering
 \caption{P-Tree Model Performance}
 \label{tab:performance}
-\begin{tabular}{l c c c c}
+\begin{tabular}{l c c c c c}
 \hline
-Scenario & Sharpe & CAPM $\alpha$ (\%) & FF3 $\alpha$ (\%) & N \\
+Scenario & Sharpe & CAPM $\alpha$ (\%) & FF3 $\alpha$ (\%) & Total $R^2$ & N \\
 \hline
-Scenario A (Full Sample) & 0.66 & 13.13** (2.41) & 12.79** (2.27) & 258 \\
-Scenario B (Train 1998-2009) & 0.49 & 11.28 (1.20) & 11.37 (1.19) & 139 \\
-Scenario B (Test 2010-2019) & 1.03 & 13.38*** (3.20) & 14.79*** (3.60) & 119 \\
-Scenario C (Train 2010-2019) & 1.48 & 9.66*** (4.53) & 10.33*** (5.01) & 119 \\
-Scenario C (Test 1998-2009) & 0.59 & 5.66 (1.49) & 5.07 (1.37) & 139 \\
+Market Benchmark (EW) & 0.66 & -- & -- & -- & 258 \\
+Scenario A (Full Sample) & 0.68 & 13.21** (2.39) & 12.68** (2.24) & 20.20\% & 258 \\
+Scenario B (Train 1998-2009) & 0.69 & 6.03** (1.99) & 5.69* (1.79) & -- & 139 \\
+Scenario B (Test 2010-2019) & 0.47 & 2.63* (1.92) & 3.29** (2.29) & 14.61\% & 119 \\
+Scenario C (Train 2010-2019) & 1.62 & 9.78*** (5.05) & 10.39*** (5.76) & -- & 119 \\
+Scenario C (Test 1998-2009) & 0.54 & 4.76 (1.39) & 4.18 (1.26) & 25.05\% & 139 \\
 \hline
 \end{tabular}
 \\[0.5em]
 \begin{minipage}{0.95\textwidth}
 \footnotesize
-\textit{Note:} Alphas are annualized (\%) with t-statistics in parentheses (Newey-West SE, 12 lags). Significance levels: *** $p<0.01$, ** $p<0.05$, * $p<0.10$.
+\textit{Note:} Alphas are annualized (\%) with t-statistics in parentheses (Newey-West SE, 12 lags). Significance levels: *** $p<0.01$, ** $p<0.05$, * $p<0.10$. Total $R^2$ is the out-of-sample predictive $R^2$ vs zero benchmark.
 \end{minipage}
 \end{table}

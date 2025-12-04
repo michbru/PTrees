@@ -73,7 +73,9 @@ def apply_publication_lag(df, pub_lag_months: int = 6):
 
     # Market cap 1-month lag for ratios/weights
     if 'market_cap' in df.columns:
-        df['market_cap_lag1'] = df.groupby('isin')['market_cap'].shift(1)
+        # FIX: Use current market cap (at time t) for scaling, as we are predicting t+1
+        # Previous version used shift(1) which caused a 2-month lag
+        df['market_cap_scaling'] = df['market_cap']
 
     # Publication-lagged accounting variables
     accounting_vars = [
@@ -149,20 +151,27 @@ def calculate_momentum_chars(df):
     for lag in [1, 2, 6, 12, 13, 36, 60]:
         df[f'close_lag{lag}'] = df.groupby('isin')['close'].shift(lag)
 
-    # MOM1M: Previous month return
-    df['MOM1M'] = df.groupby('isin')['ret_monthly'].shift(1)
+    # MOM1M: Previous month return (Short Term Reversal)
+    # FIX: Use current month t return (Jan) to predict t+1 (Feb)
+    # Previous version used shift(1) (Dec) which caused a 2-month lag
+    df['MOM1M'] = df['ret_monthly']
 
-    # MOM6M: t-6 to t-2 (skip t-1)
-    df['MOM6M'] = (df['close_lag2'] / df['close_lag6']) - 1
+    # MOM6M: t-6 to t-1 (skip t, or just past 6 months skipping most recent?)
+    # Standard momentum skips most recent month t (Jan)
+    # So we use returns from t-7 to t-1 (Dec) -> close_lag1 / close_lag7
+    # Or just t-6 to t-1? Let's use t-6 to t-1 (Dec)
+    df['MOM6M'] = (df['close_lag1'] / df['close_lag6']) - 1
 
-    # MOM12M: t-12 to t-2
-    df['MOM12M'] = (df['close_lag2'] / df['close_lag12']) - 1
+    # MOM12M: t-12 to t-1 (Standard Momentum)
+    # Skip month t (Jan), use Dec (t-1) back to Jan prev (t-12)
+    df['MOM12M'] = (df['close_lag1'] / df['close_lag12']) - 1
 
-    # MOM36M: t-36 to t-13
-    df['MOM36M'] = (df['close_lag13'] / df['close_lag36']) - 1
+    # MOM36M: t-36 to t-12 (Long term reversal)
+    # From t-12 (1 year ago) to t-36 (3 years ago)
+    df['MOM36M'] = (df['close_lag12'] / df['close_lag36']) - 1
 
-    # MOM60M: t-60 to t-13
-    df['MOM60M'] = (df['close_lag13'] / df['close_lag60']) - 1
+    # MOM60M: t-60 to t-12
+    df['MOM60M'] = (df['close_lag12'] / df['close_lag60']) - 1
 
     # SEAS1A: Same month last year
     df['SEAS1A'] = df.groupby('isin')['ret_monthly'].shift(12)
@@ -186,18 +195,18 @@ def calculate_value_chars(df):
 
     # BM: Book-to-Market using Serrano book equity (publication-lagged) and lagged market cap
     if 'book_equity_pub' in df.columns:
-        df['BM'] = safe_div(df['book_equity_pub'], df['market_cap_lag1'])
+        df['BM'] = safe_div(df['book_equity_pub'], df['market_cap_scaling'])
 
     # EP, SP, CFP: Use lagged accounting + lagged market cap
     if 'net_income_pub' in df.columns:
-        df['EP'] = safe_div(df['net_income_pub'], df['market_cap_lag1'])
+        df['EP'] = safe_div(df['net_income_pub'], df['market_cap_scaling'])
     if 'sales_pub' in df.columns:
-        df['SP'] = safe_div(df['sales_pub'], df['market_cap_lag1'])
+        df['SP'] = safe_div(df['sales_pub'], df['market_cap_scaling'])
 
     # CFP: Operating cash flow approximation
     if 'net_income_pub' in df.columns and 'depreciation_pub' in df.columns:
         df['operating_cashflow'] = df['net_income_pub'] + df['depreciation_pub']
-        df['CFP'] = safe_div(df['operating_cashflow'], df['market_cap_lag1'])
+        df['CFP'] = safe_div(df['operating_cashflow'], df['market_cap_scaling'])
 
     # Pure accounting ratios
     if 'cash_pub' in df.columns and 'total_assets_pub' in df.columns:

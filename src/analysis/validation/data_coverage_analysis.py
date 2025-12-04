@@ -33,7 +33,7 @@ sns.set_palette("husl")
 
 # Paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
-RAW_FINBAS_PATH = PROJECT_ROOT / 'data' / 'raw' / 'finbas' / 'raw_finbas_daily.csv'
+RAW_FINBAS_PATH = PROJECT_ROOT / 'data' / 'raw' / 'finbas' / 'raw_finbas_monthly.csv'
 INTERMEDIATE_FINBAS_PATH = PROJECT_ROOT / 'data' / 'intermediate' / 'finbas' / 'finbas_monthly_clean.csv'
 INTERMEDIATE_SERRANO_PATH = PROJECT_ROOT / 'data' / 'intermediate' / 'serrano' / 'serrano_accounting.csv'
 PROCESSED_DATA_PATH = PROJECT_ROOT / 'data' / 'processed' / 'ptree_dataset_monthly.csv'
