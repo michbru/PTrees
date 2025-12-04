@@ -2,21 +2,21 @@
 \centering
 \caption{P-Tree Model Performance}
 \label{tab:performance}
-\begin{tabular}{l c c c c c c c}
+\begin{tabular}{l *{6}{c}}
 \hline
-Scenario & Total Ret & Vol (Ann.) & Sharpe & CAPM $\alpha$ (\%) & FF3 $\alpha$ (\%) & Total $R^2$ & N \\
+Scenario & Ann. Ret & Vol (Ann.) & Sharpe & CAPM $\alpha$ (\%) & FF3 $\alpha$ (\%) & Total $R^2$ \\
 \hline
-Market Benchmark (EW) & 932.88\% & 19.35\% & 0.66 & -- & -- & -- & 258 \\
-Scenario A (Full Sample) & 1003.55\% & 19.29\% & 0.68 & 13.21** (2.39) & 12.68** (2.24) & 20.20\% & 258 \\
-Scenario B (Train 1998-2009) & 91.87\% & 8.68\% & 0.69 & 6.03** (1.99) & 5.69* (1.79) & -- & 139 \\
-Scenario B (Test 2010-2019) & 24.99\% & 5.01\% & 0.47 & 2.63* (1.92) & 3.29** (2.29) & 14.61\% & 119 \\
-Scenario C (Train 2010-2019) & 159.88\% & 6.09\% & 1.62 & 9.78*** (5.05) & 10.39*** (5.76) & -- & 119 \\
-Scenario C (Test 1998-2009) & 66.03\% & 8.76\% & 0.54 & 4.76 (1.39) & 4.18 (1.26) & 25.05\% & 139 \\
+Market Benchmark (EW) & 11.47\% & 19.35\% & 0.66 & -- & -- & -- \\
+Scenario A & 11.82\% & 19.29\% & 0.68 & 13.21** (2.39) & 12.68** (2.24) & 20.20\% \\
+Scenario B (Train) & 5.79\% & 8.68\% & 0.69 & 6.03** (1.99) & 5.69* (1.79) & -- \\
+Scenario B (Test) & 2.28\% & 5.01\% & 0.47 & 2.63* (1.92) & 3.29** (2.29) & 14.61\% \\
+Scenario C (Train) & 10.11\% & 6.09\% & 1.62 & 9.78*** (5.05) & 10.39*** (5.76) & -- \\
+Scenario C (Test) & 4.47\% & 8.76\% & 0.54 & 4.76 (1.39) & 4.18 (1.26) & 25.05\% \\
 \hline
 \end{tabular}
 \\[0.5em]
 \begin{minipage}{0.95\textwidth}
 \footnotesize
-\textit{Note:} Total Ret is the cumulative return over the period. Vol (Ann.) is the annualized standard deviation. Alphas are annualized (\%) with t-statistics in parentheses (Newey-West SE, 12 lags). Significance levels: *** $p<0.01$, ** $p<0.05$, * $p<0.10$. Total $R^2$ is the out-of-sample predictive $R^2$ vs zero benchmark.
+\textit{Note:} Ann. Ret is the annualized return (geometric mean). Vol (Ann.) is the annualized volatility. Sharpe is the annualized Sharpe ratio. Alphas are annualized (\%) with t-statistics in parentheses (Newey-West SE, 12 lags). Significance levels: *** $p<0.01$, ** $p<0.05$, * $p<0.10$. Total $R^2$ is the out-of-sample $R^2$ vs zero benchmark (test periods only).
 \end{minipage}
 \end{table}

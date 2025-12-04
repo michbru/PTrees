@@ -481,10 +481,13 @@ ggsave(file.path(OUTPUT_DIR, "figure_predictive_power.png"), p_predictive,
        width = 10, height = 7, dpi = 300)
 
 ################################################################################
-# OUTPUT 7: Macro Factors Time Series (Market, SMB, HML)
+# OUTPUT 7: Macro Factors Time Series (Comprehensive)
 ################################################################################
 
-cat("Creating Output 7: Macro Factors Time Series...\n")
+cat("Creating Output 7: Macro Factors Time Series (Comprehensive)...\n")
+
+MACRO_DIR <- file.path(OUTPUT_DIR, "macro_plots")
+if (!dir.exists(MACRO_DIR)) dir.create(MACRO_DIR, recursive = TRUE)
 
 if (!file.exists(FF_PATH)) {
   cat(sprintf("  Warning: Macro factors not found at %s. Skipping figure.\n\n", FF_PATH))
@@ -501,68 +504,75 @@ if (!file.exists(FF_PATH)) {
   if (!"date" %in% names(ff)) {
     cat("  Warning: No parsable date column in macro factors. Skipping figure.\n\n")
   } else {
-    # Harmonize column names from Swedish FF
-    if ("rm_rf" %in% names(ff) && !"mkt_rf" %in% names(ff)) ff[, mkt_rf := rm_rf]
-    if ("smb_ew" %in% names(ff) && !"smb" %in% names(ff)) ff[, smb := smb_ew]
-    if ("hml_ew" %in% names(ff) && !"hml" %in% names(ff)) ff[, hml := hml_ew]
-    if ("mom_ew" %in% names(ff) && !"mom" %in% names(ff)) ff[, mom := mom_ew]
-
-    # Select all available macro factors
-    keep_cols <- intersect(c("date", "mkt_rf", "smb", "hml", "mom", "rf", "rolling_vol_daily"), names(ff))
-    if (length(keep_cols) < 2) {
-      cat("  Warning: Macro factors missing expected columns. Skipping.\n\n")
-    } else {
-      ff_sub <- ff[, ..keep_cols]
-      # Long format
-      long <- melt(ff_sub, id.vars = "date", variable.name = "Factor", value.name = "Return")
-      setorder(long, Factor, date)
+    
+    # Helper function to plot a group of factors
+    plot_factors <- function(data, cols, title, filename, color_hex = "#2E86AB") {
+      # Filter columns that exist
+      valid_cols <- intersect(cols, names(data))
+      if (length(valid_cols) == 0) return()
+      
+      dt_sub <- data[, c("date", valid_cols), with = FALSE]
+      long <- melt(dt_sub, id.vars = "date", variable.name = "Factor", value.name = "Return")
+      
       # 12-month rolling mean for smoother view
       long[, Roll12 := frollmean(Return, n = 12, align = "right", na.rm = TRUE), by = Factor]
-
-      # Display names for all factors
-      display_names <- c(
-        mkt_rf = "Market (Rm-Rf)", 
-        smb = "SMB (Size)", 
-        hml = "HML (Value)",
-        mom = "MOM (Momentum)",
-        rf = "Risk-Free Rate",
-        rolling_vol_daily = "Market Volatility"
-      )
-      lvls <- intersect(names(display_names), unique(as.character(long$Factor)))
-      long[, Factor := factor(Factor, levels = lvls, labels = display_names[lvls])]
-
-      # Color palette for all factors
-      color_palette <- c(
-        "Market (Rm-Rf)" = "#2E86AB",
-        "SMB (Size)" = "#27AE60",
-        "HML (Value)" = "#8E44AD",
-        "MOM (Momentum)" = "#E74C3C",
-        "Risk-Free Rate" = "#F39C12",
-        "Market Volatility" = "#E67E22"
-      )
-
-      p_macro <- ggplot(long, aes(x = date)) +
-        geom_line(aes(y = Return * 100), color = "#95A5A6", linewidth = 0.4, alpha = 0.7) +
-        geom_line(aes(y = Roll12 * 100, color = Factor), linewidth = 0.9) +
-        scale_color_manual(values = color_palette) +
+      
+      # Create better labels
+      long[, FactorLabel := toupper(gsub("_", " ", Factor))]
+      
+      p <- ggplot(long, aes(x = date)) +
+        geom_line(aes(y = Return), color = "#BDC3C7", linewidth = 0.4, alpha = 0.6) +
+        geom_line(aes(y = Roll12), color = color_hex, linewidth = 0.8) +
         labs(
+          title = title,
+          subtitle = "Grey: Monthly values, Colored: 12-month rolling average",
           x = "Date",
-          y = "Monthly Return (%, level and 12m avg)",
-          color = "Factor"
+          y = "Value (%)"
         ) +
-        facet_wrap(~ Factor, ncol = 2, scales = "free_y") +
+        facet_wrap(~ FactorLabel, ncol = 1, scales = "free_y") +
         theme_minimal(base_size = 12) +
         theme(
-          legend.position = "none",
-          panel.grid.minor = element_blank(),
-          strip.text = element_text(face = "bold", size = 10)
+          strip.text = element_text(face = "bold", size = 10),
+          panel.grid.minor = element_blank()
         )
 
-      ggsave(file.path(OUTPUT_DIR, "figure_macro_factors.png"), p_macro,
-             width = 12, height = 10, dpi = 300)
-
-      cat("  ✓ figure_macro_factors.png\n\n")
+      ggsave(file.path(MACRO_DIR, filename), p, width = 10, height = 2.5 * length(valid_cols), dpi = 300)
+      cat(sprintf("  ✓ %s\n", filename))
     }
+
+    # Prepare data for plotting (convert decimals to percentages)
+    ff_plot <- copy(ff)
+    
+    # Columns that are in decimals and need conversion to %
+    decimal_cols <- c("rm", "rf", "rm_rf", 
+                      "smb_ew", "hml_ew", "mom_ew", 
+                      "smb_vw", "hml_vw", "mom_vw", 
+                      "rolling_vol_annualized", "rolling_vol_daily")
+    
+    # Scale them
+    cols_to_scale <- intersect(decimal_cols, names(ff_plot))
+    for (col in cols_to_scale) {
+      set(ff_plot, j = col, value = ff_plot[[col]] * 100)
+    }
+    # Note: 'inflation' is already in percent in the raw file
+
+    # 1. Market Factors
+    plot_factors(ff_plot, c("rm", "rf", "rm_rf"), 
+                 "Market Factors", "macro_01_market.png", "#2980B9")
+
+    # 2. Equal-Weighted Factors
+    plot_factors(ff_plot, c("smb_ew", "hml_ew", "mom_ew"), 
+                 "Fama-French Factors (Equal-Weighted)", "macro_02_ff_ew.png", "#27AE60")
+
+    # 3. Value-Weighted Factors
+    plot_factors(ff_plot, c("smb_vw", "hml_vw", "mom_vw"), 
+                 "Fama-French Factors (Value-Weighted)", "macro_03_ff_vw.png", "#8E44AD")
+
+    # 4. Economic Indicators
+    plot_factors(ff_plot, c("rolling_vol_annualized", "inflation"), 
+                 "Economic Indicators", "macro_04_indicators.png", "#E67E22")
+                 
+    cat(sprintf("  Saved all macro plots to %s\n\n", MACRO_DIR))
   }
 }
 

@@ -226,12 +226,15 @@ if (!file.exists(perf_file)) {
     "Scenario C (Test 1998-2009)" = file.path(MODELS_DIR, "scenario_c_test_1_factor.csv")
   )
   
-  perf[, Cum_Ret := sapply(scenario, function(s) {
+  perf[, Ann_Ret := sapply(scenario, function(s) {
     fpath <- scenario_files[[s]]
     if (!is.null(fpath) && file.exists(fpath)) {
       d <- fread(fpath)
       cum_r <- prod(1 + d$factor_return) - 1
-      return(sprintf("%.2f\\%%", cum_r * 100))
+      n_months <- nrow(d)
+      # Annualize: (1 + cum_r)^(12/n_months) - 1
+      ann_r <- (1 + cum_r)^(12/n_months) - 1
+      return(sprintf("%.2f\\%%", ann_r * 100))
     }
     return("--")
   })]
@@ -242,7 +245,7 @@ if (!file.exists(perf_file)) {
   # Format table with significance stars
   perf_table <- perf[, .(
     Scenario = scenario,
-    Cum_Ret = Cum_Ret,
+    Ann_Ret = Ann_Ret,
     Volatility = Volatility,
     Sharpe = sprintf("%.2f", sharpe_ratio),
     CAPM_Alpha = sprintf("%.2f%s (%.2f)",
@@ -253,20 +256,29 @@ if (!file.exists(perf_file)) {
                         ff3_alpha * 12 * 100,  # Annualize and convert to percentage
                         add_stars(ff3_tstat),
                         ff3_tstat),
-    Total_R2 = Total_R2,
-    N = n_months
+    Total_R2 = Total_R2
   )]
+  
+  # Simplify scenario names - remove time periods
+  perf_table[, Scenario := gsub(" 1998-2009", "", Scenario)]
+  perf_table[, Scenario := gsub(" 2010-2019", "", Scenario)]
+  perf_table[, Scenario := gsub("Full Sample", "", Scenario)]
+  perf_table[, Scenario := gsub(" \\(\\)", "", Scenario)]  # Remove empty parentheses
+  perf_table[, Scenario := gsub("  ", " ", Scenario)]  # Remove double spaces
+  perf_table[, Scenario := trimws(Scenario)]  # Trim whitespace
 
   # Add market benchmark row
+  # Calculate annualized market return
+  market_ann_ret <- (1 + market_cum_ret)^(12/nrow(market_returns)) - 1
+  
   market_row <- data.table(
     Scenario = "Market Benchmark (EW)",
-    Cum_Ret = sprintf("%.2f\\%%", market_cum_ret * 100),
+    Ann_Ret = sprintf("%.2f\\%%", market_ann_ret * 100),
     Volatility = sprintf("%.2f\\%%", market_vol_ann * 100),
     Sharpe = sprintf("%.2f", market_sharpe),
     CAPM_Alpha = "--",
     FF3_Alpha = "--",
-    Total_R2 = "--",
-    N = nrow(market_returns)
+    Total_R2 = "--"
   )
 
   perf_table <- rbind(market_row, perf_table)
@@ -277,22 +289,21 @@ if (!file.exists(perf_file)) {
   cat("\\centering\n", file = tex_file, append = TRUE)
   cat("\\caption{P-Tree Model Performance}\n", file = tex_file, append = TRUE)
   cat("\\label{tab:performance}\n", file = tex_file, append = TRUE)
-  cat("\\begin{tabular}{l c c c c c c c}\n", file = tex_file, append = TRUE)
+  cat("\\begin{tabular}{l *{6}{c}}\n", file = tex_file, append = TRUE)  # Left-align scenario, center rest
   cat("\\hline\n", file = tex_file, append = TRUE)
-  cat("Scenario & Total Ret & Vol (Ann.) & Sharpe & CAPM $\\alpha$ (\\%) & FF3 $\\alpha$ (\\%) & Total $R^2$ & N \\\\\n",
+  cat("Scenario & Ann. Ret & Vol (Ann.) & Sharpe & CAPM $\\alpha$ (\\%) & FF3 $\\alpha$ (\\%) & Total $R^2$ \\\\\n",
       file = tex_file, append = TRUE)
   cat("\\hline\n", file = tex_file, append = TRUE)
   
   for (i in 1:nrow(perf_table)) {
-    cat(sprintf("%s & %s & %s & %s & %s & %s & %s & %d \\\\\n",
+    cat(sprintf("%s & %s & %s & %s & %s & %s & %s \\\\\n",
                 perf_table[i, Scenario],
-                perf_table[i, Cum_Ret],
+                perf_table[i, Ann_Ret],
                 perf_table[i, Volatility],
                 perf_table[i, Sharpe],
                 perf_table[i, CAPM_Alpha],
                 perf_table[i, FF3_Alpha],
-                perf_table[i, Total_R2],
-                perf_table[i, N]),
+                perf_table[i, Total_R2]),
         file = tex_file, append = TRUE)
   }
   
@@ -301,9 +312,9 @@ if (!file.exists(perf_file)) {
   cat("\\\\[0.5em]\n", file = tex_file, append = TRUE)
   cat("\\begin{minipage}{0.95\\textwidth}\n", file = tex_file, append = TRUE)
   cat("\\footnotesize\n", file = tex_file, append = TRUE)
-  cat("\\textit{Note:} Total Ret is the cumulative return over the period. Vol (Ann.) is the annualized standard deviation. Alphas are annualized (\\%) with t-statistics in parentheses (Newey-West SE, 12 lags). ",
+  cat("\\textit{Note:} Ann. Ret is the annualized return (geometric mean). Vol (Ann.) is the annualized volatility. Sharpe is the annualized Sharpe ratio. Alphas are annualized (\\%) with t-statistics in parentheses (Newey-West SE, 12 lags). ",
       file = tex_file, append = TRUE)
-  cat("Significance levels: *** $p<0.01$, ** $p<0.05$, * $p<0.10$. Total $R^2$ is the out-of-sample predictive $R^2$ vs zero benchmark.\n",
+  cat("Significance levels: *** $p<0.01$, ** $p<0.05$, * $p<0.10$. Total $R^2$ is the out-of-sample $R^2$ vs zero benchmark (test periods only).\n",
       file = tex_file, append = TRUE)
   cat("\\end{minipage}\n", file = tex_file, append = TRUE)
   cat("\\end{table}\n", file = tex_file, append = TRUE)
