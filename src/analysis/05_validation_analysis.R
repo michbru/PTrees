@@ -202,11 +202,14 @@ cat("\\centering\n")
 cat("\\caption{Univariate Predictive Power: R² from $ret\\_next \\sim characteristic$ (Top 20 + Bottom 5)}\n")
 cat("\\label{tab:univariate_r2}\n")
 cat("\\small\n")
+cat("\\begin{tabular}{lrrrrrl}\n")
+cat("\\hline\n")
 print(latex_r2,
       include.rownames = FALSE,
       caption.placement = "top",
       only.contents = TRUE,
       sanitize.text.function = function(x) gsub("_", "\\\\_", x))
+cat("\\end{tabular}\n")
 cat("\\begin{tablenotes}\n")
 cat("\\footnotesize\n")
 cat("\\item Note: *** p$<$0.01, ** p$<$0.05, * p$<$0.10. Only non-zero observations used.\n")
@@ -378,28 +381,25 @@ cat("  ✓ figure_temporal_coverage.png\n\n")
 cat("Creating Output 5: Data Quality Comparison Figure...\n")
 
 comparison_data <- data.frame(
-  Metric = rep(c("Firms", "Observations\n(Thousands)", "Characteristics", "Avg Coverage\n(%)"), 2),
+  Metric = rep(c("Observations\n(Thousands)", "Characteristics"), 2),
   Value = c(
-    n_firms, n_obs/1000, n_chars, 82.5,  # Swedish
-    8000, 4800, 50, 92                    # US (Cong 2024)
+    n_obs/1000, n_chars,  # Swedish
+    2200, 61              # US (Cong et al. 2024)
   ),
-  Market = rep(c("Swedish", "US (Cong 2024)"), each = 4)
+  Market = rep(c("Swedish", "US (Cong et al. 2024)"), each = 2)
 )
 
 comparison_data$Metric <- factor(
   comparison_data$Metric,
-  levels = c("Firms", "Observations\n(Thousands)", "Characteristics", "Avg Coverage\n(%)")
+  levels = c("Observations\n(Thousands)", "Characteristics")
 )
 
 p_comparison <- ggplot(comparison_data, aes(x = Metric, y = Value, fill = Market)) +
   geom_bar(stat = "identity", position = "dodge", alpha = 0.85, width = 0.65) +
-  geom_text(aes(label = ifelse(Value > 1000, format(Value, big.mark = ","), 
-                                sprintf("%.1f", Value))),
-            position = position_dodge(width = 0.65), vjust = -0.5, size = 3.5) +
-  scale_fill_manual(values = c("Swedish" = "#E74C3C", "US (Cong 2024)" = "#3498DB")) +
+  scale_fill_manual(values = c("Swedish" = "#E74C3C", "US (Cong et al. 2024)" = "#3498DB")) +
   labs(
     x = "",
-    y = "Value (scale varies by metric)",
+    y = "Value",
     fill = ""
   ) +
   facet_wrap(~ Metric, scales = "free_y", nrow = 1, strip.position = "bottom") +
