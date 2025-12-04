@@ -193,6 +193,10 @@ if (!file.exists(perf_file)) {
   market_mean <- mean(market_returns$market_return, na.rm = TRUE)
   market_sd <- sd(market_returns$market_return, na.rm = TRUE)
   market_sharpe <- (market_mean / market_sd) * sqrt(12)  # Annualized
+  
+  # Calculate Market Cumulative Return and Volatility
+  market_cum_ret <- prod(1 + market_returns$market_return) - 1
+  market_vol_ann <- market_sd * sqrt(12)
 
   # Helper function to add significance stars (vectorized)
   add_stars <- function(tstat) {
@@ -211,10 +215,35 @@ if (!file.exists(perf_file)) {
     if (is.null(val) || is.na(val)) return("--")
     sprintf("%.2f\\%%", val * 100)
   })]
+  
+  # Calculate Cumulative Return for each scenario
+  # Map scenario names to file paths
+  scenario_files <- list(
+    "Scenario A (Full Sample)" = file.path(MODELS_DIR, "scenario_a_1_factor.csv"),
+    "Scenario B (Train 1998-2009)" = file.path(MODELS_DIR, "scenario_b_1_factor.csv"),
+    "Scenario B (Test 2010-2019)" = file.path(MODELS_DIR, "scenario_b_test_1_factor.csv"),
+    "Scenario C (Train 2010-2019)" = file.path(MODELS_DIR, "scenario_c_1_factor.csv"),
+    "Scenario C (Test 1998-2009)" = file.path(MODELS_DIR, "scenario_c_test_1_factor.csv")
+  )
+  
+  perf[, Cum_Ret := sapply(scenario, function(s) {
+    fpath <- scenario_files[[s]]
+    if (!is.null(fpath) && file.exists(fpath)) {
+      d <- fread(fpath)
+      cum_r <- prod(1 + d$factor_return) - 1
+      return(sprintf("%.2f\\%%", cum_r * 100))
+    }
+    return("--")
+  })]
+  
+  # Calculate Annualized Volatility
+  perf[, Volatility := sprintf("%.2f\\%%", sd_monthly * sqrt(12) * 100)]
 
   # Format table with significance stars
   perf_table <- perf[, .(
     Scenario = scenario,
+    Cum_Ret = Cum_Ret,
+    Volatility = Volatility,
     Sharpe = sprintf("%.2f", sharpe_ratio),
     CAPM_Alpha = sprintf("%.2f%s (%.2f)",
                          capm_alpha * 12 * 100,  # Annualize and convert to percentage
@@ -231,6 +260,8 @@ if (!file.exists(perf_file)) {
   # Add market benchmark row
   market_row <- data.table(
     Scenario = "Market Benchmark (EW)",
+    Cum_Ret = sprintf("%.2f\\%%", market_cum_ret * 100),
+    Volatility = sprintf("%.2f\\%%", market_vol_ann * 100),
     Sharpe = sprintf("%.2f", market_sharpe),
     CAPM_Alpha = "--",
     FF3_Alpha = "--",
@@ -246,15 +277,17 @@ if (!file.exists(perf_file)) {
   cat("\\centering\n", file = tex_file, append = TRUE)
   cat("\\caption{P-Tree Model Performance}\n", file = tex_file, append = TRUE)
   cat("\\label{tab:performance}\n", file = tex_file, append = TRUE)
-  cat("\\begin{tabular}{l c c c c c}\n", file = tex_file, append = TRUE)
+  cat("\\begin{tabular}{l c c c c c c c}\n", file = tex_file, append = TRUE)
   cat("\\hline\n", file = tex_file, append = TRUE)
-  cat("Scenario & Sharpe & CAPM $\\alpha$ (\\%) & FF3 $\\alpha$ (\\%) & Total $R^2$ & N \\\\\n",
+  cat("Scenario & Total Ret & Vol (Ann.) & Sharpe & CAPM $\\alpha$ (\\%) & FF3 $\\alpha$ (\\%) & Total $R^2$ & N \\\\\n",
       file = tex_file, append = TRUE)
   cat("\\hline\n", file = tex_file, append = TRUE)
   
   for (i in 1:nrow(perf_table)) {
-    cat(sprintf("%s & %s & %s & %s & %s & %d \\\\\n",
+    cat(sprintf("%s & %s & %s & %s & %s & %s & %s & %d \\\\\n",
                 perf_table[i, Scenario],
+                perf_table[i, Cum_Ret],
+                perf_table[i, Volatility],
                 perf_table[i, Sharpe],
                 perf_table[i, CAPM_Alpha],
                 perf_table[i, FF3_Alpha],
@@ -268,7 +301,7 @@ if (!file.exists(perf_file)) {
   cat("\\\\[0.5em]\n", file = tex_file, append = TRUE)
   cat("\\begin{minipage}{0.95\\textwidth}\n", file = tex_file, append = TRUE)
   cat("\\footnotesize\n", file = tex_file, append = TRUE)
-  cat("\\textit{Note:} Alphas are annualized (\\%) with t-statistics in parentheses (Newey-West SE, 12 lags). ",
+  cat("\\textit{Note:} Total Ret is the cumulative return over the period. Vol (Ann.) is the annualized standard deviation. Alphas are annualized (\\%) with t-statistics in parentheses (Newey-West SE, 12 lags). ",
       file = tex_file, append = TRUE)
   cat("Significance levels: *** $p<0.01$, ** $p<0.05$, * $p<0.10$. Total $R^2$ is the out-of-sample predictive $R^2$ vs zero benchmark.\n",
       file = tex_file, append = TRUE)
@@ -280,97 +313,10 @@ if (!file.exists(perf_file)) {
 
 
 ################################################################################
-# Table 3: Tree Structure Summary
+# Table 3: Leaf Portfolio Weights with Tree Structure
 ################################################################################
 
-cat("Generating Table 3: Tree Structure...\n")
-
-# Parse tree files to extract splits and characteristics
-tree_summary <- list()
-
-for (scenario in c("a", "b", "c")) {
-  tree_file <- file.path(MODELS_DIR, sprintf("scenario_%s_trees.txt", scenario))
-
-  if (file.exists(tree_file)) {
-    tree_text <- readLines(tree_file)[1]
-
-    # Parse tree text - split by \n
-    lines <- strsplit(tree_text, "\\\\n")[[1]]
-
-    split_char <- ""
-    split_threshold <- NA
-    num_splits <- 0
-
-    if (length(lines) >= 2) {
-      # Parse split line: "node char_idx threshold left_child right_child"
-      split_parts <- strsplit(lines[2], " ")[[1]]
-      split_parts <- split_parts[split_parts != ""]
-
-      if (length(split_parts) >= 3) {
-        char_idx <- as.numeric(split_parts[2])
-        split_threshold <- as.numeric(split_parts[3])
-
-        if (!is.na(char_idx) && char_idx > 0 && char_idx <= length(inp$char_cols)) {
-          num_splits <- 1
-          # Remove "rank_" prefix for display
-          split_char <- gsub("^rank_", "", inp$char_cols[char_idx])
-        }
-      }
-    }
-
-    num_leaves <- num_splits + 1
-
-    scenario_name <- switch(scenario,
-                           "a" = "A: Full Sample",
-                           "b" = "B: Train (1998-2009)",
-                           "c" = "C: Train (2010-2019)")
-
-    tree_summary[[length(tree_summary) + 1]] <- data.table(
-      Scenario = scenario_name,
-      Num_Splits = num_splits,
-      Num_Leaves = num_leaves,
-      Split_Char = split_char,
-      Split_Threshold = split_threshold
-    )
-  }
-}
-
-if (length(tree_summary) > 0) {
-  tree_table <- rbindlist(tree_summary)
-
-  # Write LaTeX table
-  tex_file <- file.path(OUTPUT_DIR, "table_tree_structure.tex")
-  cat("\\begin{table}[!ht]\n", file = tex_file)
-  cat("\\centering\n", file = tex_file, append = TRUE)
-  cat("\\caption{P-Tree Structure by Scenario}\n", file = tex_file, append = TRUE)
-  cat("\\label{tab:tree_structure}\n", file = tex_file, append = TRUE)
-  cat("\\begin{tabular}{l c c l c}\n", file = tex_file, append = TRUE)
-  cat("\\hline\n", file = tex_file, append = TRUE)
-  cat("Scenario & Splits & Leaves & Split Variable & Threshold \\\\\n", file = tex_file, append = TRUE)
-  cat("\\hline\n", file = tex_file, append = TRUE)
-
-  for (i in 1:nrow(tree_table)) {
-    threshold_str <- if (!is.na(tree_table[i, Split_Threshold])) {
-      sprintf("%.2f", tree_table[i, Split_Threshold])
-    } else {
-      "--"
-    }
-
-    cat(sprintf("%s & %d & %d & %s & %s \\\\\n",
-                tree_table[i, Scenario],
-                tree_table[i, Num_Splits],
-                tree_table[i, Num_Leaves],
-                tree_table[i, Split_Char],
-                threshold_str),
-        file = tex_file, append = TRUE)
-  }
-
-  cat("\\hline\n", file = tex_file, append = TRUE)
-  cat("\\end{tabular}\n", file = tex_file, append = TRUE)
-  cat("\\end{table}\n", file = tex_file, append = TRUE)
-
-  cat("  ✓ table_tree_structure.tex\n")
-}
+cat("Generating Table 3: Leaf Portfolio Weights...\n")
 
 
 ################################################################################
@@ -432,6 +378,8 @@ for (scenario in c("a", "b", "c")) {
       for (i in seq_along(leaf_weights)) {
         weights_summary[[length(weights_summary) + 1]] <- data.table(
           Scenario = scenario_name,
+          Split_Var = split_char,
+          Split_Threshold = split_threshold,
           Leaf_ID = leaf_ids[i],
           Leaf_Description = leaf_descriptions[i],
           Weight = leaf_weights[i],
@@ -445,25 +393,42 @@ for (scenario in c("a", "b", "c")) {
 if (length(weights_summary) > 0) {
   weights_table <- rbindlist(weights_summary)
 
-  # Write LaTeX table
+  # Write LaTeX table with split information
   tex_file <- file.path(OUTPUT_DIR, "table_leaf_weights.tex")
   cat("\\begin{table}[!ht]\n", file = tex_file)
   cat("\\centering\n", file = tex_file, append = TRUE)
-  cat("\\caption{Leaf Portfolio Weights (Tangency Portfolio)}\n", file = tex_file, append = TRUE)
+  cat("\\caption{P-Tree Portfolio Weights and Structure}\n", file = tex_file, append = TRUE)
   cat("\\label{tab:leaf_weights}\n", file = tex_file, append = TRUE)
-  cat("\\begin{tabular}{l c l c c}\n", file = tex_file, append = TRUE)
+  cat("\\begin{tabular}{l l l c r}\n", file = tex_file, append = TRUE)
   cat("\\hline\n", file = tex_file, append = TRUE)
-  cat("Scenario & Leaf & Description & Weight & Weight (\\%) \\\\\n", file = tex_file, append = TRUE)
+  cat("Scenario & Split Variable & Portfolio & Threshold & Weight (\\%) \\\\\n", file = tex_file, append = TRUE)
   cat("\\hline\n", file = tex_file, append = TRUE)
 
-  for (i in 1:nrow(weights_table)) {
-    cat(sprintf("%s & %d & %s & %.4f & %.2f\\%% \\\\\n",
-                weights_table[i, Scenario],
-                weights_table[i, Leaf_ID],
-                weights_table[i, Leaf_Description],
-                weights_table[i, Weight],
-                weights_table[i, Weight_Pct]),
-        file = tex_file, append = TRUE)
+  # Group by scenario to add split info
+  scenarios <- unique(weights_table$Scenario)
+  for (scen in scenarios) {
+    scen_rows <- weights_table[Scenario == scen]
+    
+    # Get split info (same for all rows in scenario)
+    split_var <- scen_rows[1, Split_Var]
+    
+    for (i in 1:nrow(scen_rows)) {
+      # Only show split variable on first row of each scenario
+      split_display <- if (i == 1) split_var else ""
+      
+      cat(sprintf("%s & %s & %s & %.2f & %.2f\\%% \\\\\n",
+                  scen_rows[i, Scenario],
+                  split_display,
+                  scen_rows[i, Leaf_Description],
+                  scen_rows[i, Split_Threshold],
+                  scen_rows[i, Weight_Pct]),
+          file = tex_file, append = TRUE)
+    }
+    
+    # Add spacing between scenarios
+    if (scen != scenarios[length(scenarios)]) {
+      cat("\\hline\n", file = tex_file, append = TRUE)
+    }
   }
 
   cat("\\hline\n", file = tex_file, append = TRUE)
@@ -597,8 +562,7 @@ cat(sprintf("Results saved to: %s\n\n", normalizePath(OUTPUT_DIR)))
 cat("Tables (LaTeX):\n")
 cat("  - table_data_summary.tex\n")
 cat("  - table_performance.tex\n")
-cat("  - table_tree_structure.tex\n")
-cat("  - table_leaf_weights.tex (NEW)\n\n")
+cat("  - table_leaf_weights.tex (includes tree structure)\n\n")
 
 cat("Tables (CSV):\n")
 cat("  - table_leaf_weights.csv (NEW)\n\n")

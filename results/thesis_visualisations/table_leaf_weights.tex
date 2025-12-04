@@ -1,17 +1,19 @@
 \begin{table}[!ht]
 \centering
-\caption{Leaf Portfolio Weights (Tangency Portfolio)}
+\caption{P-Tree Portfolio Weights and Structure}
 \label{tab:leaf_weights}
-\begin{tabular}{l c l c c}
+\begin{tabular}{l l l c r}
 \hline
-Scenario & Leaf & Description & Weight & Weight (\%) \\
+Scenario & Split Variable & Portfolio & Threshold & Weight (\%) \\
 \hline
-A: Full Sample & 2 & Low ato (< -0.20) & 0.0671 & 6.71\% \\
-A: Full Sample & 3 & High ato ($\geq$ -0.20) & 0.9329 & 93.29\% \\
-B: Train (1998-2009) & 2 & Low ato (< -0.20) & -0.3468 & -34.68\% \\
-B: Train (1998-2009) & 3 & High ato ($\geq$ -0.20) & 0.6532 & 65.32\% \\
-C: Train (2010-2019) & 2 & Low cashdebt (< -0.60) & -0.3162 & -31.62\% \\
-C: Train (2010-2019) & 3 & High cashdebt ($\geq$ -0.60) & 0.6838 & 68.38\% \\
+A: Full Sample & ato & Low ato (< -0.20) & -0.20 & 6.71\% \\
+A: Full Sample &  & High ato ($\geq$ -0.20) & -0.20 & 93.29\% \\
+\hline
+B: Train (1998-2009) & ato & Low ato (< -0.20) & -0.20 & -34.68\% \\
+B: Train (1998-2009) &  & High ato ($\geq$ -0.20) & -0.20 & 65.32\% \\
+\hline
+C: Train (2010-2019) & cashdebt & Low cashdebt (< -0.60) & -0.60 & -31.62\% \\
+C: Train (2010-2019) &  & High cashdebt ($\geq$ -0.60) & -0.60 & 68.38\% \\
 \hline
 \end{tabular}
 \\[0.5em]

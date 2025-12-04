@@ -178,6 +178,8 @@ r2_display <- rbind(top_20, bottom_5)
 
 r2_display[, `:=`(
   characteristic = gsub("rank_", "", characteristic),
+  # Annualized long-short spread: coef × 2 (full range) × 12 (months) × 100 (%)
+  annual_spread = coef * 2 * 12 * 100,
   sig = ifelse(p_value < 0.01, "***",
                ifelse(p_value < 0.05, "**",
                       ifelse(p_value < 0.10, "*", "")))
@@ -187,7 +189,7 @@ r2_table <- r2_display[, .(
   Characteristic = characteristic,
   N = format(n_obs, big.mark = ","),
   `R²` = sprintf("%.6f", r2),
-  Coef = sprintf("%.4f", coef),
+  `Annual Spread (\\%)` = sprintf("%.2f", annual_spread),
   `t-stat` = sprintf("%.2f", t_stat),
   Sig = sig
 )]
@@ -215,6 +217,7 @@ cat("\\end{tabular}\n")
 cat("\\begin{tablenotes}\n")
 cat("\\footnotesize\n")
 cat("\\item Note: *** p$<$0.01, ** p$<$0.05, * p$<$0.10. Only non-zero observations used.\n")
+cat("\\item Annual Spread: Annualized return difference between highest and lowest ranked stocks (long-short portfolio).\n")
 cat("\\item Median R² across all 32 characteristics: ", sprintf("%.6f", median(r2_results$r2)), "\n")
 cat("\\end{tablenotes}\n")
 cat("\\end{table}\n")
@@ -502,10 +505,12 @@ if (!file.exists(FF_PATH)) {
     if ("rm_rf" %in% names(ff) && !"mkt_rf" %in% names(ff)) ff[, mkt_rf := rm_rf]
     if ("smb_ew" %in% names(ff) && !"smb" %in% names(ff)) ff[, smb := smb_ew]
     if ("hml_ew" %in% names(ff) && !"hml" %in% names(ff)) ff[, hml := hml_ew]
+    if ("mom_ew" %in% names(ff) && !"mom" %in% names(ff)) ff[, mom := mom_ew]
 
-    keep_cols <- intersect(c("date", "mkt_rf", "smb", "hml"), names(ff))
+    # Select all available macro factors
+    keep_cols <- intersect(c("date", "mkt_rf", "smb", "hml", "mom", "rf", "rolling_vol_daily"), names(ff))
     if (length(keep_cols) < 2) {
-      cat("  Warning: Macro factors missing expected columns (mkt_rf, smb, hml). Skipping.\n\n")
+      cat("  Warning: Macro factors missing expected columns. Skipping.\n\n")
     } else {
       ff_sub <- ff[, ..keep_cols]
       # Long format
@@ -514,38 +519,117 @@ if (!file.exists(FF_PATH)) {
       # 12-month rolling mean for smoother view
       long[, Roll12 := frollmean(Return, n = 12, align = "right", na.rm = TRUE), by = Factor]
 
-      # Display names (ensure levels/labels lengths match)
-      display_names <- c(mkt_rf = "Market (Rm-Rf)", smb = "SMB", hml = "HML")
+      # Display names for all factors
+      display_names <- c(
+        mkt_rf = "Market (Rm-Rf)", 
+        smb = "SMB (Size)", 
+        hml = "HML (Value)",
+        mom = "MOM (Momentum)",
+        rf = "Risk-Free Rate",
+        rolling_vol_daily = "Market Volatility"
+      )
       lvls <- intersect(names(display_names), unique(as.character(long$Factor)))
       long[, Factor := factor(Factor, levels = lvls, labels = display_names[lvls])]
+
+      # Color palette for all factors
+      color_palette <- c(
+        "Market (Rm-Rf)" = "#2E86AB",
+        "SMB (Size)" = "#27AE60",
+        "HML (Value)" = "#8E44AD",
+        "MOM (Momentum)" = "#E74C3C",
+        "Risk-Free Rate" = "#F39C12",
+        "Market Volatility" = "#E67E22"
+      )
 
       p_macro <- ggplot(long, aes(x = date)) +
         geom_line(aes(y = Return * 100), color = "#95A5A6", linewidth = 0.4, alpha = 0.7) +
         geom_line(aes(y = Roll12 * 100, color = Factor), linewidth = 0.9) +
-        scale_color_manual(values = c(
-          "Market (Rm-Rf)" = "#2E86AB",
-          "SMB" = "#27AE60",
-          "HML" = "#8E44AD"
-        )) +
+        scale_color_manual(values = color_palette) +
         labs(
           x = "Date",
           y = "Monthly Return (%, level and 12m avg)",
           color = "Factor"
         ) +
-        facet_wrap(~ Factor, ncol = 1, scales = "free_y") +
+        facet_wrap(~ Factor, ncol = 2, scales = "free_y") +
         theme_minimal(base_size = 12) +
         theme(
           legend.position = "none",
-          panel.grid.minor = element_blank()
+          panel.grid.minor = element_blank(),
+          strip.text = element_text(face = "bold", size = 10)
         )
 
       ggsave(file.path(OUTPUT_DIR, "figure_macro_factors.png"), p_macro,
-             width = 10, height = 8, dpi = 300)
+             width = 12, height = 10, dpi = 300)
 
       cat("  ✓ figure_macro_factors.png\n\n")
     }
   }
 }
+
+################################################################################
+################################################################################
+# OUTPUT 8: Correlation Heatmap (Top 20 - Lower Triangle)
+################################################################################
+
+cat("Creating Output 8: Correlation Heatmap (Top 20 - Lower Triangle)...\n")
+
+# Select top 20 characteristics by R2 for readability
+top_20_chars <- head(r2_results$characteristic, 20)
+dt_corr <- dt[, ..top_20_chars]
+
+# Clean names
+clean_names <- sapply(names(dt_corr), function(x) toupper(gsub("^rank_", "", x)))
+setnames(dt_corr, names(dt_corr), clean_names)
+
+# Calculate correlation matrix
+cor_mat <- cor(dt_corr, use = "pairwise.complete.obs")
+
+# Hierarchical clustering order
+dist_mat <- as.dist(1 - abs(cor_mat))
+hc <- hclust(dist_mat, method = "complete")
+ord <- hc$order
+cor_mat_ordered <- cor_mat[ord, ord]
+
+# Get lower triangle only
+cor_mat_ordered[upper.tri(cor_mat_ordered)] <- NA
+
+# Melt
+melted_cormat <- as.data.frame(as.table(cor_mat_ordered))
+names(melted_cormat) <- c("Var1", "Var2", "value")
+melted_cormat <- na.omit(melted_cormat)
+
+# Enforce order
+melted_cormat$Var1 <- factor(melted_cormat$Var1, levels = rownames(cor_mat_ordered))
+melted_cormat$Var2 <- factor(melted_cormat$Var2, levels = colnames(cor_mat_ordered))
+
+# Plot
+p_corr <- ggplot(melted_cormat, aes(Var1, Var2, fill = value)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = sprintf("%.2f", value)), size = 2.5, color = "black") +
+  scale_fill_gradient2(low = "#E74C3C", high = "#3498DB", mid = "white", 
+                       midpoint = 0, limit = c(-1,1), space = "Lab", 
+                       name="Correlation") +
+  theme_minimal() + 
+  theme(
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1, size = 10),
+    axis.text.y = element_text(size = 10),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.ticks = element_blank(),
+    legend.position = "none"
+  ) +
+  coord_fixed()
+
+ggsave(file.path(OUTPUT_DIR, "figure_correlation_heatmap.png"), p_corr,
+       width = 10, height = 10, dpi = 300)
+
+cat("  ✓ figure_correlation_heatmap.png\n\n")
+################################################################################
+
+
 
 ################################################################################
 # Save Summary Results
