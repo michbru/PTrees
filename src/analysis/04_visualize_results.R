@@ -325,14 +325,12 @@ if (length(plot_data_list) > 1) {
       "Market (EW)" = "#A23B72"
     )) +
     labs(
-      title = "Cumulative Returns: P-Tree vs Market",
       x = "Date",
       y = "Cumulative Return (%)"
     ) +
     theme_minimal(base_size = 12) +
     theme(
-      legend.position = "bottom",
-      plot.title = element_text(face = "bold")
+      legend.position = "bottom"
     )
   
   ggsave(file.path(OUTPUT_DIR, "figure_cumulative_returns.png"), 
@@ -359,12 +357,10 @@ if (file.exists(factor_a_file)) {
     geom_line(color = "#2E86AB", linewidth = 0.8) +
     geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
     labs(
-      title = "P-Tree Factor Returns Over Time (Scenario A: Full Sample)",
       x = "Date",
       y = "Monthly Return (%)"
     ) +
-    theme_minimal(base_size = 12) +
-    theme(plot.title = element_text(face = "bold"))
+    theme_minimal(base_size = 12)
   
   ggsave(file.path(OUTPUT_DIR, "figure_factor_timeseries.png"),
          p2, width = 10, height = 6, dpi = 300)

@@ -356,16 +356,12 @@ p_temporal <- ggplot(firms_per_month, aes(x = as.Date(date), y = n_firms)) +
            label = sprintf("Mean = %.0f firms", avg_firms_month),
            color = "#27AE60", fontface = "bold", size = 4) +
   labs(
-    title = "Temporal Coverage: Number of Firms Over Time",
-    subtitle = sprintf("Swedish market data: %d firms over %d months", n_firms, n_months),
     x = "Date",
     y = "Number of Firms"
   ) +
   scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
   theme_minimal(base_size = 13) +
   theme(
-    plot.title = element_text(face = "bold", hjust = 0.5, size = 14),
-    plot.subtitle = element_text(hjust = 0.5, size = 11, color = "gray40"),
     axis.text.x = element_text(angle = 45, hjust = 1),
     panel.grid.minor = element_blank()
   )
@@ -402,8 +398,6 @@ p_comparison <- ggplot(comparison_data, aes(x = Metric, y = Value, fill = Market
             position = position_dodge(width = 0.65), vjust = -0.5, size = 3.5) +
   scale_fill_manual(values = c("Swedish" = "#E74C3C", "US (Cong 2024)" = "#3498DB")) +
   labs(
-    title = "Data Quality: Swedish vs US Market",
-    subtitle = "Swedish market has significantly smaller scale and sparser coverage",
     x = "",
     y = "Value (scale varies by metric)",
     fill = ""
@@ -411,8 +405,6 @@ p_comparison <- ggplot(comparison_data, aes(x = Metric, y = Value, fill = Market
   facet_wrap(~ Metric, scales = "free_y", nrow = 1, strip.position = "bottom") +
   theme_minimal(base_size = 12) +
   theme(
-    plot.title = element_text(face = "bold", hjust = 0.5, size = 14),
-    plot.subtitle = element_text(hjust = 0.5, size = 10, color = "gray40"),
     legend.position = "bottom",
     legend.text = element_text(size = 11),
     axis.text.x = element_blank(),
@@ -446,25 +438,18 @@ p_predictive <- ggplot(top_15, aes(x = reorder(characteristic_clean, r2), y = r2
     labels = c("TRUE" = "Significant (p<0.05)", "FALSE" = "Not significant")
   ) +
   labs(
-    title = "Characteristic Predictive Power",
-    subtitle = sprintf("Top 15 of %d characteristics by univariate R² (Median R² = %.6f)", 
-                       nrow(r2_results), median(r2_results$r2)),
     x = "Characteristic",
     y = "R² (Univariate)"
   ) +
   coord_flip(ylim = c(0, max(top_15$r2) * 1.15)) +
   theme_minimal(base_size = 12) +
   theme(
-    plot.title = element_text(face = "bold", hjust = 0.5, size = 14),
-    plot.subtitle = element_text(hjust = 0.5, size = 10, color = "gray40"),
     legend.position = "bottom",
     panel.grid.major.y = element_blank()
   )
 
 ggsave(file.path(OUTPUT_DIR, "figure_predictive_power.png"), p_predictive,
        width = 10, height = 7, dpi = 300)
-
-cat("  ✓ figure_predictive_power.png\n\n")
 
 ################################################################################
 # Save Summary Results
