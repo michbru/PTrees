@@ -171,7 +171,7 @@ train_single_ptree <- function(train_data, scenario_name, params = PARAMS) {
       num_cutpoints = params$num_cutpoints,
       
       # Training parameters
-      num_iter = 1,                        # Single split (conservative, prevents overfitting)
+      num_iter = 1,                        # Optimal depth (see 06_optimal_tree_depth.R)
       eta = 1.0,                           # Learning rate (not used for single tree)
       equal_weight = params$equal_weight,
       abs_normalize = params$abs_normalize,
