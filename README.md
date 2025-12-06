@@ -48,7 +48,8 @@ PTrees/
 │       ├── 02_train_ptree.R
 │       ├── 03_evaluate_model.R
 │       ├── 04_visualize_results.R
-│       └── 05_validation_analysis.R
+│       ├── 05_validation_analysis.R
+│       └── 06_sensitivity_analysis_tree_depth.R  # Tree depth investigation
 ├── results/
 │   ├── inputs/                       # Prepared P-Tree inputs
 │   ├── models/                       # Trained model outputs
@@ -156,6 +157,34 @@ Rscript src/analysis/05_validation_analysis.R
 - `results/models/` - Trained P-Tree models and factor returns
 - `results/evaluation/performance_metrics.csv` - Alpha and Sharpe ratio estimates
 - `results/thesis_visualisations/` - LaTeX tables and figures
+
+---
+
+## Sensitivity Analysis
+
+We investigated the effect of tree depth on model performance by varying the `num_iter` parameter:
+
+- **Conservative (Submitted):** `num_iter = 1` → Single split, prevents overfitting
+- **Alternative:** `num_iter = 10` → Multiple splits allowed
+
+**Key Finding:** Deeper trees improve in-sample Sharpe ratios (+104%) but do NOT improve out-of-sample performance, indicating overfitting. The submitted results use `num_iter = 1` as optimal for this dataset.
+
+To view the detailed sensitivity analysis:
+
+```bash
+Rscript src/analysis/06_sensitivity_analysis_tree_depth.R
+```
+
+To reproduce the deeper tree results, edit `02_train_ptree.R` line 174:
+```r
+# Change from:
+num_iter = 1
+
+# To:
+num_iter = params$max_depth  # Allows up to 10 splits
+```
+
+Then re-run scripts 02-05.
 
 ---
 
