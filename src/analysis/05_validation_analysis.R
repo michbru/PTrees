@@ -425,7 +425,7 @@ comparison_data$Metric <- factor(
 
 p_comparison <- ggplot(comparison_data, aes(x = Metric, y = Value, fill = Market)) +
   geom_bar(stat = "identity", position = "dodge", alpha = 0.85, width = 0.65) +
-  scale_fill_manual(values = c("Swedish" = "#E74C3C", "US (Cong et al. 2024)" = "#3498DB")) +
+  scale_fill_manual(values = c("Swedish" = "#E74C3C", "US (Cong et al. 2025)" = "#3498DB")) +
   labs(
     x = "",
     y = "Value",
