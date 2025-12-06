@@ -71,7 +71,29 @@ PTrees/
 | **Fama-French Factors** | Swedish market factors (Rm-Rf, SMB, HML) | Shof et al. (2020) |
 | **LSEG Workspace** | ISIN-ORGNR identifier mapping | SSE Library |
 
-**Note:** Raw data files are not included in this repository due to licensing restrictions and file size. Contact the authors for data access instructions.
+**Note:** Raw data files from Finbas and Serrano are required but not included in this repository due to licensing restrictions. These datasets are available through the Swedish House of Finance. Contact the authors for data access instructions.
+
+### Required Raw Data Files
+
+The following files must be placed in the `data/raw/` directory before running the pipeline:
+
+```
+data/raw/
+├── finbas/
+│   └── raw_finbas_monthly.csv          # Finbas market data export
+├── serrano/
+│   └── Stata_2025/                     # Serrano accounting data (Stata format)
+│       ├── bokslut1.dta ... bokslut10.dta    # Balance sheet data
+│       ├── ftg1.dta ... ftg10.dta            # Company information
+│       ├── nyckeltal1.dta ... nyckeltal10.dta # Financial ratios
+│       ├── knc1.dta ... knc10.dta            # Cash flow data
+│       ├── bol1.dta ... bol10.dta            # Income statement data
+│       └── serrano1.dta ... serrano10.dta    # Combined Serrano data
+├── macro/
+│   └── raw_macro_factors.csv           # Swedish FF factors (Rm, SMB, HML, MOM)
+└── FamaFrench2020/
+    └── FF4F_monthly.csv                # Shof et al. (2020) factors
+```
 
 ---
 
