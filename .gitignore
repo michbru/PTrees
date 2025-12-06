@@ -1,6 +1,4 @@
 # Directories to ignore
-thesis-omxspi-pipeline/
-
 .claude/
 .idea/
 .venv/
@@ -8,29 +6,11 @@ thesis-omxspi-pipeline/
 # Configuration files to ignore
 lseg-data.config.json
 
-# Exclude ALL large data files (>10MB)
-analysis_dataset/**/ptrees_final_dataset.csv
-analysis_dataset/**/ptree_ready_data_full.csv
-analysis_dataset/**/ptree_ready_data_sample.csv
-analysis_dataset/**/finbas_market_data.csv
-analysis_dataset/**/lseg_*.csv
-
-# Exclude all prepared data files from results (too large for GitHub)
-results/**/ptree_ready_data*.csv
-results/ptree_ready_data*.csv
-
-# Archive large files
-data/processed/ptrees_enhanced_dataset.csv
-data/processed/ptrees_final_dataset.csv
-
-# Keep only small result files
-!analysis_dataset/**/ptree_factors.csv
-
-#PTree files
+# Archive folder
 archive/
 
 # Serrano database files (large)
-serrano/
+data/raw/serrano/
 
 # Exclude all exe files and installers
 *.exe
@@ -42,20 +22,17 @@ desktop.ini
 *.xlsx
 *.xls
 
-# Exclude large intermediate and raw data files
-data/raw/lseg/ptrees_final_dataset.csv
-data/intermediate/stock_with_accounting.csv
-data/intermediate/serrano_nyckeltal_full.csv
-data/intermediate/finbas/finbas_daily_clean.csv
+# Large data files
+data/intermediate/finbas/finbas_monthly_clean.csv
 data/intermediate/serrano/serrano_accounting.csv
-data/processed/merged_data_daily.csv
+data/processed/merged_data_monthly.csv
 data/processed/ptree_dataset_monthly.csv
-data/raw/finbas/raw_finbas_daily.csv
+data/raw/finbas/raw_finbas_monthly.csv
 data/raw/serrano/Stata_2025/*.dta
 data/raw/macro/raw_macro_factors.csv
 
 # Results files that may be large
-results/analysis/inputs/ptree_inputs.rds
+results/inputs/ptree_inputs.rds
 
 # Mapping files - automated is generated, manual is tracked
 data/mappings/automated/

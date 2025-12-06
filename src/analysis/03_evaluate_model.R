@@ -92,11 +92,11 @@ calc_alpha <- function(factor_dt, ff_data, scenario_name, nw_lags = 12) {
   if ("rm_rf" %in% names(ff_sub) && !"mkt_rf" %in% names(ff_sub)) {
     ff_sub[, mkt_rf := rm_rf]
   }
-  if ("smb_ew" %in% names(ff_sub) && !"smb" %in% names(ff_sub)) {
-    ff_sub[, smb := smb_ew]
+  if ("smb_vw" %in% names(ff_sub) && !"smb" %in% names(ff_sub)) {
+    ff_sub[, smb := smb_vw]  # VALUE-WEIGHTED (matches P-Tree weighting)
   }
-  if ("hml_ew" %in% names(ff_sub) && !"hml" %in% names(ff_sub)) {
-    ff_sub[, hml := hml_ew]
+  if ("hml_vw" %in% names(ff_sub) && !"hml" %in% names(ff_sub)) {
+    ff_sub[, hml := hml_vw]  # VALUE-WEIGHTED (matches P-Tree weighting)
   }
   
   # Keep only needed FF columns
@@ -129,12 +129,14 @@ calc_alpha <- function(factor_dt, ff_data, scenario_name, nw_lags = 12) {
   capm_model <- lm(factor ~ mkt_rf, data = reg_data)
   capm_nw <- coeftest(capm_model, vcov = NeweyWest(capm_model, lag = nw_lags))
   capm_alpha_monthly <- coef(capm_model)["(Intercept)"]
+  capm_beta <- coef(capm_model)["mkt_rf"]
   capm_alpha_annual <- capm_alpha_monthly * 12
   capm_tstat <- capm_nw["(Intercept)", "t value"]
   capm_r2 <- summary(capm_model)$r.squared
   
   cat(sprintf("  CAPM alpha: %.4f (%.2f%% annual, t=%.2f)\n",
               capm_alpha_monthly, capm_alpha_annual * 100, capm_tstat))
+  cat(sprintf("  CAPM beta: %.4f\n", capm_beta))
   
   # FF3 regression: factor ~ mkt_rf + smb + hml
   ff3_model <- lm(factor ~ mkt_rf + smb + hml, data = reg_data)
@@ -155,6 +157,7 @@ calc_alpha <- function(factor_dt, ff_data, scenario_name, nw_lags = 12) {
     sd_monthly = sd_monthly,
     sharpe_ratio = sharpe,
     capm_alpha = capm_alpha_monthly,  # Store monthly alpha
+    capm_beta = capm_beta,
     capm_tstat = capm_tstat,
     capm_r2 = capm_r2,
     ff3_alpha = ff3_alpha_monthly,  # Store monthly alpha
@@ -270,29 +273,31 @@ tex_dt <- copy(final_results)
 tex_dt[, scenario := gsub("_", "\\\\_", scenario)]
 tex_dt[, sharpe_ratio := sprintf("%.2f", sharpe_ratio)]
 tex_dt[, capm_alpha := sprintf("%.2f", capm_alpha * 100)]  # Convert to %
+tex_dt[, capm_beta := sprintf("%.2f", capm_beta)]
 tex_dt[, capm_tstat := sprintf("(%.2f)", capm_tstat)]
 tex_dt[, ff3_alpha := sprintf("%.2f", ff3_alpha * 100)]   # Convert to %
 tex_dt[, ff3_tstat := sprintf("(%.2f)", ff3_tstat)]
 
 # Select columns for table
-tex_dt <- tex_dt[, .(scenario, sharpe_ratio, capm_alpha, capm_tstat, ff3_alpha, ff3_tstat)]
+tex_dt <- tex_dt[, .(scenario, sharpe_ratio, capm_alpha, capm_beta, capm_tstat, ff3_alpha, ff3_tstat)]
 
 # Write LaTeX
 cat("\\begin{table}[!ht]\n", file = output_tex)
 cat("\\centering\n", file = output_tex, append = TRUE)
 cat("\\caption{P-Tree Model Performance}\n", file = output_tex, append = TRUE)
 cat("\\label{tab:performance}\n", file = output_tex, append = TRUE)
-cat("\\begin{tabular}{l c c c c c}\n", file = output_tex, append = TRUE)
+cat("\\begin{tabular}{l c c c c c c}\n", file = output_tex, append = TRUE)
 cat("\\hline\n", file = output_tex, append = TRUE)
-cat("Scenario & Sharpe & CAPM $\\alpha$ (\\%) & t-stat & FF3 $\\alpha$ (\\%) & t-stat \\\\\n",
+cat("Scenario & Sharpe & CAPM $\\alpha$ (\\%) & Beta & t-stat & FF3 $\\alpha$ (\\%) & t-stat \\\\\n",
     file = output_tex, append = TRUE)
 cat("\\hline\n", file = output_tex, append = TRUE)
 
 for (i in 1:nrow(tex_dt)) {
-  cat(sprintf("%s & %s & %s & %s & %s & %s \\\\\n",
+  cat(sprintf("%s & %s & %s & %s & %s & %s & %s \\\\\n",
               tex_dt[i, scenario],
               tex_dt[i, sharpe_ratio],
               tex_dt[i, capm_alpha],
+              tex_dt[i, capm_beta],
               tex_dt[i, capm_tstat],
               tex_dt[i, ff3_alpha],
               tex_dt[i, ff3_tstat]),

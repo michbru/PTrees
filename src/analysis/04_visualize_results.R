@@ -188,8 +188,14 @@ if (!file.exists(perf_file)) {
 } else {
   perf <- fread(perf_file)
 
-  # Calculate market Sharpe ratio
-  market_returns <- dt[, .(market_return = mean(ret_next, na.rm = TRUE)), by = date]
+  # Load Fama-French data for value-weighted market benchmark
+  FF_PATH <- "data/raw/macro/raw_macro_factors.csv"
+  if (!file.exists(FF_PATH)) stop("Fama-French factors not found")
+  ff_data <- fread(FF_PATH)
+  ff_data[, date := as.IDate(date)]
+  
+  # Use rm (value-weighted market return) as benchmark
+  market_returns <- ff_data[, .(date, market_return = rm)]
   market_mean <- mean(market_returns$market_return, na.rm = TRUE)
   market_sd <- sd(market_returns$market_return, na.rm = TRUE)
   market_sharpe <- (market_mean / market_sd) * sqrt(12)  # Annualized
@@ -248,6 +254,7 @@ if (!file.exists(perf_file)) {
     Ann_Ret = Ann_Ret,
     Volatility = Volatility,
     Sharpe = sprintf("%.2f", sharpe_ratio),
+    Beta = sprintf("%.2f", capm_beta),
     CAPM_Alpha = sprintf("%.2f%s (%.2f)",
                          capm_alpha * 12 * 100,  # Annualize and convert to percentage
                          add_stars(capm_tstat),
@@ -272,10 +279,11 @@ if (!file.exists(perf_file)) {
   market_ann_ret <- (1 + market_cum_ret)^(12/nrow(market_returns)) - 1
   
   market_row <- data.table(
-    Scenario = "Market Benchmark (EW)",
+    Scenario = "Market Benchmark (VW)",
     Ann_Ret = sprintf("%.2f\\%%", market_ann_ret * 100),
     Volatility = sprintf("%.2f\\%%", market_vol_ann * 100),
     Sharpe = sprintf("%.2f", market_sharpe),
+    Beta = "1.00",
     CAPM_Alpha = "--",
     FF3_Alpha = "--",
     Total_R2 = "--"
@@ -289,18 +297,19 @@ if (!file.exists(perf_file)) {
   cat("\\centering\n", file = tex_file, append = TRUE)
   cat("\\caption{P-Tree Model Performance}\n", file = tex_file, append = TRUE)
   cat("\\label{tab:performance}\n", file = tex_file, append = TRUE)
-  cat("\\begin{tabular}{l *{6}{c}}\n", file = tex_file, append = TRUE)  # Left-align scenario, center rest
+  cat("\\begin{tabular}{l *{7}{c}}\n", file = tex_file, append = TRUE)  # Left-align scenario, center rest
   cat("\\hline\n", file = tex_file, append = TRUE)
-  cat("Scenario & Ann. Ret & Vol (Ann.) & Sharpe & CAPM $\\alpha$ (\\%) & FF3 $\\alpha$ (\\%) & Total $R^2$ \\\\\n",
+  cat("Scenario & Ann. Ret & Vol (Ann.) & Sharpe & Beta & CAPM $\\alpha$ (\\%) & FF3 $\\alpha$ (\\%) & Total $R^2$ \\\\\n",
       file = tex_file, append = TRUE)
   cat("\\hline\n", file = tex_file, append = TRUE)
   
   for (i in 1:nrow(perf_table)) {
-    cat(sprintf("%s & %s & %s & %s & %s & %s & %s \\\\\n",
+    cat(sprintf("%s & %s & %s & %s & %s & %s & %s & %s \\\\\n",
                 perf_table[i, Scenario],
                 perf_table[i, Ann_Ret],
                 perf_table[i, Volatility],
                 perf_table[i, Sharpe],
+                perf_table[i, Beta],
                 perf_table[i, CAPM_Alpha],
                 perf_table[i, FF3_Alpha],
                 perf_table[i, Total_R2]),
@@ -312,7 +321,7 @@ if (!file.exists(perf_file)) {
   cat("\\\\[0.5em]\n", file = tex_file, append = TRUE)
   cat("\\begin{minipage}{0.95\\textwidth}\n", file = tex_file, append = TRUE)
   cat("\\footnotesize\n", file = tex_file, append = TRUE)
-  cat("\\textit{Note:} Ann. Ret is the annualized return (geometric mean). Vol (Ann.) is the annualized volatility. Sharpe is the annualized Sharpe ratio. Alphas are annualized (\\%) with t-statistics in parentheses (Newey-West SE, 12 lags). ",
+  cat("\\textit{Note:} Ann. Ret is the annualized return (geometric mean). Vol (Ann.) is the annualized volatility. Sharpe is the annualized Sharpe ratio. Beta is the CAPM beta. Alphas are annualized (\\%) with t-statistics in parentheses (Newey-West SE, 12 lags). ",
       file = tex_file, append = TRUE)
   cat("Significance levels: *** $p<0.01$, ** $p<0.05$, * $p<0.10$. Total $R^2$ is the out-of-sample $R^2$ vs zero benchmark (test periods only).\n",
       file = tex_file, append = TRUE)
@@ -478,10 +487,15 @@ factor_files <- list(
 
 plot_data_list <- list()
 
-# Add market benchmark
-market <- dt[, .(factor_return = mean(ret_next, na.rm = TRUE)), by = date]
-market[, Scenario := "Market (EW)"]
-plot_data_list[[1]] <- market
+# Add market benchmark (value-weighted from Fama-French)
+FF_PATH <- "data/raw/macro/raw_macro_factors.csv"
+if (file.exists(FF_PATH)) {
+  ff_data <- fread(FF_PATH)
+  ff_data[, date := as.IDate(date)]
+  market <- ff_data[, .(date, factor_return = rm)]
+  market[, Scenario := "Market (VW)"]
+  plot_data_list[[1]] <- market
+}
 
 # Add P-Tree factors
 for (name in names(factor_files)) {
@@ -512,7 +526,7 @@ if (length(plot_data_list) > 1) {
       "A (Full)" = "#2E86AB",
       "B (Test)" = "#F24333", 
       "C (Test)" = "#F2A900",
-      "Market (EW)" = "#A23B72"
+      "Market (VW)" = "#A23B72"
     )) +
     labs(
       x = "Date",

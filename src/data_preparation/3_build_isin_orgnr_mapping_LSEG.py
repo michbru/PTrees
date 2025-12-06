@@ -11,6 +11,7 @@ Output: data/mappings/automated/isin_orgnr_automated.csv
 import pandas as pd
 import lseg.data as ld
 from pathlib import Path
+from typing import Optional
 import json
 import time
 import re
@@ -47,7 +48,7 @@ def connect_lseg():
         return False
 
 
-def extract_orgnr(tax_id: str) -> int | None:
+def extract_orgnr(tax_id: str) -> Optional[int]:
     """Extract a 10-digit Swedish ORGNR from a TaxID string.
 
     - Uppercase and strip; drop leading 'SE' if present

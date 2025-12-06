@@ -4,7 +4,7 @@
 # Step 2: Train P-Tree Models
 ################################################################################
 #
-# Purpose: Train single P-Tree for each scenario following Cong et al. (2024)
+# Purpose: Train single P-Tree for each scenario following Cong et al. (2025)
 #
 # Model: ONE P-Tree per scenario (not boosted ensemble, just one tree)
 # - The tree grows by iteratively splitting the cross-section
@@ -66,7 +66,7 @@ cat(sprintf("Dataset loaded: %s obs, %s firms, %s months, %d characteristics\n\n
             length(char_cols)))
 
 ################################################################################
-# Hyperparameters (Following Cong et al. 2024, adjusted for Swedish market)
+# Hyperparameters (Following Cong et al. (2025), adjusted for Swedish market)
 ################################################################################
 
 PARAMS <- list(
@@ -80,7 +80,7 @@ PARAMS <- list(
   lambda = 1e-5,            # Factor covariance shrinkage (paper: 1e-5)
   
   # Weighting
-  equal_weight = TRUE,      # Equal-weighted leaf portfolios (paper default)
+  equal_weight = FALSE,     # Value-weighted leaf portfolios (paper default)
   abs_normalize = TRUE      # Normalize by absolute values (paper default)
 )
 
@@ -397,9 +397,7 @@ cat("Results saved to:", normalizePath(OUTPUT_DIR), "\n\n")
 
 cat("Files per scenario:\n")
 cat("  - scenario_X_1_factor.csv       : Factor returns (train)\n")
-cat("  - scenario_X_ensemble.csv       : Same as above (compatibility)\n")
 cat("  - scenario_X_test_1_factor.csv  : Factor returns (test, B & C only)\n")
-cat("  - scenario_X_test_ensemble.csv  : Same as above (compatibility)\n")
 cat("  - scenario_X_trees.txt          : Tree structure\n")
 cat("  - scenario_X_summary.csv        : Performance metrics\n")
 cat("  - scenario_X_model.rds          : Trained model object\n\n")

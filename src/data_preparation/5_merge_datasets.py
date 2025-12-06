@@ -167,8 +167,8 @@ def main():
     )
     
     # Concatenate back with unmapped?
-    # USER REQUEST: "only keep these 552 companies"
-    # So we DISCARD the unmapped companies and any rows that didn't find a match.
+    # We DISCARD unmapped companies (no accounting data available) and
+    # any rows that didn't find a matching fiscal year.
     
     print("  Filtering to only rows with valid accounting data...")
     df_final = merged_mapped.dropna(subset=['sales'])

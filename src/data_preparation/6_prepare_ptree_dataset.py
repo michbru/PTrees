@@ -73,8 +73,7 @@ def apply_publication_lag(df, pub_lag_months: int = 6):
 
     # Market cap 1-month lag for ratios/weights
     if 'market_cap' in df.columns:
-        # FIX: Use current market cap (at time t) for scaling, as we are predicting t+1
-        # Previous version used shift(1) which caused a 2-month lag
+        # Use current market cap (at time t) for scaling, as we are predicting t+1 returns
         df['market_cap_scaling'] = df['market_cap']
 
     # Publication-lagged accounting variables
@@ -152,8 +151,7 @@ def calculate_momentum_chars(df):
         df[f'close_lag{lag}'] = df.groupby('isin')['close'].shift(lag)
 
     # MOM1M: Previous month return (Short Term Reversal)
-    # FIX: Use current month t return (Jan) to predict t+1 (Feb)
-    # Previous version used shift(1) (Dec) which caused a 2-month lag
+    # Use current month t return to predict t+1
     df['MOM1M'] = df['ret_monthly']
 
     # MOM6M: t-6 to t-1 (skip t, or just past 6 months skipping most recent?)

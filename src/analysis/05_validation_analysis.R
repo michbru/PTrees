@@ -413,9 +413,9 @@ comparison_data <- data.frame(
   Metric = rep(c("Observations\n(Thousands)", "Characteristics"), 2),
   Value = c(
     n_obs/1000, n_chars,  # Swedish
-    2200, 61              # US (Cong et al. 2024)
+    2200, 61              # US (Cong et al. 2025)
   ),
-  Market = rep(c("Swedish", "US (Cong et al. 2024)"), each = 2)
+  Market = rep(c("Swedish", "US (Cong et al. 2025)"), each = 2)
 )
 
 comparison_data$Metric <- factor(

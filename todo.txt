@@ -1,7 +1,0 @@
-✓ get coverage of all firms, how is the representation, for how many time periods are the 
-firms present in the data frame (COMPLETED - see results/validation/coverage_analysis/)
-- Calculate R squared for each characteristics, how much return can each characteristic explain
-- Compare final dataset to "original" dataset
-- Try to tweak variables, and see if ptrees split
-- Proportion of 0s in each of the characteristics
-- split stopping criteria

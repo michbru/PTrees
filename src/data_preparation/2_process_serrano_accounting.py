@@ -6,8 +6,6 @@ This script:
 2. Loads and merges all 10 bokslut files (balance sheets)
 3. Keeps only relevant variables for our characteristics
 4. Saves to data/intermediate/serrano/serrano_accounting.csv
-
-Date: 2025-11-28
 """
 
 import pandas as pd
@@ -25,7 +23,7 @@ OUTPUT_DIR = Path('data/intermediate/serrano')
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Key variables we need from the Serrano data
-# Based on VARIABLE_REGISTRY.py characteristics
+# Maps raw Serrano column names to standardized English names
 
 NYCKELTAL_VARS = {
     # Identifiers and dates (always keep)

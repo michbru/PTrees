@@ -71,17 +71,17 @@ def main():
     df['year'] = df['date'].dt.year
     df['month'] = df['date'].dt.month
     
-    # 2. Coerce numeric columns to ensure math works correctly
+    # 3. Coerce numeric columns to ensure math works correctly
     numeric_cols = [
         'close', 'high', 'low', 'bid', 'ask',
         'turnover_sek', 'volume', 'book_value',
-        'market_cap', 'total_market_cap'
+        'market_cap'
     ]
     for col in numeric_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
 
-    # 3. Deterministic de-duplication per ISIN/Date
+    # 4. Deterministic de-duplication per ISIN/Date
     # Prefer rows with higher turnover/volume and primary exchanges
     # Map observed exchange codes/variants to a small preference rank (lower is better)
     exchange_pref = {
@@ -155,7 +155,7 @@ def main():
     if before_dups != after_dups:
         print(f"  De-duplicated {before_dups - after_dups:,} rows on (isin, date) with liquidity/venue preference")
 
-    # 4. Aggregate to monthly (month-end)
+    # 5. Aggregate to monthly (month-end)
     # Take last trading day of each month for all variables
     print(f"  Aggregating to monthly (month-end)...")
     df['year_month'] = df['date'].dt.to_period('M')
@@ -168,7 +168,7 @@ def main():
     
     print(f"  Monthly observations: {len(df_monthly):,}")
     
-    # 5. Calculate monthly returns
+    # 6. Calculate monthly returns
     df_monthly = df_monthly.sort_values(['isin', 'date'])
     df_monthly['ret_monthly'] = df_monthly.groupby('isin')['close'].pct_change(fill_method=None)
     
