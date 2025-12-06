@@ -1,0 +1,26 @@
+\begin{table}[htbp]
+\centering
+\caption{P-Tree model performance when the number of boosting iterations is set to 10 (\texttt{num\_iter = 10}). The in-sample results are better but the out-of-sample results are worse. This shows that deeper trees tend to overfit as they capture noise rather than true relationships.}
+\label{tab:performance_maxdepth}
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.0}
+\small
+\begin{tabular}{lccccccc}
+\hline
+Scenario & Ret (\%) & Vol (\%) & Sharpe & $\beta$ & CAPM $\alpha$ (\%, t) & FF3 $\alpha$ (\%, t) & $R^2$ (\%) \\
+\hline
+Market (VW) & 10.9 & 19.0 & 0.64 & 1.00 & -- & -- & -- \\
+A & 10.4 & 5.5 & 0.54 & 0.02 & 9.73*** (6.84) & 9.73*** (7.02) & -- \\
+B (Train) & 12.1 & 6.4 & 0.55 & -0.01 & 11.09*** (4.82) & 10.65*** (4.90) & -- \\
+B (Test) & 0.9 & 4.7 & 0.06 & -0.02 & 0.79 (0.79) & 0.86 (0.85) & 0.5 \\
+C (Train) & 11.1 & 2.9 & 1.12 & 0.04 & 10.61*** (19.36) & 10.63*** (18.40) & -- \\
+C (Test) & 2.8 & 6.5 & 0.12 & -0.03 & 3.80 (1.61) & 3.47 (1.37) & 1.4 \\
+\hline
+\end{tabular}
+
+\vspace{0.15cm}
+\begin{minipage}{0.9\textwidth}
+\footnotesize
+\textit{Notes:} Ret and Vol are annualized. Alphas are annualized (\%) with Newey--West t-stats (12 lags). Significance: *** $p<0.01$, ** $p<0.05$, * $p<0.10$. $R^2$ is out-of-sample.
+\end{minipage}
+\end{table}
