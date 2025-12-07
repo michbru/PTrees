@@ -637,6 +637,70 @@ ggsave(file.path(OUTPUT_DIR, "figure_correlation_heatmap.png"), p_corr,
        width = 10, height = 10, dpi = 300)
 
 cat("  ✓ figure_correlation_heatmap.png\n\n")
+
+################################################################################
+# OUTPUT 9: High Correlation Pairs Table
+################################################################################
+
+cat("Creating Output 9: High Correlation Pairs Table...\n")
+
+# Use all characteristics (not just top 20)
+dt_all_chars <- dt[, ..char_cols]
+clean_names_all <- sapply(names(dt_all_chars), function(x) toupper(gsub("^rank_", "", x)))
+setnames(dt_all_chars, names(dt_all_chars), clean_names_all)
+
+# Calculate correlation matrix for all characteristics
+cor_mat_all <- cor(dt_all_chars, use = "pairwise.complete.obs")
+
+# Extract upper triangle (to avoid duplicates)
+cor_mat_all[lower.tri(cor_mat_all, diag = TRUE)] <- NA
+
+# Find pairs with |correlation| > 0.7
+high_corr_pairs <- data.table()
+for (i in 1:(nrow(cor_mat_all)-1)) {
+  for (j in (i+1):ncol(cor_mat_all)) {
+    corr_val <- cor_mat_all[i, j]
+    if (!is.na(corr_val) && abs(corr_val) > 0.7) {
+      high_corr_pairs <- rbind(high_corr_pairs, data.table(
+        Char1 = rownames(cor_mat_all)[i],
+        Char2 = colnames(cor_mat_all)[j],
+        Correlation = corr_val
+      ))
+    }
+  }
+}
+
+# Sort by absolute correlation (descending)
+high_corr_pairs <- high_corr_pairs[order(-abs(Correlation))]
+
+# Create LaTeX table
+sink(file.path(OUTPUT_DIR, "table_high_correlations.tex"))
+cat("\\begin{table}[H]\n")
+cat("\\centering\n")
+cat(sprintf("\\caption{Highly correlated characteristic pairs with $|\\rho|>0.7$. Many variables are derived from common underlying measures, which naturally induces correlation. %d out of the %d characteristics have a correlation coefficient above 0.7.}\n",
+    length(unique(c(high_corr_pairs$Char1, high_corr_pairs$Char2))),
+    length(char_cols)))
+cat("\\label{tab:high_correlations}\n")
+cat("\\begin{tabular}{llc}\n")
+cat("\\toprule\n")
+cat("Characteristic 1 & Characteristic 2 & $\\rho$ \\\\\n")
+cat("\\midrule\n")
+
+for (i in 1:nrow(high_corr_pairs)) {
+  cat(sprintf("%s & %s & %.3f \\\\\n",
+              high_corr_pairs$Char1[i],
+              high_corr_pairs$Char2[i],
+              high_corr_pairs$Correlation[i]))
+}
+
+cat("\\bottomrule\n")
+cat("\\end{tabular}\n")
+cat("\\end{table}\n")
+sink()
+
+cat("  ✓ table_high_correlations.tex\n")
+cat(sprintf("  Found %d pairs with |ρ| > 0.7\n\n", nrow(high_corr_pairs)))
+
 ################################################################################
 
 

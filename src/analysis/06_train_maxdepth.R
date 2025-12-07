@@ -406,4 +406,72 @@ latex_orig <- c(latex_orig,
 writeLines(latex_orig, "results/thesis_visualisations/table_original_paper_results.tex")
 cat("\n✓ Saved to: results/thesis_visualisations/table_original_paper_results.tex\n")
 
+################################################################################
+# Generate table with original paper results - Panel C2
+################################################################################
+
+cat("\n================================================================================\n")
+cat("Generating table with original paper results (Table 7, Panel C2)...\n")
+cat("================================================================================\n\n")
+
+# Original paper results from Table 7, Panel C2 (Out-of-sample: 1981-2000)
+# This is the reverse time split - train on 2001-2020, test on 1981-2000
+
+original_paper_c2 <- data.table(
+  Model = c("P-Tree1", "P-Tree1-5", "P-Tree1-10", "P-Tree1-15", "P-Tree1-20"),
+  SR = c(4.35, 3.87, 4.29, 4.03, 3.88),
+  alpha_CAPM = c(1.50, 1.18, 1.02, 0.96, 0.96),
+  alpha_FF5 = c(1.42, 1.05, 0.93, 0.86, 0.87),
+  alpha_Q5 = c(1.35, 0.96, 0.85, 0.80, 0.81),
+  alpha_RP5 = c(1.60, 1.23, 1.14, 1.07, 1.08),
+  alpha_IP5 = c(1.58, 1.24, 1.10, 1.02, 1.03)
+)
+
+cat("Creating table with original paper's Panel C2 results...\n")
+cat("Source: Cong et al. (2025), Table 7, Panel C2\n")
+cat("Data: U.S. equities, Train (2001-2020), Test OOS (1981-2000)\n\n")
+
+latex_c2 <- c(
+  "\\begin{table}[htbp]",
+  "\\centering",
+  "\\caption{Original Paper Results: P-Tree Performance, Panel C2 (Cong et al., 2025)}",
+  "\\label{tab:original_paper_c2}",
+  "\\setlength{\\tabcolsep}{5pt}",
+  "\\renewcommand{\\arraystretch}{1.1}",
+  "\\small",
+  "\\begin{tabular}{lcccccc}",
+  "\\hline",
+  "Model & Sharpe Ratio & $\\alpha_{CAPM}$ & $\\alpha_{FF5}$ & $\\alpha_{Q5}$ & $\\alpha_{RP5}$ & $\\alpha_{IP5}$ \\\\",
+  "\\hline"
+)
+
+for (i in 1:nrow(original_paper_c2)) {
+  row <- original_paper_c2[i]
+  latex_c2 <- c(latex_c2, sprintf(
+    "%s & %.2f & %.2f*** & %.2f*** & %.2f*** & %.2f*** & %.2f*** \\\\",
+    row$Model, row$SR, row$alpha_CAPM, row$alpha_FF5, row$alpha_Q5, row$alpha_RP5, row$alpha_IP5
+  ))
+}
+
+latex_c2 <- c(latex_c2,
+  "\\hline",
+  "\\end{tabular}",
+  "",
+  "\\vspace{0.2cm}",
+  "\\begin{minipage}{0.95\\textwidth}",
+  "\\footnotesize",
+  "\\textit{Source:} Cong et al. (2025), Table 7, Panel C2. Results are for out-of-sample period 1981--2000",
+  "using U.S. equity data with 61 firm characteristics. Models are trained on 2001--2020 and tested on 1981--2000",
+  "(reverse time split). Sharpe ratios are annualized. Alphas are monthly returns (\\%) with respect to various",
+  "factor models: CAPM, Fama-French 5-factor (FF5), Q5, RP-PCA 5-factor (RP5), and IPCA 5-factor (IP5).",
+  "All alphas are statistically significant at the 1\\% level (*** $p<0.01$). P-Tree1 uses a single tree",
+  "with 10 leaf portfolios. P-Tree1-5 through P-Tree1-20 use boosted models with 5, 10, 15, and 20 trees",
+  "respectively (50, 100, 150, 200 total leaf portfolios).",
+  "\\end{minipage}",
+  "\\end{table}"
+)
+
+writeLines(latex_c2, "results/thesis_visualisations/table_original_paper_c2.tex")
+cat("\n✓ Saved to: results/thesis_visualisations/table_original_paper_c2.tex\n")
+
 cat("\nDone!\n")

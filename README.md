@@ -57,7 +57,6 @@ PTrees/
 │   ├── validation/                   # Data validation outputs
 │   └── thesis_visualisations/        # Tables and figures for thesis
 ├── notebooks/                        # Exploratory Jupyter notebooks
-├── docs/                             # Documentation and references
 └── archive/                          # Original PTree package source
 ```
 
@@ -158,6 +157,28 @@ Rscript src/analysis/06_optimal_tree_depth.R  # Optional: model selection analys
 - `results/models/` - Trained P-Tree models and factor returns
 - `results/evaluation/performance_metrics.csv` - Alpha and Sharpe ratio estimates
 - `results/thesis_visualisations/` - LaTeX tables and figures
+- `results/validation/` - Data validation tables and figures
+
+---
+
+## Key Output Tables for Thesis
+
+### Performance Tables
+- **`table_performance.tex`** - Main results: P-Tree performance across all scenarios
+- **`table_performance_2splits.tex`** - Sensitivity analysis with 2 splits
+- **`table_performance_maxdepth.tex`** - Sensitivity analysis with maximum depth (10 splits)
+- **`table_original_paper_results.tex`** - Original paper results (Panel B2: OOS 2001-2020)
+- **`table_original_paper_c2.tex`** - Original paper results (Panel C2: OOS 1981-2000)
+
+### Data Validation Tables
+- **`table_data_summary.tex`** - Dataset overview statistics
+- **`table_univariate_r2.tex`** - Top predictive characteristics
+- **`table_sample_attrition.tex`** - Sample construction pipeline
+- **`table_variable_stats.tex`** - Variable coverage and distributions
+- **`table_high_correlations.tex`** - Highly correlated characteristic pairs (|ρ| > 0.7)
+
+### Model Structure
+- **`table_leaf_weights.tex`** - Portfolio weights and tree structure
 
 ---
 
@@ -180,6 +201,12 @@ We empirically determined the optimal tree depth using cross-validation and docu
 ```bash
 Rscript src/analysis/06_optimal_tree_depth.R
 ```
+
+**Outputs:**
+- `results/thesis_visualisations/table_performance_maxdepth.tex`
+- `results/thesis_visualisations/table_performance_2splits.tex`
+- `results/thesis_visualisations/table_original_paper_results.tex` - Panel B2 from Cong et al. (2025)
+- `results/thesis_visualisations/table_original_paper_c2.tex` - Panel C2 from Cong et al. (2025)
 
 **Key Findings:**
 - **Optimal depth:** `num_iter = 1` (single split) maximizes test Sharpe (0.534)
@@ -272,19 +299,45 @@ Characteristics are lagged appropriately:
 
 ## Key Results
 
-Performance summary from `results/evaluation/performance_metrics.csv`:
+Performance summary comparing our Swedish replication with the original US study:
 
-| Scenario | Sharpe Ratio | CAPM Alpha (Monthly) | FF3 Alpha (Monthly) | t-stat |
-|----------|--------------|----------------------|---------------------|--------|
-| A (Full) | 0.92 | 0.81% | 0.80% | 4.43*** |
-| B (Train) | 0.90 | 0.85% | 0.84% | 3.43*** |
-| B (Test) | 0.53 | 0.26% | 0.27% | 2.02** |
-| C (Train) | 1.43 | 0.80% | 0.80% | 5.35*** |
-| C (Test) | 0.48 | 0.31% | 0.28% | 1.21 |
+### Our Results (Swedish Market, 1998-2019)
 
-*Note: *** p<0.01, ** p<0.05. T-statistics use Newey-West standard errors (12 lags).*
+| Scenario | Sharpe Ratio | CAPM Alpha (%) | FF3 Alpha (%) | t-stat |
+|----------|--------------|----------------|---------------|--------|
+| A (Full Sample) | 0.92 | 9.68 | 9.61 | 4.43*** |
+| B (Test OOS) | 0.53 | 3.08 | 3.21 | 2.02** |
+| C (Test OOS) | 0.48 | 3.71 | 3.39 | 1.33 |
 
-**Key Finding:** The P-Tree model generates statistically significant alphas in-sample (Scenarios A, B-Train, C-Train), but out-of-sample performance (B-Test, C-Test) is more modest, consistent with the limited cross-section of Swedish stocks compared to the US market studied in Cong et al. (2025).
+*Note: Alphas are annualized (%). *** p<0.01, ** p<0.05.*
+
+### Original Paper (US Market, 1981-2020)
+
+**Panel B2 (OOS 2001-2020):**
+
+| Model | Sharpe Ratio | Monthly α (CAPM) | Monthly α (FF5) |
+|-------|--------------|------------------|-----------------|
+| P-Tree1 | 3.23 | 1.35%*** | 1.31%*** |
+| P-Tree1-5 | 3.41 | 1.02%*** | 1.00%*** |
+| P-Tree1-20 | 3.13 | 0.85%*** | 0.84%*** |
+
+**Panel C2 (OOS 1981-2000):**
+
+| Model | Sharpe Ratio | Monthly α (CAPM) | Monthly α (FF5) |
+|-------|--------------|------------------|-----------------|
+| P-Tree1 | 4.35 | 1.50%*** | 1.42%*** |
+| P-Tree1-5 | 3.87 | 1.18%*** | 1.05%*** |
+| P-Tree1-20 | 3.88 | 0.96%*** | 0.87%*** |
+
+### Comparison Interpretation
+
+Our Swedish results show lower Sharpe ratios (0.48-0.92) compared to the original US study (3.13-4.35). This difference reflects:
+1. **Market size:** ~150 Swedish firms/month vs. thousands of US firms
+2. **Characteristic availability:** Missing key predictors (SUE, analyst revisions)
+3. **Sample period:** Shorter time span (22 years vs. 40 years)
+4. **Model complexity:** Single P-Tree vs. boosted multi-tree models (1-20 trees)
+
+Despite these constraints, our results demonstrate economically meaningful outperformance with statistical significance in several specifications, validating the portability of P-Trees to smaller markets.
 
 ---
 

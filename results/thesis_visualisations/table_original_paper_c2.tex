@@ -1,0 +1,31 @@
+\begin{table}[htbp]
+\centering
+\caption{Original Paper Results: P-Tree Performance, Panel C2 (Cong et al., 2025)}
+\label{tab:original_paper_c2}
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.1}
+\small
+\begin{tabular}{lcccccc}
+\hline
+Model & Sharpe Ratio & $\alpha_{CAPM}$ & $\alpha_{FF5}$ & $\alpha_{Q5}$ & $\alpha_{RP5}$ & $\alpha_{IP5}$ \\
+\hline
+P-Tree1 & 4.35 & 1.50*** & 1.42*** & 1.35*** & 1.60*** & 1.58*** \\
+P-Tree1-5 & 3.87 & 1.18*** & 1.05*** & 0.96*** & 1.23*** & 1.24*** \\
+P-Tree1-10 & 4.29 & 1.02*** & 0.93*** & 0.85*** & 1.14*** & 1.10*** \\
+P-Tree1-15 & 4.03 & 0.96*** & 0.86*** & 0.80*** & 1.07*** & 1.02*** \\
+P-Tree1-20 & 3.88 & 0.96*** & 0.87*** & 0.81*** & 1.08*** & 1.03*** \\
+\hline
+\end{tabular}
+
+\vspace{0.2cm}
+\begin{minipage}{0.95\textwidth}
+\footnotesize
+\textit{Source:} Cong et al. (2025), Table 7, Panel C2. Results are for out-of-sample period 1981--2000
+using U.S. equity data with 61 firm characteristics. Models are trained on 2001--2020 and tested on 1981--2000
+(reverse time split). Sharpe ratios are annualized. Alphas are monthly returns (\%) with respect to various
+factor models: CAPM, Fama-French 5-factor (FF5), Q5, RP-PCA 5-factor (RP5), and IPCA 5-factor (IP5).
+All alphas are statistically significant at the 1\% level (*** $p<0.01$). P-Tree1 uses a single tree
+with 10 leaf portfolios. P-Tree1-5 through P-Tree1-20 use boosted models with 5, 10, 15, and 20 trees
+respectively (50, 100, 150, 200 total leaf portfolios).
+\end{minipage}
+\end{table}
